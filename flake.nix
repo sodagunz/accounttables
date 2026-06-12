@@ -28,6 +28,7 @@
             nodejs_22
             pnpm
             nil
+            zed-editor
           ];
 
           shellHook = ''

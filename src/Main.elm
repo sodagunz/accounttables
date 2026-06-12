@@ -1,6 +1,6 @@
 module Main exposing (main)
 
-import Accounting exposing (Currency(..), Expense, FilterWindow(..), Form)
+import Accounting exposing (Currency(..), Expense, FilterWindow(..), Form, SortDirection(..), SortField(..))
 import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
 import Browser
 import Html exposing (Html, div, h1, header, main_, p, text)
@@ -23,6 +23,8 @@ type alias Model =
     , customStart : String
     , customEnd : String
     , dateDisplay : DateDisplay
+    , sortField : SortField
+    , sortDirection : SortDirection
     , exchangeRate : Float
     , exchangeRateStatus : ExchangeRateStatus
     , zone : Time.Zone
@@ -40,6 +42,7 @@ type Msg
     | UpdateCustomStart String
     | UpdateCustomEnd String
     | SelectDateDisplay DateDisplay
+    | SelectSort SortField
     | GotExchangeRate (Result Http.Error OfficialDollar)
     | AddExpense
 
@@ -65,6 +68,8 @@ init =
       , customStart = ""
       , customEnd = ""
       , dateDisplay = NumericDate
+      , sortField = SortByDate
+      , sortDirection = Descending
       , exchangeRate = Accounting.fallbackExchangeRate
       , exchangeRateStatus = LoadingRate
       , zone = Time.utc
@@ -121,13 +126,15 @@ update msg model =
         SelectDateDisplay dateDisplay ->
             ( { model | dateDisplay = dateDisplay }, Cmd.none )
 
+        SelectSort sortField ->
+            ( selectSort sortField model, Cmd.none )
+
         GotExchangeRate result ->
             case result of
                 Ok officialDollar ->
                     ( { model
                         | exchangeRate = officialDollar.sale
                         , exchangeRateStatus = LoadedRate officialDollar.updatedAt
-                        , expenses = Accounting.recalculateExpenses officialDollar.sale model.expenses
                       }
                     , Cmd.none
                     )
@@ -162,6 +169,7 @@ view model =
     let
         visibleExpenses =
             Accounting.filteredExpenses model
+                |> Accounting.sortExpenses model.sortField model.sortDirection
     in
     div [ class "app" ]
         [ header [ class "topbar" ]
@@ -192,12 +200,50 @@ view model =
                         , dateDisplay = model.dateDisplay
                         , customStart = model.customStart
                         , customEnd = model.customEnd
+                        , sortField = model.sortField
+                        , sortDirection = model.sortDirection
                         , onSelectFilter = SelectFilter
                         , onCustomStart = UpdateCustomStart
                         , onCustomEnd = UpdateCustomEnd
                         , onSelectDateDisplay = SelectDateDisplay
+                        , onSelectSort = SelectSort
                         }
                     ]
                 ]
             ]
         ]
+
+
+selectSort : SortField -> Model -> Model
+selectSort sortField model =
+    if model.sortField == sortField then
+        { model | sortDirection = toggleSortDirection model.sortDirection }
+
+    else
+        { model | sortField = sortField, sortDirection = defaultSortDirection sortField }
+
+
+toggleSortDirection : SortDirection -> SortDirection
+toggleSortDirection sortDirection =
+    case sortDirection of
+        Ascending ->
+            Descending
+
+        Descending ->
+            Ascending
+
+
+defaultSortDirection : SortField -> SortDirection
+defaultSortDirection sortField =
+    case sortField of
+        SortByDate ->
+            Descending
+
+        SortByPerson ->
+            Ascending
+
+        SortByDescription ->
+            Ascending
+
+        SortByAmount ->
+            Descending

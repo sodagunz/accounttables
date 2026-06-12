@@ -1,6 +1,6 @@
 module View.ExpenseTable exposing (Config, view)
 
-import Accounting exposing (Currency(..), Expense, FilterWindow(..), MoneyTotal, Person(..), expensesFor, personToString, summarizeMoney)
+import Accounting exposing (Currency(..), Expense, FilterWindow(..), MoneyTotal, Person(..), SortDirection(..), SortField(..), expensesFor, personToString, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
@@ -14,10 +14,13 @@ type alias Config msg =
     , dateDisplay : DateDisplay
     , customStart : String
     , customEnd : String
+    , sortField : SortField
+    , sortDirection : SortDirection
     , onSelectFilter : FilterWindow -> msg
     , onCustomStart : String -> msg
     , onCustomEnd : String -> msg
     , onSelectDateDisplay : DateDisplay -> msg
+    , onSelectSort : SortField -> msg
     }
 
 
@@ -34,16 +37,17 @@ view config =
                 [ table []
                     [ thead []
                         [ tr []
-                            [ th [] [ text "Fecha" ]
-                            , th [] [ text "Nombre" ]
-                            , th [] [ text "Descripción" ]
-                            , th [ class "numeric" ] [ text "Ingresado" ]
+                            [ sortableHeader config SortByDate "" "Fecha"
+                            , sortableHeader config SortByPerson "" "Nombre"
+                            , sortableHeader config SortByDescription "" "Descripción"
+                            , sortableHeader config SortByAmount "numeric" "Ingresado"
+                            , th [ class "numeric" ] [ text "Cotización" ]
                             , th [ class "numeric" ] [ text "Pesos" ]
                             , th [ class "equivalence" ] [ text "=" ]
                             , th [ class "numeric" ] [ text "Dólar" ]
                             ]
                         ]
-                    , tbody [] (List.map (expenseRow config.dateDisplay) (List.reverse config.expenses) ++ subtotalRows config.expenses)
+                    , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.expenses)
                     ]
                 ]
         ]
@@ -123,9 +127,44 @@ expenseRow dateDisplay expense =
         , td [] [ text (personToString expense.person) ]
         , td [] [ text expense.description ]
         , td [ class "numeric" ] [ text (formatMoney expense.inputCurrency expense.inputAmount) ]
+        , td [ class "numeric" ] [ text (formatMoney ARS expense.exchangeRate) ]
         , td [ class "numeric" ] [ text (formatMoney ARS expense.ars) ]
         , td [ class "equivalence" ] [ text "=" ]
         , td [ class "numeric" ] [ text (formatMoney USD expense.usd) ]
+        ]
+
+
+sortableHeader : Config msg -> SortField -> String -> String -> Html msg
+sortableHeader config sortField alignment labelText =
+    let
+        active =
+            config.sortField == sortField
+
+        sortIndicator =
+            if active then
+                case config.sortDirection of
+                    Ascending ->
+                        " ▲"
+
+                    Descending ->
+                        " ▼"
+
+            else
+                ""
+    in
+    th [ class alignment ]
+        [ button
+            [ type_ "button"
+            , class
+                (if active then
+                    "sort-button sort-button--active"
+
+                 else
+                    "sort-button"
+                )
+            , onClick (config.onSelectSort sortField)
+            ]
+            [ text (labelText ++ sortIndicator) ]
         ]
 
 
@@ -150,7 +189,7 @@ subtotalRows expenses =
 totalRow : String -> String -> MoneyTotal -> Html msg
 totalRow labelText rowClass total =
     tr [ class rowClass ]
-        [ td [ attribute "colspan" "4" ] [ text labelText ]
+        [ td [ attribute "colspan" "5" ] [ text labelText ]
         , td [ class "numeric" ] [ text (formatMoney ARS total.ars) ]
         , td [ class "equivalence" ] [ text "=" ]
         , td [ class "numeric" ] [ text (formatMoney USD total.usd) ]

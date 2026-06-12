@@ -5,6 +5,8 @@ module Accounting exposing
     , Form
     , MoneyTotal
     , Person(..)
+    , SortDirection(..)
+    , SortField(..)
     , addMoney
     , buildExpense
     , convert
@@ -18,13 +20,13 @@ module Accounting exposing
     , filteredExpenses
     , personFromString
     , personToString
-    , recalculateExpenses
     , sampleExpenses
     , setAmount
     , setCurrency
     , setDate
     , setDescription
     , setPerson
+    , sortExpenses
     , summarizeMoney
     )
 
@@ -56,12 +58,25 @@ type FilterWindow
     | Custom
 
 
+type SortField
+    = SortByDate
+    | SortByPerson
+    | SortByDescription
+    | SortByAmount
+
+
+type SortDirection
+    = Ascending
+    | Descending
+
+
 type alias Expense =
     { id : Int
     , description : String
     , person : Person
     , inputAmount : Float
     , inputCurrency : Currency
+    , exchangeRate : Float
     , ars : Float
     , usd : Float
     , date : String
@@ -149,6 +164,7 @@ buildExpense exchangeRate id form =
                     , person = form.person
                     , inputAmount = amount
                     , inputCurrency = form.currency
+                    , exchangeRate = exchangeRate
                     , ars = converted.ars
                     , usd = converted.usd
                     , date = form.date
@@ -214,24 +230,11 @@ sampleExpense exchangeRate id description person amount currency date =
     , person = person
     , inputAmount = amount
     , inputCurrency = currency
+    , exchangeRate = exchangeRate
     , ars = converted.ars
     , usd = converted.usd
     , date = date
     }
-
-
-recalculateExpenses : Float -> List Expense -> List Expense
-recalculateExpenses exchangeRate expenses =
-    List.map (recalculateExpense exchangeRate) expenses
-
-
-recalculateExpense : Float -> Expense -> Expense
-recalculateExpense exchangeRate expense =
-    let
-        converted =
-            convert exchangeRate expense.inputCurrency expense.inputAmount
-    in
-    { expense | ars = converted.ars, usd = converted.usd }
 
 
 filteredExpenses :
@@ -287,6 +290,61 @@ withinCustomRange start end date =
             end == "" || date <= end
     in
     afterStart && beforeEnd
+
+
+sortExpenses : SortField -> SortDirection -> List Expense -> List Expense
+sortExpenses sortField sortDirection expenses =
+    let
+        sorted =
+            case sortField of
+                SortByDate ->
+                    List.sortWith compareByDate expenses
+
+                SortByPerson ->
+                    List.sortWith compareByPerson expenses
+
+                SortByDescription ->
+                    List.sortWith compareByDescription expenses
+
+                SortByAmount ->
+                    List.sortWith compareByAmount expenses
+    in
+    case sortDirection of
+        Ascending ->
+            sorted
+
+        Descending ->
+            List.reverse sorted
+
+
+compareByDate : Expense -> Expense -> Order
+compareByDate left right =
+    compareThen left.id right.id (compare left.date right.date)
+
+
+compareByPerson : Expense -> Expense -> Order
+compareByPerson left right =
+    compareThen left.id right.id (compare (personToString left.person) (personToString right.person))
+
+
+compareByDescription : Expense -> Expense -> Order
+compareByDescription left right =
+    compareThen left.id right.id (compare (String.toLower left.description) (String.toLower right.description))
+
+
+compareByAmount : Expense -> Expense -> Order
+compareByAmount left right =
+    compareThen left.id right.id (compare left.ars right.ars)
+
+
+compareThen : comparable -> comparable -> Order -> Order
+compareThen left right order =
+    case order of
+        EQ ->
+            compare left right
+
+        _ ->
+            order
 
 
 currencyFromString : String -> Currency

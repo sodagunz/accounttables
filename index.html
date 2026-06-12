@@ -237,7 +237,7 @@
       table {
         width: 100%;
         border-collapse: collapse;
-        min-width: 860px;
+        min-width: 980px;
       }
 
       th,
@@ -252,6 +252,25 @@
         color: #4c5b55;
         font-size: 0.82rem;
         font-weight: 700;
+      }
+
+      .sort-button {
+        border: 0;
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+        font-weight: inherit;
+        padding: 0;
+        text-align: inherit;
+        white-space: nowrap;
+      }
+
+      .sort-button:hover,
+      .sort-button--active {
+        color: #17352c;
+        text-decoration: underline;
+        text-underline-offset: 3px;
       }
 
       td.numeric,

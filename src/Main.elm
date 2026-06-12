@@ -1,11 +1,13 @@
-module Main exposing (main)
+port module Main exposing (main)
 
 import Accounting exposing (Currency(..), Expense, FilterWindow(..), Form, SortDirection(..), SortField(..))
 import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
 import Browser
+import Export
 import Html exposing (Html, div, h1, header, main_, p, text)
 import Html.Attributes exposing (class)
 import Http
+import Json.Encode as Encode
 import Task
 import Time
 import Util.Date exposing (DateDisplay(..), dateToIso)
@@ -43,8 +45,13 @@ type Msg
     | UpdateCustomEnd String
     | SelectDateDisplay DateDisplay
     | SelectSort SortField
+    | ExportCsv
+    | ExportXlsx
     | GotExchangeRate (Result Http.Error OfficialDollar)
     | AddExpense
+
+
+port exportTable : Encode.Value -> Cmd msg
 
 
 main : Program () Model Msg
@@ -129,6 +136,12 @@ update msg model =
         SelectSort sortField ->
             ( selectSort sortField model, Cmd.none )
 
+        ExportCsv ->
+            ( model, exportVisibleTable Export.Csv model )
+
+        ExportXlsx ->
+            ( model, exportVisibleTable Export.Xlsx model )
+
         GotExchangeRate result ->
             case result of
                 Ok officialDollar ->
@@ -167,9 +180,8 @@ update msg model =
 view : Model -> Html Msg
 view model =
     let
-        visibleExpenses =
-            Accounting.filteredExpenses model
-                |> Accounting.sortExpenses model.sortField model.sortDirection
+        rows =
+            visibleExpenses model
     in
     div [ class "app" ]
         [ header [ class "topbar" ]
@@ -195,7 +207,7 @@ view model =
                     }
                 , div [ class "content-stack" ]
                     [ ExpenseTable.view
-                        { expenses = visibleExpenses
+                        { expenses = rows
                         , filterWindow = model.filterWindow
                         , dateDisplay = model.dateDisplay
                         , customStart = model.customStart
@@ -207,6 +219,8 @@ view model =
                         , onCustomEnd = UpdateCustomEnd
                         , onSelectDateDisplay = SelectDateDisplay
                         , onSelectSort = SelectSort
+                        , onExportCsv = ExportCsv
+                        , onExportXlsx = ExportXlsx
                         }
                     ]
                 ]
@@ -253,3 +267,17 @@ defaultSortDirection sortField =
 
         SortByDollars ->
             Descending
+
+
+exportVisibleTable : Export.Format -> Model -> Cmd Msg
+exportVisibleTable format model =
+    model
+        |> visibleExpenses
+        |> Export.tablePayload format model.dateDisplay model.today
+        |> exportTable
+
+
+visibleExpenses : Model -> List Expense
+visibleExpenses model =
+    Accounting.filteredExpenses model
+        |> Accounting.sortExpenses model.sortField model.sortDirection

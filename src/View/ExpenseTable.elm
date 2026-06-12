@@ -21,6 +21,8 @@ type alias Config msg =
     , onCustomEnd : String -> msg
     , onSelectDateDisplay : DateDisplay -> msg
     , onSelectSort : SortField -> msg
+    , onExportCsv : msg
+    , onExportXlsx : msg
     }
 
 
@@ -28,7 +30,7 @@ view : Config msg -> Html msg
 view config =
     section [ class "panel" ]
         [ Html.h2 [ class "section-title" ] [ text "Gastos" ]
-        , filterControls config
+        , tableControls config
         , if List.isEmpty config.expenses then
             p [ class "empty" ] [ text "Todavía no hay gastos." ]
 
@@ -50,6 +52,14 @@ view config =
                     , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.expenses)
                     ]
                 ]
+        ]
+
+
+tableControls : Config msg -> Html msg
+tableControls config =
+    div [ class "table-controls" ]
+        [ filterControls config
+        , exportControls config
         ]
 
 
@@ -85,6 +95,17 @@ filterControls config =
 
           else
             text ""
+        ]
+
+
+exportControls : Config msg -> Html msg
+exportControls config =
+    div [ class "export-controls" ]
+        [ p [] [ text "Exportar" ]
+        , div [ class "filter-buttons" ]
+            [ button [ type_ "button", class "filter-button", onClick config.onExportCsv ] [ text "CSV" ]
+            , button [ type_ "button", class "filter-button", onClick config.onExportXlsx ] [ text "XLSX" ]
+            ]
         ]
 
 

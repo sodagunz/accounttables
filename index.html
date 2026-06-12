@@ -182,6 +182,13 @@
       .filters {
         display: grid;
         gap: 12px;
+      }
+
+      .table-controls {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 16px;
         margin-bottom: 14px;
       }
 
@@ -219,6 +226,18 @@
       }
 
       .date-mode p {
+        color: #5e6b66;
+        font-size: 0.9rem;
+        font-weight: 700;
+      }
+
+      .export-controls {
+        display: grid;
+        gap: 8px;
+        align-content: start;
+      }
+
+      .export-controls p {
         color: #5e6b66;
         font-size: 0.9rem;
         font-weight: 700;
@@ -338,9 +357,90 @@
   </head>
   <body>
     <div id="app"></div>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="elm.js"></script>
     <script>
-      Elm.Main.init({ node: document.getElementById("app") });
+      const app = Elm.Main.init({ node: document.getElementById("app") });
+
+      app.ports.exportTable.subscribe((payload) => {
+        if (payload.format === "xlsx" && window.XLSX) {
+          downloadXlsx(payload);
+        } else {
+          downloadCsv({
+            ...payload,
+            filename: payload.filename.replace(/\.xlsx$/i, ".csv"),
+          });
+        }
+      });
+
+      function downloadCsv(payload) {
+        const lines = [payload.headers, ...payload.rows.map((row) => row.cells)];
+        const csv = lines.map((row) => row.map(escapeCsv).join(",")).join("\r\n");
+        downloadBlob(payload.filename, "text/csv;charset=utf-8", "\uFEFF" + csv);
+      }
+
+      function downloadXlsx(payload) {
+        const rows = [payload.headers, ...payload.rows.map((row) => row.cells)];
+        const worksheet = XLSX.utils.aoa_to_sheet(rows);
+        const range = XLSX.utils.decode_range(worksheet["!ref"]);
+
+        worksheet["!cols"] = [
+          { wch: 18 },
+          { wch: 14 },
+          { wch: 28 },
+          { wch: 16 },
+          { wch: 16 },
+          { wch: 18 },
+          { wch: 4 },
+          { wch: 18 },
+        ];
+
+        worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+        worksheet["!autofilter"] = { ref: worksheet["!ref"] };
+
+        for (let column = range.s.c; column <= range.e.c; column += 1) {
+          const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c: column })];
+          if (cell) {
+            cell.s = { font: { bold: true }, fill: { fgColor: { rgb: "EEF5F2" } } };
+          }
+        }
+
+        payload.rows.forEach((row, index) => {
+          if (row.type === "subtotal" || row.type === "total") {
+            for (let column = range.s.c; column <= range.e.c; column += 1) {
+              const cell = worksheet[XLSX.utils.encode_cell({ r: index + 1, c: column })];
+              if (cell) {
+                cell.s = { font: { bold: true }, fill: { fgColor: { rgb: row.type === "total" ? "E7F2EE" : "F8FAF9" } } };
+              }
+            }
+          }
+        });
+
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, payload.sheetName || "Gastos");
+        XLSX.writeFile(workbook, payload.filename);
+      }
+
+      function escapeCsv(value) {
+        const text = String(value ?? "");
+        if (/[",\r\n]/.test(text)) {
+          return `"${text.replace(/"/g, '""')}"`;
+        }
+
+        return text;
+      }
+
+      function downloadBlob(filename, mimeType, content) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
     </script>
   </body>
 </html>

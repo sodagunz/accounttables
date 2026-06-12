@@ -10,8 +10,8 @@ module Util.Date exposing
     , weekStartIso
     )
 
-import String
-import Time
+import Date as Calendar exposing (Interval(..), Unit(..))
+import Time exposing (Month(..), Weekday(..))
 
 
 type DateDisplay
@@ -28,77 +28,55 @@ type alias CivilDate =
 
 weekStartIso : String -> String
 weekStartIso iso =
-    case dateFromIso iso of
-        Nothing ->
-            iso
-
-        Just date ->
-            let
-                days =
-                    daysFromCivil date.year date.month date.day
-
-                monday =
-                    days - modBy 7 (days + 3)
-            in
-            civilToIso (civilFromDays monday)
+    iso
+        |> Calendar.fromIsoString
+        |> Result.map (Calendar.floor Monday >> Calendar.toIsoString)
+        |> Result.withDefault iso
 
 
 addDays : Int -> String -> String
 addDays offset iso =
-    case dateFromIso iso of
-        Nothing ->
-            iso
-
-        Just date ->
-            civilToIso (civilFromDays (daysFromCivil date.year date.month date.day + offset))
+    iso
+        |> Calendar.fromIsoString
+        |> Result.map (Calendar.add Days offset >> Calendar.toIsoString)
+        |> Result.withDefault iso
 
 
 dateFromIso : String -> Maybe CivilDate
 dateFromIso iso =
-    case String.split "-" iso of
-        [ yearString, monthString, dayString ] ->
-            Maybe.map3 CivilDate
-                (String.toInt yearString)
-                (String.toInt monthString)
-                (String.toInt dayString)
-
-        _ ->
-            Nothing
+    iso
+        |> Calendar.fromIsoString
+        |> Result.map toCivilDate
+        |> Result.toMaybe
 
 
 dateToIso : Time.Zone -> Time.Posix -> String
 dateToIso zone posix =
-    String.fromInt (Time.toYear zone posix)
-        ++ "-"
-        ++ pad2 (monthToNumber (Time.toMonth zone posix))
-        ++ "-"
-        ++ pad2 (Time.toDay zone posix)
+    Calendar.fromPosix zone posix
+        |> Calendar.toIsoString
 
 
-civilToIso : CivilDate -> String
-civilToIso date =
-    String.fromInt date.year ++ "-" ++ pad2 date.month ++ "-" ++ pad2 date.day
+toCivilDate : Calendar.Date -> CivilDate
+toCivilDate date =
+    { year = Calendar.year date
+    , month = Calendar.monthNumber date
+    , day = Calendar.day date
+    }
 
 
 formatDate : DateDisplay -> String -> String
 formatDate dateDisplay iso =
-    case dateFromIso iso of
-        Nothing ->
+    case Calendar.fromIsoString iso of
+        Err _ ->
             iso
 
-        Just date ->
+        Ok date ->
             case dateDisplay of
                 NumericDate ->
-                    pad2 date.day ++ "/" ++ pad2 date.month ++ "/" ++ String.fromInt date.year
+                    Calendar.formatWithLanguage spanish "dd/MM/y" date
 
                 LongDate ->
-                    weekdayName date
-                        ++ " "
-                        ++ String.fromInt date.day
-                        ++ " de "
-                        ++ monthName date.month
-                        ++ " de "
-                        ++ String.fromInt date.year
+                    Calendar.formatWithLanguage spanish "EEEE d 'de' MMMM 'de' y" date
 
 
 formatApiDate : Time.Zone -> String -> String
@@ -124,13 +102,17 @@ parseApiTimestamp timestamp =
                 |> String.dropLeft 11
                 |> String.left 8
     in
-    case ( dateFromIso datePart, String.split ":" timePart ) of
-        ( Just date, [ hourString, minuteString, secondString ] ) ->
+    case ( Calendar.fromIsoString datePart, String.split ":" timePart ) of
+        ( Ok date, [ hourString, minuteString, secondString ] ) ->
             Maybe.map3
                 (\hour minute second ->
                     let
                         millis =
-                            ((daysFromCivil date.year date.month date.day * 24 + hour) * 60 + minute)
+                            ((Calendar.toRataDie date - unixEpochRataDie) * 24 + hour)
+                                * 60
+                                * 60
+                                * 1000
+                                + minute
                                 * 60
                                 * 1000
                                 + second
@@ -146,69 +128,85 @@ parseApiTimestamp timestamp =
             Nothing
 
 
-weekdayName : CivilDate -> String
-weekdayName date =
-    case modBy 7 (daysFromCivil date.year date.month date.day + 3) of
-        0 ->
-            "Lunes"
-
-        1 ->
-            "Martes"
-
-        2 ->
-            "Miércoles"
-
-        3 ->
-            "Jueves"
-
-        4 ->
-            "Viernes"
-
-        5 ->
-            "Sábado"
-
-        _ ->
-            "Domingo"
+unixEpochRataDie : Int
+unixEpochRataDie =
+    Calendar.fromCalendarDate 1970 Jan 1
+        |> Calendar.toRataDie
 
 
-monthName : Int -> String
-monthName month =
+spanish : Calendar.Language
+spanish =
+    { monthName = spanishMonthName
+    , monthNameShort = spanishMonthName >> String.left 3
+    , weekdayName = spanishWeekdayName
+    , weekdayNameShort = spanishWeekdayName >> String.left 3
+    , dayWithSuffix = String.fromInt
+    }
+
+
+spanishMonthName : Time.Month -> String
+spanishMonthName month =
     case month of
-        1 ->
+        Jan ->
             "enero"
 
-        2 ->
+        Feb ->
             "febrero"
 
-        3 ->
+        Mar ->
             "marzo"
 
-        4 ->
+        Apr ->
             "abril"
 
-        5 ->
+        May ->
             "mayo"
 
-        6 ->
+        Jun ->
             "junio"
 
-        7 ->
+        Jul ->
             "julio"
 
-        8 ->
+        Aug ->
             "agosto"
 
-        9 ->
+        Sep ->
             "septiembre"
 
-        10 ->
+        Oct ->
             "octubre"
 
-        11 ->
+        Nov ->
             "noviembre"
 
-        _ ->
+        Dec ->
             "diciembre"
+
+
+spanishWeekdayName : Time.Weekday -> String
+spanishWeekdayName weekday =
+    case weekday of
+        Mon ->
+            "Lunes"
+
+        Tue ->
+            "Martes"
+
+        Wed ->
+            "Miércoles"
+
+        Thu ->
+            "Jueves"
+
+        Fri ->
+            "Viernes"
+
+        Sat ->
+            "Sábado"
+
+        Sun ->
+            "Domingo"
 
 
 pad2 : Int -> String
@@ -218,119 +216,3 @@ pad2 number =
 
     else
         String.fromInt number
-
-
-monthToNumber : Time.Month -> Int
-monthToNumber month =
-    case month of
-        Time.Jan ->
-            1
-
-        Time.Feb ->
-            2
-
-        Time.Mar ->
-            3
-
-        Time.Apr ->
-            4
-
-        Time.May ->
-            5
-
-        Time.Jun ->
-            6
-
-        Time.Jul ->
-            7
-
-        Time.Aug ->
-            8
-
-        Time.Sep ->
-            9
-
-        Time.Oct ->
-            10
-
-        Time.Nov ->
-            11
-
-        Time.Dec ->
-            12
-
-
-daysFromCivil : Int -> Int -> Int -> Int
-daysFromCivil year month day =
-    let
-        adjustedYear =
-            if month <= 2 then
-                year - 1
-
-            else
-                year
-
-        era =
-            floor (toFloat adjustedYear / 400)
-
-        yearOfEra =
-            adjustedYear - era * 400
-
-        monthPrime =
-            if month > 2 then
-                month - 3
-
-            else
-                month + 9
-
-        dayOfYear =
-            (153 * monthPrime + 2) // 5 + day - 1
-
-        dayOfEra =
-            yearOfEra * 365 + yearOfEra // 4 - yearOfEra // 100 + dayOfYear
-    in
-    era * 146097 + dayOfEra - 719468
-
-
-civilFromDays : Int -> CivilDate
-civilFromDays days =
-    let
-        z =
-            days + 719468
-
-        era =
-            floor (toFloat z / 146097)
-
-        dayOfEra =
-            z - era * 146097
-
-        yearOfEra =
-            (dayOfEra - dayOfEra // 1460 + dayOfEra // 36524 - dayOfEra // 146096) // 365
-
-        year =
-            yearOfEra + era * 400
-
-        dayOfYear =
-            dayOfEra - (365 * yearOfEra + yearOfEra // 4 - yearOfEra // 100)
-
-        monthPrime =
-            (5 * dayOfYear + 2) // 153
-
-        day =
-            dayOfYear - (153 * monthPrime + 2) // 5 + 1
-
-        month =
-            if monthPrime < 10 then
-                monthPrime + 3
-
-            else
-                monthPrime - 9
-
-        finalYear =
-            if month <= 2 then
-                year + 1
-
-            else
-                year
-    in
-    { year = finalYear, month = month, day = day }

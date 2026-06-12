@@ -245,5 +245,11 @@ defaultSortDirection sortField =
         SortByDescription ->
             Ascending
 
-        SortByAmount ->
+        SortByExchangeRate ->
+            Descending
+
+        SortByPesos ->
+            Descending
+
+        SortByDollars ->
             Descending

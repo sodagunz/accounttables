@@ -62,7 +62,9 @@ type SortField
     = SortByDate
     | SortByPerson
     | SortByDescription
-    | SortByAmount
+    | SortByExchangeRate
+    | SortByPesos
+    | SortByDollars
 
 
 type SortDirection
@@ -306,8 +308,14 @@ sortExpenses sortField sortDirection expenses =
                 SortByDescription ->
                     List.sortWith compareByDescription expenses
 
-                SortByAmount ->
-                    List.sortWith compareByAmount expenses
+                SortByExchangeRate ->
+                    List.sortWith compareByExchangeRate expenses
+
+                SortByPesos ->
+                    List.sortWith compareByPesos expenses
+
+                SortByDollars ->
+                    List.sortWith compareByDollars expenses
     in
     case sortDirection of
         Ascending ->
@@ -332,9 +340,19 @@ compareByDescription left right =
     compareThen left.id right.id (compare (String.toLower left.description) (String.toLower right.description))
 
 
-compareByAmount : Expense -> Expense -> Order
-compareByAmount left right =
+compareByExchangeRate : Expense -> Expense -> Order
+compareByExchangeRate left right =
+    compareThen left.id right.id (compare left.exchangeRate right.exchangeRate)
+
+
+compareByPesos : Expense -> Expense -> Order
+compareByPesos left right =
     compareThen left.id right.id (compare left.ars right.ars)
+
+
+compareByDollars : Expense -> Expense -> Order
+compareByDollars left right =
+    compareThen left.id right.id (compare left.usd right.usd)
 
 
 compareThen : comparable -> comparable -> Order -> Order

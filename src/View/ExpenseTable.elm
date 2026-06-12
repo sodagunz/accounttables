@@ -40,11 +40,11 @@ view config =
                             [ sortableHeader config SortByDate "" "Fecha"
                             , sortableHeader config SortByPerson "" "Nombre"
                             , sortableHeader config SortByDescription "" "Descripción"
-                            , sortableHeader config SortByAmount "numeric" "Ingresado"
-                            , th [ class "numeric" ] [ text "Cotización" ]
-                            , th [ class "numeric" ] [ text "Pesos" ]
+                            , th [ class "numeric" ] [ text "Ingresado" ]
+                            , sortableHeader config SortByExchangeRate "numeric" "Cotización"
+                            , sortableHeader config SortByPesos "numeric" "Pesos"
                             , th [ class "equivalence" ] [ text "=" ]
-                            , th [ class "numeric" ] [ text "Dólar" ]
+                            , sortableHeader config SortByDollars "numeric" "Dólar"
                             ]
                         ]
                     , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.expenses)

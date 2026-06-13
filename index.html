@@ -19,6 +19,14 @@
         signInWithPopup,
         signOut,
       } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+      import {
+        collection,
+        doc,
+        getDocs,
+        getFirestore,
+        serverTimestamp,
+        setDoc,
+      } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
       import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
 
       const app = Elm.Main.init({ node: document.getElementById("app") });
@@ -113,7 +121,10 @@
 
         const firebaseApp = initializeApp(firebaseConfig);
         const auth = getAuth(firebaseApp);
+        const db = getFirestore(firebaseApp);
         const provider = new GoogleAuthProvider();
+
+        setupFirestore(app, auth, db);
 
         onAuthStateChanged(auth, (user) => {
           if (user) {
@@ -147,6 +158,73 @@
         });
       }
 
+      function setupFirestore(app, auth, db) {
+        app.ports.loadWorkspaceData.subscribe(async ({ workspaceId }) => {
+          try {
+            await ensureWorkspace(auth, db, workspaceId);
+
+            const snapshot = await getDocs(collection(db, "workspaces", workspaceId, "expenses"));
+            const expenses = snapshot.docs.map((documentSnapshot) => documentSnapshot.data());
+
+            app.ports.workspaceLoaded.send({
+              status: "loaded",
+              workspaceId,
+              expenses,
+            });
+          } catch (error) {
+            console.error("Firestore workspace load failed", error);
+            app.ports.workspaceLoaded.send({
+              status: "error",
+              workspaceId,
+              message: firestoreErrorMessage(error),
+            });
+          }
+        });
+
+        app.ports.saveExpense.subscribe(async ({ workspaceId, expense }) => {
+          try {
+            await ensureWorkspace(auth, db, workspaceId);
+            await setDoc(
+              doc(db, "workspaces", workspaceId, "expenses", String(expense.id)),
+              {
+                ...expense,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            );
+          } catch (error) {
+            console.error("Firestore expense save failed", error);
+            app.ports.workspaceLoaded.send({
+              status: "error",
+              workspaceId,
+              message: firestoreErrorMessage(error),
+            });
+          }
+        });
+      }
+
+      async function ensureWorkspace(auth, db, workspaceId) {
+        const uid = auth.currentUser?.uid;
+
+        if (!uid) {
+          throw new Error("No hay una sesión activa.");
+        }
+
+        if (workspaceId !== uid) {
+          return;
+        }
+
+        await setDoc(
+          doc(db, "workspaces", workspaceId),
+          {
+            ownerUid: uid,
+            memberUids: [uid],
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        );
+      }
+
       function serializeUser(user) {
         return {
           uid: user.uid || "",
@@ -177,6 +255,21 @@
         }
 
         return `No se pudo iniciar sesión con Google (${code}): ${message}`;
+      }
+
+      function firestoreErrorMessage(error) {
+        const code = error?.code || "firestore/unknown";
+        const message = error?.message || "Sin detalle técnico.";
+
+        if (code === "permission-denied") {
+          return "Firestore rechazó el acceso a este workspace.";
+        }
+
+        if (code === "unavailable") {
+          return "Firestore no está disponible en este momento.";
+        }
+
+        return `No se pudieron sincronizar los datos (${code}): ${message}`;
       }
     </script>
   </body>

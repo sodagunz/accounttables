@@ -16,6 +16,7 @@ import Util.Date exposing (DateDisplay(..), dateToIso)
 import View.AuthStatus as AuthStatus
 import View.ExpenseForm as ExpenseForm
 import View.ExpenseTable as ExpenseTable
+import Workspace exposing (LoadState(..))
 
 
 type alias Model =
@@ -34,6 +35,7 @@ type alias Model =
     , exchangeRateStatus : ExchangeRateStatus
     , zone : Time.Zone
     , authState : AuthState
+    , workspaceLoadState : LoadState
     }
 
 
@@ -54,6 +56,7 @@ type Msg
     | SignInWithGoogle
     | SignOut
     | AuthStateChanged Decode.Value
+    | WorkspaceLoaded Decode.Value
     | GotExchangeRate (Result Http.Error OfficialDollar)
     | AddExpense
 
@@ -68,6 +71,15 @@ port signOutUser : () -> Cmd msg
 
 
 port authStateChanged : (Decode.Value -> msg) -> Sub msg
+
+
+port loadWorkspaceData : Encode.Value -> Cmd msg
+
+
+port saveExpense : Encode.Value -> Cmd msg
+
+
+port workspaceLoaded : (Decode.Value -> msg) -> Sub msg
 
 
 main : Program () Model Msg
@@ -97,6 +109,7 @@ init =
       , exchangeRateStatus = LoadingRate
       , zone = Time.utc
       , authState = AuthLoading
+      , workspaceLoadState = NotLoaded
       }
     , Cmd.batch
         [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
@@ -166,7 +179,10 @@ update msg model =
             ( model, signOutUser () )
 
         AuthStateChanged value ->
-            ( { model | authState = Auth.decodeAuthState value }, Cmd.none )
+            handleAuthStateChanged (Auth.decodeAuthState value) model
+
+        WorkspaceLoaded value ->
+            handleWorkspaceLoaded value model
 
         GotExchangeRate result ->
             case result of
@@ -184,20 +200,7 @@ update msg model =
         AddExpense ->
             case Accounting.buildExpense model.exchangeRate model.nextId model.form of
                 Ok expense ->
-                    ( { model
-                        | expenses = expense :: model.expenses
-                        , nextId = model.nextId + 1
-                        , form =
-                            { description = ""
-                            , amount = ""
-                            , person = model.form.person
-                            , currency = ARS
-                            , date = model.form.date
-                            }
-                        , error = ""
-                      }
-                    , Cmd.none
-                    )
+                    addExpense expense model
 
                 Err error ->
                     ( { model | error = error }, Cmd.none )
@@ -219,6 +222,7 @@ view model =
                         ]
                     , AuthStatus.view
                         { authState = model.authState
+                        , workspaceLoadState = model.workspaceLoadState
                         , onSignIn = SignInWithGoogle
                         , onSignOut = SignOut
                         }
@@ -320,4 +324,99 @@ visibleExpenses model =
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
-    authStateChanged AuthStateChanged
+    Sub.batch
+        [ authStateChanged AuthStateChanged
+        , workspaceLoaded WorkspaceLoaded
+        ]
+
+
+handleAuthStateChanged : AuthState -> Model -> ( Model, Cmd Msg )
+handleAuthStateChanged authState model =
+    case authState of
+        SignedIn user ->
+            let
+                workspaceId =
+                    Workspace.workspaceIdForUser user
+            in
+            ( { model
+                | authState = authState
+                , workspaceLoadState = Loading
+                , expenses = []
+                , nextId = 1
+              }
+            , loadWorkspaceData (Workspace.encodeWorkspaceRequest workspaceId)
+            )
+
+        SignedOut ->
+            ( { model
+                | authState = authState
+                , workspaceLoadState = NotLoaded
+                , expenses = sampleExpensesForModel model
+                , nextId = 5
+              }
+            , Cmd.none
+            )
+
+        _ ->
+            ( { model | authState = authState }, Cmd.none )
+
+
+handleWorkspaceLoaded : Decode.Value -> Model -> ( Model, Cmd Msg )
+handleWorkspaceLoaded value model =
+    case Workspace.decodeExpenses value of
+        Ok expenses ->
+            ( { model
+                | expenses = expenses
+                , nextId = nextExpenseId expenses
+                , workspaceLoadState = Loaded
+              }
+            , Cmd.none
+            )
+
+        Err error ->
+            ( { model | workspaceLoadState = LoadError error }, Cmd.none )
+
+
+addExpense : Expense -> Model -> ( Model, Cmd Msg )
+addExpense expense model =
+    let
+        updatedModel =
+            { model
+                | expenses = expense :: model.expenses
+                , nextId = model.nextId + 1
+                , form =
+                    { description = ""
+                    , amount = ""
+                    , person = model.form.person
+                    , currency = ARS
+                    , date = model.form.date
+                    }
+                , error = ""
+            }
+    in
+    case model.authState of
+        SignedIn user ->
+            ( updatedModel
+            , saveExpense (Workspace.encodeExpense (Workspace.workspaceIdForUser user) expense)
+            )
+
+        _ ->
+            ( updatedModel, Cmd.none )
+
+
+nextExpenseId : List Expense -> Int
+nextExpenseId expenses =
+    expenses
+        |> List.map .id
+        |> List.maximum
+        |> Maybe.map ((+) 1)
+        |> Maybe.withDefault 1
+
+
+sampleExpensesForModel : Model -> List Expense
+sampleExpensesForModel model =
+    if model.today == "" then
+        []
+
+    else
+        Accounting.sampleExpenses model.exchangeRate model.today

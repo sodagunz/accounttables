@@ -1,6 +1,6 @@
 module Export exposing (Format(..), tablePayload)
 
-import Accounting exposing (Currency(..), Expense, MoneyTotal, Person(..), expensesFor, personToString, summarizeMoney)
+import Accounting exposing (Currency(..), Expense, MoneyTotal, WorkspaceUser, expensesFor, summarizeMoney)
 import Json.Encode as Encode
 import Util.Date exposing (DateDisplay, formatDate)
 import Util.Format exposing (formatMoney)
@@ -17,14 +17,14 @@ type alias TableRow =
     }
 
 
-tablePayload : Format -> DateDisplay -> String -> List Expense -> Encode.Value
-tablePayload format dateDisplay today expenses =
+tablePayload : Format -> DateDisplay -> String -> List WorkspaceUser -> List Expense -> Encode.Value
+tablePayload format dateDisplay today users expenses =
     Encode.object
         [ ( "format", Encode.string (formatToString format) )
         , ( "filename", Encode.string (filename format today) )
         , ( "sheetName", Encode.string "Gastos" )
         , ( "headers", Encode.list Encode.string headers )
-        , ( "rows", Encode.list rowEncoder (expenseRows dateDisplay expenses ++ subtotalRows expenses) )
+        , ( "rows", Encode.list rowEncoder (expenseRows dateDisplay expenses ++ subtotalRows users expenses) )
         ]
 
 
@@ -74,7 +74,7 @@ expenseRow dateDisplay expense =
     { label = "expense"
     , cells =
         [ formatDate dateDisplay expense.date
-        , personToString expense.person
+        , expense.userName
         , expense.description
         , formatMoney expense.inputCurrency expense.inputAmount
         , formatMoney ARS expense.exchangeRate
@@ -85,22 +85,14 @@ expenseRow dateDisplay expense =
     }
 
 
-subtotalRows : List Expense -> List TableRow
-subtotalRows expenses =
+subtotalRows : List WorkspaceUser -> List Expense -> List TableRow
+subtotalRows users expenses =
     let
-        aliceTotal =
-            summarizeMoney (expensesFor Alice expenses)
-
-        bobTotal =
-            summarizeMoney (expensesFor Bob expenses)
-
         grandTotal =
             summarizeMoney expenses
     in
-    [ totalRow "Subtotal Alice" "subtotal" aliceTotal
-    , totalRow "Subtotal Bob" "subtotal" bobTotal
-    , totalRow "Total" "total" grandTotal
-    ]
+    List.map (\user -> totalRow ("Subtotal " ++ user.name) "subtotal" (summarizeMoney (expensesFor user expenses))) users
+        ++ [ totalRow "Total" "total" grandTotal ]
 
 
 totalRow : String -> String -> MoneyTotal -> TableRow

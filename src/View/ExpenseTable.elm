@@ -1,6 +1,6 @@
 module View.ExpenseTable exposing (Config, view)
 
-import Accounting exposing (Currency(..), Expense, FilterWindow(..), MoneyTotal, Person(..), SortDirection(..), SortField(..), expensesFor, personToString, summarizeMoney)
+import Accounting exposing (Currency(..), Expense, FilterWindow(..), MoneyTotal, SortDirection(..), SortField(..), WorkspaceUser, expensesFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
@@ -10,6 +10,7 @@ import Util.Format exposing (formatMoney)
 
 type alias Config msg =
     { expenses : List Expense
+    , users : List WorkspaceUser
     , filterWindow : FilterWindow
     , dateDisplay : DateDisplay
     , customStart : String
@@ -49,7 +50,7 @@ view config =
                             , sortableHeader config SortByDollars "numeric" "Dólar"
                             ]
                         ]
-                    , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.expenses)
+                    , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.users config.expenses)
                     ]
                 ]
         ]
@@ -145,7 +146,7 @@ expenseRow : DateDisplay -> Expense -> Html msg
 expenseRow dateDisplay expense =
     tr []
         [ td [] [ text (formatDate dateDisplay expense.date) ]
-        , td [] [ text (personToString expense.person) ]
+        , td [] [ text expense.userName ]
         , td [] [ text expense.description ]
         , td [ class "numeric" ] [ text (formatMoney expense.inputCurrency expense.inputAmount) ]
         , td [ class "numeric" ] [ text (formatMoney ARS expense.exchangeRate) ]
@@ -189,22 +190,14 @@ sortableHeader config sortField alignment labelText =
         ]
 
 
-subtotalRows : List Expense -> List (Html msg)
-subtotalRows expenses =
+subtotalRows : List WorkspaceUser -> List Expense -> List (Html msg)
+subtotalRows users expenses =
     let
-        aliceTotal =
-            summarizeMoney (expensesFor Alice expenses)
-
-        bobTotal =
-            summarizeMoney (expensesFor Bob expenses)
-
         grandTotal =
             summarizeMoney expenses
     in
-    [ totalRow "Subtotal Alice" "subtotal" aliceTotal
-    , totalRow "Subtotal Bob" "subtotal" bobTotal
-    , totalRow "Total" "grand-total" grandTotal
-    ]
+    List.map (\user -> totalRow ("Subtotal " ++ user.name) "subtotal" (summarizeMoney (expensesFor user expenses))) users
+        ++ [ totalRow "Total" "grand-total" grandTotal ]
 
 
 totalRow : String -> String -> MoneyTotal -> Html msg

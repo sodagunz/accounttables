@@ -20,18 +20,28 @@
         signOut,
       } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
       import {
+        arrayRemove,
+        arrayUnion,
         collection,
+        deleteDoc,
         doc,
+        getDoc,
         getDocs,
         getFirestore,
         serverTimestamp,
         setDoc,
+        updateDoc,
+        writeBatch,
       } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
       import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
 
       const app = Elm.Main.init({ node: document.getElementById("app") });
 
       setupFirebaseAuth(app);
+
+      app.ports.generateExpenseId.subscribe(() => {
+        app.ports.expenseIdGenerated.send(uuidv7());
+      });
 
       app.ports.exportTable.subscribe((payload) => {
         if (payload.format === "xlsx" && window.XLSX) {
@@ -81,7 +91,10 @@
             for (let column = range.s.c; column <= range.e.c; column += 1) {
               const cell = worksheet[XLSX.utils.encode_cell({ r: index + 1, c: column })];
               if (cell) {
-                cell.s = { font: { bold: true }, fill: { fgColor: { rgb: row.type === "total" ? "E7F2EE" : "F8FAF9" } } };
+                cell.s = {
+                  font: { bold: true },
+                  fill: { fgColor: { rgb: row.type === "total" ? "E7F2EE" : "F8FAF9" } },
+                };
               }
             }
           }
@@ -161,16 +174,7 @@
       function setupFirestore(app, auth, db) {
         app.ports.loadWorkspaceData.subscribe(async ({ workspaceId }) => {
           try {
-            await ensureWorkspace(auth, db, workspaceId);
-
-            const snapshot = await getDocs(collection(db, "workspaces", workspaceId, "expenses"));
-            const expenses = snapshot.docs.map((documentSnapshot) => documentSnapshot.data());
-
-            app.ports.workspaceLoaded.send({
-              status: "loaded",
-              workspaceId,
-              expenses,
-            });
+            await loadWorkspace(app, auth, db, workspaceId);
           } catch (error) {
             console.error("Firestore workspace load failed", error);
             app.ports.workspaceLoaded.send({
@@ -201,28 +205,407 @@
             });
           }
         });
+
+        app.ports.saveWorkspaceUser.subscribe(async ({ workspaceId, name }) => {
+          try {
+            await ensureWorkspace(auth, db, workspaceId);
+            const trimmedName = String(name || "").trim();
+
+            if (!trimmedName) {
+              throw new Error("El nombre no puede estar vacío.");
+            }
+
+            const userId = uuidv7();
+            await setDoc(
+              doc(db, "workspaces", workspaceId, "users", userId),
+              {
+                id: userId,
+                name: trimmedName,
+                createdAt: new Date().toISOString(),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            );
+            await loadWorkspace(app, auth, db, workspaceId);
+          } catch (error) {
+            console.error("Firestore user save failed", error);
+            app.ports.workspaceLoaded.send({
+              status: "error",
+              workspaceId,
+              message: firestoreErrorMessage(error),
+            });
+          }
+        });
+
+        app.ports.deleteWorkspaceUser.subscribe(async ({ workspaceId, userId }) => {
+          try {
+            await ensureWorkspace(auth, db, workspaceId);
+            const deletedAt = new Date().toISOString();
+            let batch = writeBatch(db);
+            let writeCount = 0;
+
+            async function setInBatch(ref, data) {
+              batch.set(ref, data, { merge: true });
+              writeCount += 1;
+
+              if (writeCount >= 450) {
+                await batch.commit();
+                batch = writeBatch(db);
+                writeCount = 0;
+              }
+            }
+
+            await setInBatch(doc(db, "workspaces", workspaceId, "users", userId), {
+              deletedAt,
+              updatedAt: serverTimestamp(),
+            });
+
+            const expenseSnapshot = await getDocs(
+              collection(db, "workspaces", workspaceId, "expenses"),
+            );
+            for (const documentSnapshot of expenseSnapshot.docs) {
+              const expense = documentSnapshot.data();
+              if (expense.userId === userId && !expense.deletedAt) {
+                await setInBatch(documentSnapshot.ref, {
+                  deletedAt,
+                  updatedAt: serverTimestamp(),
+                });
+              }
+            }
+
+            if (writeCount > 0) {
+              await batch.commit();
+            }
+            await loadWorkspace(app, auth, db, workspaceId);
+          } catch (error) {
+            console.error("Firestore user delete failed", error);
+            app.ports.workspaceLoaded.send({
+              status: "error",
+              workspaceId,
+              message: firestoreErrorMessage(error),
+            });
+          }
+        });
+
+        app.ports.inviteWorkspaceGuest.subscribe(async ({ workspaceId, email }) => {
+          try {
+            await ensureWorkspace(auth, db, workspaceId);
+            const normalizedEmail = normalizeEmail(email);
+            if (!normalizedEmail) {
+              throw new Error("El email no puede estar vacío.");
+            }
+
+            const workspaceSnapshot = await getDoc(doc(db, "workspaces", workspaceId));
+            const workspace = workspaceSnapshot.data();
+            if (workspace?.ownerUid !== auth.currentUser?.uid) {
+              throw new Error("Solo el owner puede invitar usuarios.");
+            }
+
+            await setDoc(
+              doc(db, "emailInvites", normalizedEmail, "workspaces", workspaceId),
+              {
+                workspaceId,
+                workspaceName: workspace?.name || "Workspace",
+                ownerUid: auth.currentUser.uid,
+                ownerEmail: normalizeEmail(auth.currentUser.email),
+                invitedEmail: normalizedEmail,
+                createdAt: new Date().toISOString(),
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            );
+            await updateDoc(doc(db, "workspaces", workspaceId), {
+              invitedEmails: arrayUnion(normalizedEmail),
+              updatedAt: serverTimestamp(),
+            });
+            await loadWorkspace(app, auth, db, workspaceId);
+          } catch (error) {
+            console.error("Firestore guest invite failed", error);
+            app.ports.workspaceLoaded.send({
+              status: "error",
+              workspaceId,
+              message: firestoreErrorMessage(error),
+            });
+          }
+        });
+
+        app.ports.removeWorkspaceGuest.subscribe(async ({ workspaceId, uid }) => {
+          try {
+            await ensureWorkspace(auth, db, workspaceId);
+            const workspaceRef = doc(db, "workspaces", workspaceId);
+            const workspaceSnapshot = await getDoc(workspaceRef);
+            const workspace = workspaceSnapshot.data();
+
+            if (workspace?.ownerUid !== auth.currentUser?.uid) {
+              throw new Error("Solo el owner puede quitar invitados.");
+            }
+
+            const member = (workspace.members || []).find((candidate) => candidate.uid === uid);
+            if (!member || uid === workspace.ownerUid) {
+              throw new Error("No se puede quitar este miembro.");
+            }
+
+            await updateDoc(workspaceRef, {
+              memberUids: arrayRemove(uid),
+              memberEmails: arrayRemove(normalizeEmail(member.email)),
+              members: arrayRemove(member),
+              updatedAt: serverTimestamp(),
+            });
+            await deleteDoc(doc(db, "userWorkspaces", uid, "workspaces", workspaceId));
+            await loadWorkspace(app, auth, db, workspaceId);
+          } catch (error) {
+            console.error("Firestore guest removal failed", error);
+            app.ports.workspaceLoaded.send({
+              status: "error",
+              workspaceId,
+              message: firestoreErrorMessage(error),
+            });
+          }
+        });
+
+        app.ports.updateWorkspaceName.subscribe(async ({ workspaceId, name }) => {
+          try {
+            await ensureWorkspace(auth, db, workspaceId);
+            const trimmedName = String(name || "").trim();
+            if (!trimmedName) {
+              throw new Error("El nombre del workspace no puede estar vacío.");
+            }
+
+            const workspaceRef = doc(db, "workspaces", workspaceId);
+            const workspaceSnapshot = await getDoc(workspaceRef);
+            const workspace = workspaceSnapshot.data();
+            if (workspace?.ownerUid !== auth.currentUser?.uid) {
+              throw new Error("Solo el owner puede renombrar el workspace.");
+            }
+
+            await updateDoc(workspaceRef, {
+              name: trimmedName,
+              updatedAt: serverTimestamp(),
+            });
+            await loadWorkspace(app, auth, db, workspaceId);
+          } catch (error) {
+            console.error("Firestore workspace rename failed", error);
+            app.ports.workspaceLoaded.send({
+              status: "error",
+              workspaceId,
+              message: firestoreErrorMessage(error),
+            });
+          }
+        });
+      }
+
+      async function loadWorkspace(app, auth, db, workspaceId) {
+        await ensurePersonalWorkspace(auth, db);
+        await acceptPendingInvites(auth, db);
+
+        const workspaces = await loadWorkspaceSummaries(auth, db);
+        const selectedWorkspaceId = workspaces.some((workspace) => workspace.id === workspaceId)
+          ? workspaceId
+          : workspaces[0]?.id || auth.currentUser?.uid || "";
+
+        const [userSnapshot, expenseSnapshot] = await Promise.all([
+          getDocs(collection(db, "workspaces", selectedWorkspaceId, "users")),
+          getDocs(collection(db, "workspaces", selectedWorkspaceId, "expenses")),
+        ]);
+        const users = userSnapshot.docs.map((documentSnapshot) =>
+          serializeFirestoreDocument(documentSnapshot),
+        );
+        const expenses = expenseSnapshot.docs.map((documentSnapshot) =>
+          serializeFirestoreDocument(documentSnapshot),
+        );
+
+        app.ports.workspaceLoaded.send({
+          status: "loaded",
+          workspaceId: selectedWorkspaceId,
+          workspaces,
+          users,
+          expenses,
+        });
       }
 
       async function ensureWorkspace(auth, db, workspaceId) {
+        if (!auth.currentUser?.uid) {
+          throw new Error("No hay una sesión activa.");
+        }
+
+        if (workspaceId === auth.currentUser.uid) {
+          await ensurePersonalWorkspace(auth, db);
+        }
+      }
+
+      async function ensurePersonalWorkspace(auth, db) {
         const uid = auth.currentUser?.uid;
 
         if (!uid) {
           throw new Error("No hay una sesión activa.");
         }
 
-        if (workspaceId !== uid) {
-          return;
-        }
+        const email = normalizeEmail(auth.currentUser.email);
+        const member = {
+          uid,
+          email,
+          displayName: auth.currentUser.displayName || email,
+        };
+        const workspaceRef = doc(db, "workspaces", uid);
+        const workspaceSnapshot = await getDoc(workspaceRef);
 
-        await setDoc(
-          doc(db, "workspaces", workspaceId),
-          {
+        if (workspaceSnapshot.exists()) {
+          await setDoc(
+            workspaceRef,
+            {
+              id: uid,
+              name: workspaceSnapshot.data().name || "Mi workspace",
+              ownerUid: uid,
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true },
+          );
+        } else {
+          await setDoc(workspaceRef, {
+            id: uid,
+            name: "Mi workspace",
             ownerUid: uid,
             memberUids: [uid],
+            memberEmails: [email],
+            members: [member],
+            updatedAt: serverTimestamp(),
+          });
+        }
+        await setDoc(
+          doc(db, "userWorkspaces", uid, "workspaces", uid),
+          {
+            workspaceId: uid,
+            role: "owner",
             updatedAt: serverTimestamp(),
           },
           { merge: true },
         );
+      }
+
+      async function acceptPendingInvites(auth, db) {
+        const uid = auth.currentUser?.uid;
+        const email = normalizeEmail(auth.currentUser?.email);
+        if (!uid || !email) {
+          return;
+        }
+
+        const inviteSnapshot = await getDocs(collection(db, "emailInvites", email, "workspaces"));
+        for (const inviteDocument of inviteSnapshot.docs) {
+          const invite = inviteDocument.data();
+          const workspaceId = invite.workspaceId || inviteDocument.id;
+          const member = {
+            uid,
+            email,
+            displayName: auth.currentUser.displayName || email,
+          };
+
+          await updateDoc(doc(db, "workspaces", workspaceId), {
+            memberUids: arrayUnion(uid),
+            memberEmails: arrayUnion(email),
+            members: arrayUnion(member),
+            invitedEmails: arrayRemove(email),
+            updatedAt: serverTimestamp(),
+          });
+          await setDoc(
+            doc(db, "userWorkspaces", uid, "workspaces", workspaceId),
+            {
+              workspaceId,
+              role: "member",
+              updatedAt: serverTimestamp(),
+            },
+            { merge: true },
+          );
+          await deleteDoc(inviteDocument.ref);
+        }
+      }
+
+      async function loadWorkspaceSummaries(auth, db) {
+        const uid = auth.currentUser?.uid;
+        if (!uid) {
+          return [];
+        }
+
+        const membershipSnapshot = await getDocs(
+          collection(db, "userWorkspaces", uid, "workspaces"),
+        );
+        const summaries = [];
+        for (const membershipDocument of membershipSnapshot.docs) {
+          const workspaceId = membershipDocument.data().workspaceId || membershipDocument.id;
+          const workspaceSnapshot = await getDoc(doc(db, "workspaces", workspaceId));
+          if (workspaceSnapshot.exists()) {
+            summaries.push(serializeWorkspaceSummary(workspaceSnapshot));
+          } else {
+            await deleteDoc(membershipDocument.ref);
+          }
+        }
+
+        return summaries.sort((left, right) => left.name.localeCompare(right.name));
+      }
+
+      function serializeWorkspaceSummary(documentSnapshot) {
+        const data = documentSnapshot.data();
+        return {
+          id: String(data.id || documentSnapshot.id),
+          name: data.name || "Workspace",
+          ownerUid: data.ownerUid || "",
+          members: Array.isArray(data.members) ? data.members.map(serializeMember) : [],
+        };
+      }
+
+      function serializeMember(member) {
+        return {
+          uid: member.uid || "",
+          email: normalizeEmail(member.email),
+          displayName: member.displayName || "",
+        };
+      }
+
+      function serializeFirestoreDocument(documentSnapshot) {
+        const data = documentSnapshot.data();
+        return {
+          ...data,
+          id: String(data.id || documentSnapshot.id),
+          deletedAt: serializeMaybeTimestamp(data.deletedAt),
+        };
+      }
+
+      function serializeMaybeTimestamp(value) {
+        if (!value) {
+          return null;
+        }
+
+        if (typeof value === "string") {
+          return value;
+        }
+
+        if (typeof value.toDate === "function") {
+          return value.toDate().toISOString();
+        }
+
+        return String(value);
+      }
+
+      function normalizeEmail(email) {
+        return String(email || "")
+          .trim()
+          .toLowerCase();
+      }
+
+      function uuidv7() {
+        const bytes = new Uint8Array(16);
+        crypto.getRandomValues(bytes);
+
+        let timestamp = BigInt(Date.now());
+        for (let index = 5; index >= 0; index -= 1) {
+          bytes[index] = Number(timestamp & 0xffn);
+          timestamp >>= 8n;
+        }
+
+        bytes[6] = (bytes[6] & 0x0f) | 0x70;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+        const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
       }
 
       function serializeUser(user) {

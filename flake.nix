@@ -28,6 +28,8 @@
             firebase-tools
             nodejs_22
             pnpm
+            prettier
+            prettierd
             nil
             zed-editor
           ];
@@ -35,7 +37,7 @@
           shellHook = ''
             export NODE_PATH=${pkgs.firebase-tools}/lib/node_modules:${pkgs.firebase-tools}/lib/node_modules/firebase-tools/node_modules
             echo "Elm accounting app dev shell"
-            echo "Available: elm, elm-format, elm-test, elm-review, firebase, node, pnpm"
+            echo "Available: elm, elm-format, elm-test, elm-review, firebase, node, pnpm, prettier"
           '';
         };
       });

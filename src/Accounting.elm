@@ -4,9 +4,9 @@ module Accounting exposing
     , FilterWindow(..)
     , Form
     , MoneyTotal
-    , Person(..)
     , SortDirection(..)
     , SortField(..)
+    , WorkspaceUser
     , addMoney
     , buildExpense
     , convert
@@ -18,14 +18,12 @@ module Accounting exposing
     , expensesFor
     , fallbackExchangeRate
     , filteredExpenses
-    , personFromString
-    , personToString
     , sampleExpenses
     , setAmount
     , setCurrency
     , setDate
     , setDescription
-    , setPerson
+    , setUser
     , sortExpenses
     , summarizeMoney
     )
@@ -42,11 +40,6 @@ fallbackExchangeRate =
 type Currency
     = ARS
     | USD
-
-
-type Person
-    = Alice
-    | Bob
 
 
 type FilterWindow
@@ -73,22 +66,31 @@ type SortDirection
 
 
 type alias Expense =
-    { id : Int
+    { id : String
     , description : String
-    , person : Person
+    , userId : String
+    , userName : String
     , inputAmount : Float
     , inputCurrency : Currency
     , exchangeRate : Float
     , ars : Float
     , usd : Float
     , date : String
+    , deletedAt : Maybe String
+    }
+
+
+type alias WorkspaceUser =
+    { id : String
+    , name : String
+    , deletedAt : Maybe String
     }
 
 
 type alias Form =
     { description : String
     , amount : String
-    , person : Person
+    , userId : String
     , currency : Currency
     , date : String
     }
@@ -104,7 +106,7 @@ emptyForm : Form
 emptyForm =
     { description = ""
     , amount = ""
-    , person = Alice
+    , userId = ""
     , currency = ARS
     , date = ""
     }
@@ -120,9 +122,9 @@ setAmount amount form =
     { form | amount = amount }
 
 
-setPerson : Person -> Form -> Form
-setPerson person form =
-    { form | person = person }
+setUser : String -> Form -> Form
+setUser userId form =
+    { form | userId = userId }
 
 
 setCurrency : Currency -> Form -> Form
@@ -135,11 +137,16 @@ setDate date form =
     { form | date = date }
 
 
-buildExpense : Float -> Int -> Form -> Result String Expense
-buildExpense exchangeRate id form =
+buildExpense : Float -> String -> List WorkspaceUser -> Form -> Result String Expense
+buildExpense exchangeRate id users form =
     let
         description =
             String.trim form.description
+
+        selectedUser =
+            users
+                |> List.filter (\user -> user.id == form.userId && user.deletedAt == Nothing)
+                |> List.head
     in
     case String.toFloat form.amount of
         Nothing ->
@@ -156,21 +163,28 @@ buildExpense exchangeRate id form =
                 Err "Ingresa una fecha válida."
 
             else
-                let
-                    converted =
-                        convert exchangeRate form.currency amount
-                in
-                Ok
-                    { id = id
-                    , description = description
-                    , person = form.person
-                    , inputAmount = amount
-                    , inputCurrency = form.currency
-                    , exchangeRate = exchangeRate
-                    , ars = converted.ars
-                    , usd = converted.usd
-                    , date = form.date
-                    }
+                case selectedUser of
+                    Nothing ->
+                        Err "Selecciona una persona."
+
+                    Just user ->
+                        let
+                            converted =
+                                convert exchangeRate form.currency amount
+                        in
+                        Ok
+                            { id = id
+                            , description = description
+                            , userId = user.id
+                            , userName = user.name
+                            , inputAmount = amount
+                            , inputCurrency = form.currency
+                            , exchangeRate = exchangeRate
+                            , ars = converted.ars
+                            , usd = converted.usd
+                            , date = form.date
+                            , deletedAt = Nothing
+                            }
 
 
 convert : Float -> Currency -> Float -> { ars : Float, usd : Float }
@@ -200,13 +214,13 @@ addMoney expense total =
     }
 
 
-expensesFor : Person -> List Expense -> List Expense
-expensesFor person expenses =
-    List.filter (\expense -> expense.person == person) expenses
+expensesFor : WorkspaceUser -> List Expense -> List Expense
+expensesFor user expenses =
+    List.filter (\expense -> expense.userId == user.id) expenses
 
 
-sampleExpenses : Float -> String -> List Expense
-sampleExpenses exchangeRate today =
+sampleExpenses : Float -> String -> List WorkspaceUser -> List Expense
+sampleExpenses exchangeRate today users =
     let
         yesterday =
             Date.addDays -1 today
@@ -214,28 +228,40 @@ sampleExpenses exchangeRate today =
         lastWeek =
             Date.addDays -7 today
     in
-    [ sampleExpense exchangeRate 1 "Supermercado" Alice 28500 ARS today
-    , sampleExpense exchangeRate 2 "Nafta" Bob 42 USD today
-    , sampleExpense exchangeRate 3 "Almuerzo" Alice 12500 ARS yesterday
-    , sampleExpense exchangeRate 4 "Librería" Bob 18500 ARS lastWeek
-    ]
+    case users of
+        first :: second :: _ ->
+            [ sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
+            , sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000002" "Nafta" second 42 USD today
+            , sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
+            , sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000004" "Librería" second 18500 ARS lastWeek
+            ]
+
+        first :: [] ->
+            [ sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
+            , sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
+            ]
+
+        [] ->
+            []
 
 
-sampleExpense : Float -> Int -> String -> Person -> Float -> Currency -> String -> Expense
-sampleExpense exchangeRate id description person amount currency date =
+sampleExpense : Float -> String -> String -> WorkspaceUser -> Float -> Currency -> String -> Expense
+sampleExpense exchangeRate id description user amount currency date =
     let
         converted =
             convert exchangeRate currency amount
     in
     { id = id
     , description = description
-    , person = person
+    , userId = user.id
+    , userName = user.name
     , inputAmount = amount
     , inputCurrency = currency
     , exchangeRate = exchangeRate
     , ars = converted.ars
     , usd = converted.usd
     , date = date
+    , deletedAt = Nothing
     }
 
 
@@ -332,7 +358,7 @@ compareByDate left right =
 
 compareByPerson : Expense -> Expense -> Order
 compareByPerson left right =
-    compareThen left.id right.id (compare (personToString left.person) (personToString right.person))
+    compareThen left.id right.id (compare (String.toLower left.userName) (String.toLower right.userName))
 
 
 compareByDescription : Expense -> Expense -> Order
@@ -382,22 +408,3 @@ currencyToString currency =
 
         USD ->
             "USD"
-
-
-personFromString : String -> Person
-personFromString person =
-    if person == "Bob" then
-        Bob
-
-    else
-        Alice
-
-
-personToString : Person -> String
-personToString person =
-    case person of
-        Alice ->
-            "Alice"
-
-        Bob ->
-            "Bob"

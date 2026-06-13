@@ -1,13 +1,18 @@
 module Workspace exposing
     ( LoadState(..)
-    , decodeExpenses
+    , Member
+    , WorkspaceSummary
+    , decodeWorkspace
     , encodeExpense
+    , encodeGuestInvite
+    , encodeGuestRemove
+    , encodeUserCreate
+    , encodeUserDelete
+    , encodeWorkspaceName
     , encodeWorkspaceRequest
-    , workspaceIdForUser
     )
 
-import Accounting exposing (Expense, currencyFromString, currencyToString, personFromString, personToString)
-import Auth
+import Accounting exposing (Expense, WorkspaceUser, currencyFromString, currencyToString)
 import Json.Decode as Decode
 import Json.Encode as Encode
 
@@ -19,9 +24,19 @@ type LoadState
     | LoadError String
 
 
-workspaceIdForUser : Auth.User -> String
-workspaceIdForUser user =
-    user.uid
+type alias WorkspaceSummary =
+    { id : String
+    , name : String
+    , ownerUid : String
+    , members : List Member
+    }
+
+
+type alias Member =
+    { uid : String
+    , email : String
+    , displayName : String
+    }
 
 
 encodeWorkspaceRequest : String -> Encode.Value
@@ -38,12 +53,53 @@ encodeExpense workspaceId expense =
         ]
 
 
+encodeUserCreate : String -> String -> Encode.Value
+encodeUserCreate workspaceId name =
+    Encode.object
+        [ ( "workspaceId", Encode.string workspaceId )
+        , ( "name", Encode.string name )
+        ]
+
+
+encodeUserDelete : String -> String -> Encode.Value
+encodeUserDelete workspaceId userId =
+    Encode.object
+        [ ( "workspaceId", Encode.string workspaceId )
+        , ( "userId", Encode.string userId )
+        ]
+
+
+encodeGuestInvite : String -> String -> Encode.Value
+encodeGuestInvite workspaceId email =
+    Encode.object
+        [ ( "workspaceId", Encode.string workspaceId )
+        , ( "email", Encode.string email )
+        ]
+
+
+encodeGuestRemove : String -> String -> Encode.Value
+encodeGuestRemove workspaceId uid =
+    Encode.object
+        [ ( "workspaceId", Encode.string workspaceId )
+        , ( "uid", Encode.string uid )
+        ]
+
+
+encodeWorkspaceName : String -> String -> Encode.Value
+encodeWorkspaceName workspaceId name =
+    Encode.object
+        [ ( "workspaceId", Encode.string workspaceId )
+        , ( "name", Encode.string name )
+        ]
+
+
 encodeExpenseRecord : Expense -> Encode.Value
 encodeExpenseRecord expense =
     Encode.object
-        [ ( "id", Encode.int expense.id )
+        [ ( "id", Encode.string expense.id )
         , ( "description", Encode.string expense.description )
-        , ( "person", Encode.string (personToString expense.person) )
+        , ( "userId", Encode.string expense.userId )
+        , ( "userName", Encode.string expense.userName )
         , ( "inputAmount", Encode.float expense.inputAmount )
         , ( "inputCurrency", Encode.string (currencyToString expense.inputCurrency) )
         , ( "exchangeRate", Encode.float expense.exchangeRate )
@@ -53,20 +109,31 @@ encodeExpenseRecord expense =
         ]
 
 
-decodeExpenses : Decode.Value -> Result String (List Expense)
-decodeExpenses value =
-    Decode.decodeValue expensesPayloadDecoder value
+decodeWorkspace : Decode.Value -> Result String { expenses : List Expense, users : List WorkspaceUser, workspaces : List WorkspaceSummary, currentWorkspaceId : String }
+decodeWorkspace value =
+    Decode.decodeValue workspacePayloadDecoder value
         |> Result.mapError Decode.errorToString
 
 
-expensesPayloadDecoder : Decode.Decoder (List Expense)
-expensesPayloadDecoder =
+workspacePayloadDecoder : Decode.Decoder { expenses : List Expense, users : List WorkspaceUser, workspaces : List WorkspaceSummary, currentWorkspaceId : String }
+workspacePayloadDecoder =
     Decode.field "status" Decode.string
         |> Decode.andThen
             (\status ->
                 case status of
                     "loaded" ->
-                        Decode.field "expenses" (Decode.list expenseDecoder)
+                        Decode.map4
+                            (\workspaces currentWorkspaceId users expenses ->
+                                { workspaces = workspaces
+                                , currentWorkspaceId = currentWorkspaceId
+                                , users = users
+                                , expenses = expenses
+                                }
+                            )
+                            (Decode.field "workspaces" (Decode.list workspaceSummaryDecoder))
+                            (Decode.field "workspaceId" Decode.string)
+                            (Decode.field "users" (Decode.list userDecoder))
+                            (Decode.field "expenses" (Decode.list expenseDecoder))
 
                     "error" ->
                         Decode.field "message" Decode.string
@@ -77,32 +144,61 @@ expensesPayloadDecoder =
             )
 
 
+userDecoder : Decode.Decoder WorkspaceUser
+userDecoder =
+    Decode.map3 WorkspaceUser
+        (Decode.field "id" Decode.string)
+        (Decode.field "name" Decode.string)
+        (Decode.maybe (Decode.field "deletedAt" Decode.string))
+
+
+workspaceSummaryDecoder : Decode.Decoder WorkspaceSummary
+workspaceSummaryDecoder =
+    Decode.map4 WorkspaceSummary
+        (Decode.field "id" Decode.string)
+        (Decode.field "name" Decode.string)
+        (Decode.field "ownerUid" Decode.string)
+        (Decode.field "members" (Decode.list memberDecoder))
+
+
+memberDecoder : Decode.Decoder Member
+memberDecoder =
+    Decode.map3 Member
+        (Decode.field "uid" Decode.string)
+        (Decode.field "email" Decode.string)
+        (Decode.field "displayName" Decode.string)
+
+
 expenseDecoder : Decode.Decoder Expense
 expenseDecoder =
     Decode.map8
-        (\id description person inputAmount inputCurrency exchangeRate ars usd ->
-            \date ->
+        (\id description userId userName inputAmount inputCurrency exchangeRate ars ->
+            \usd date deletedAt ->
                 { id = id
                 , description = description
-                , person = person
+                , userId = userId
+                , userName = userName
                 , inputAmount = inputAmount
                 , inputCurrency = inputCurrency
                 , exchangeRate = exchangeRate
                 , ars = ars
                 , usd = usd
                 , date = date
+                , deletedAt = deletedAt
                 }
         )
-        (Decode.field "id" Decode.int)
+        (Decode.field "id" Decode.string)
         (Decode.field "description" Decode.string)
-        (Decode.field "person" (Decode.map personFromString Decode.string))
+        (Decode.field "userId" Decode.string)
+        (Decode.field "userName" Decode.string)
         (Decode.field "inputAmount" Decode.float)
         (Decode.field "inputCurrency" (Decode.map currencyFromString Decode.string))
         (Decode.field "exchangeRate" Decode.float)
         (Decode.field "ars" Decode.float)
-        (Decode.field "usd" Decode.float)
         |> Decode.andThen
             (\buildExpense ->
-                Decode.field "date" Decode.string
-                    |> Decode.map buildExpense
+                Decode.map3 buildExpense
+                    (Decode.field "usd" Decode.float)
+                    (Decode.field "date" Decode.string)
+                    (Decode.maybe (Decode.field "deletedAt" Decode.string))
             )

@@ -1,6 +1,6 @@
 module View.ExpenseForm exposing (Config, view)
 
-import Accounting exposing (Currency(..), Form, Person(..), convert, currencyToString, personToString)
+import Accounting exposing (Currency(..), Form, WorkspaceUser, convert, currencyToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Html exposing (Html, button, div, input, label, option, p, section, select, strong, text)
 import Html.Attributes exposing (class, step, type_, value)
@@ -12,6 +12,7 @@ import Util.Format exposing (formatMoney)
 
 type alias Config msg =
     { form : Form
+    , users : List WorkspaceUser
     , exchangeRate : Float
     , exchangeRateStatus : ExchangeRateStatus
     , zone : Time.Zone
@@ -50,10 +51,8 @@ view config =
             , div [ class "two-col" ]
                 [ label []
                     [ text "Nombre"
-                    , select [ value (personToString config.form.person), onInput config.onPerson ]
-                        [ option [ value "Alice" ] [ text "Alice" ]
-                        , option [ value "Bob" ] [ text "Bob" ]
-                        ]
+                    , select [ value config.form.userId, onInput config.onPerson ]
+                        (userOptions config.users)
                     ]
                 , label []
                     [ text "Fecha"
@@ -66,6 +65,22 @@ view config =
             , button [ class "primary", type_ "submit" ] [ text "Agregar gasto" ]
             ]
         ]
+
+
+userOptions : List WorkspaceUser -> List (Html msg)
+userOptions users =
+    case users of
+        [] ->
+            [ option [ value "" ] [ text "Agrega una persona" ] ]
+
+        _ ->
+            option [ value "" ] [ text "Seleccionar" ]
+                :: List.map userOption users
+
+
+userOption : WorkspaceUser -> Html msg
+userOption user =
+    option [ value user.id ] [ text user.name ]
 
 
 conversionPreview : Float -> Form -> Html msg

@@ -16,18 +16,61 @@ service cloud.firestore {
         && request.auth.uid in get(workspaceRef(workspaceId)).data.memberUids;
     }
 
+    function isWorkspaceOwner(workspaceId) {
+      return signedIn()
+        && exists(workspaceRef(workspaceId))
+        && get(workspaceRef(workspaceId)).data.ownerUid == request.auth.uid;
+    }
+
+    function invitedToWorkspace() {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email in resource.data.invitedEmails;
+    }
+
+    function hasWorkspaceIndex(workspaceId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/userWorkspaces/$(request.auth.uid)/workspaces/$(workspaceId));
+    }
+
+    function isPersonalWorkspace(workspaceId) {
+      return signedIn() && workspaceId == request.auth.uid;
+    }
+
     match /workspaces/{workspaceId} {
       allow create: if signedIn()
         && workspaceId == request.auth.uid
         && request.resource.data.ownerUid == request.auth.uid
         && request.auth.uid in request.resource.data.memberUids;
 
-      allow read, update: if isWorkspaceMember(workspaceId);
+      allow read: if isPersonalWorkspace(workspaceId)
+        || isWorkspaceMember(workspaceId)
+        || hasWorkspaceIndex(workspaceId);
+      allow update: if isWorkspaceMember(workspaceId)
+        || isWorkspaceOwner(workspaceId)
+        || isPersonalWorkspace(workspaceId)
+        || invitedToWorkspace();
       allow delete: if signedIn() && resource.data.ownerUid == request.auth.uid;
 
       match /expenses/{expenseId} {
         allow read, write: if isWorkspaceMember(workspaceId);
       }
+
+      match /users/{userId} {
+        allow read, write: if isWorkspaceMember(workspaceId);
+      }
+    }
+
+    match /userWorkspaces/{uid}/workspaces/{workspaceId} {
+      allow read, list, create, update: if signedIn() && uid == request.auth.uid;
+      allow delete: if signedIn()
+        && (uid == request.auth.uid || isWorkspaceOwner(resource.data.workspaceId));
+    }
+
+    match /emailInvites/{email}/workspaces/{workspaceId} {
+      allow read, list, delete: if signedIn()
+        && (request.auth.token.email == email || isWorkspaceOwner(workspaceId));
+      allow create, update: if isWorkspaceOwner(workspaceId);
     }
   }
 }

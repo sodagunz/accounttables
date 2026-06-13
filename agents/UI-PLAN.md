@@ -16,9 +16,11 @@
 
    Implemented by keeping `Importe` as the first control in the form, adding autofocus to it, and adding mobile/browser input hints so phones open a decimal numeric keyboard. The form still leaves caja, currency, date, and description available, but the first interaction is now explicitly optimized around amount entry.
 
-4. [ ] Make description optional
+4. [x] Make description optional
 
    Description is not required to register a movement. The field should stay available as secondary input, but the fast path must work with only amount, caja, currency, and date. Empty descriptions are stored as `Nothing`/`null` and displayed as `-`.
+
+   Verified end to end. `Expense.description` is modeled as `Maybe String`, `buildExpense` accepts an empty description and stores it as `Nothing`, Firestore encoding writes `null`, decoding reads nullable descriptions, and table/export rendering falls back to `-`. No code changes were required for this item.
 
 5. [ ] Keep description secondary
 

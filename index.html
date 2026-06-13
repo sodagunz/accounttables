@@ -128,6 +128,7 @@
 
         app.ports.signInWithGoogle.subscribe(() => {
           signInWithPopup(auth, provider).catch((error) => {
+            console.error("Firebase Google sign-in failed", error);
             app.ports.authStateChanged.send({
               status: "error",
               message: firebaseAuthErrorMessage(error),
@@ -137,6 +138,7 @@
 
         app.ports.signOutUser.subscribe(() => {
           signOut(auth).catch((error) => {
+            console.error("Firebase sign-out failed", error);
             app.ports.authStateChanged.send({
               status: "error",
               message: firebaseAuthErrorMessage(error),
@@ -155,11 +157,26 @@
       }
 
       function firebaseAuthErrorMessage(error) {
-        if (error && error.code === "auth/popup-closed-by-user") {
+        const code = error?.code || "auth/unknown";
+        const message = error?.message || "Sin detalle técnico.";
+
+        if (code === "auth/popup-closed-by-user") {
           return "Se cerró la ventana de ingreso.";
         }
 
-        return "No se pudo iniciar sesión con Google.";
+        if (code === "auth/unauthorized-domain") {
+          return "Dominio no autorizado en Firebase Auth: " + window.location.hostname;
+        }
+
+        if (code === "auth/operation-not-allowed") {
+          return "Google no está habilitado en Firebase Auth.";
+        }
+
+        if (code === "auth/popup-blocked") {
+          return "El navegador bloqueó la ventana de ingreso.";
+        }
+
+        return `No se pudo iniciar sesión con Google (${code}): ${message}`;
       }
     </script>
   </body>

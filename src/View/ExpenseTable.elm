@@ -4,6 +4,7 @@ import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), Mo
 import Html exposing (Html, button, div, input, label, p, section, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
+import Maybe
 import Util.Date exposing (DateDisplay(..), formatDate)
 import Util.Format exposing (formatMoney)
 
@@ -147,7 +148,7 @@ expenseRow dateDisplay expense =
     tr []
         [ td [] [ text (formatDate dateDisplay expense.date) ]
         , td [] [ text expense.accountName ]
-        , td [] [ text expense.description ]
+        , td [] [ text (Maybe.withDefault "-" expense.description) ]
         , td [ class "numeric" ] [ text (formatMoney expense.inputCurrency expense.inputAmount) ]
         , td [ class "numeric" ] [ text (formatMoney ARS expense.exchangeRate) ]
         , td [ class "numeric" ] [ text (formatMoney ARS expense.ars) ]

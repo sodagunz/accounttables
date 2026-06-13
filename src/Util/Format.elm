@@ -22,24 +22,47 @@ formatFloat : Float -> String
 formatFloat amount =
     let
         cents =
-            round (amount * 100)
+            round (abs amount * 100)
 
         whole =
             cents // 100
 
         decimal =
-            abs (modBy 100 cents)
+            modBy 100 cents
+
+        sign =
+            if amount < 0 then
+                "-"
+
+            else
+                ""
     in
-    formatThousands whole ++ "," ++ pad2 decimal
+    sign ++ formatThousands whole ++ "," ++ pad2 decimal
 
 
 formatThousands : Int -> String
 formatThousands number =
+    let
+        absolute =
+            abs number
+
+        formatted =
+            formatPositiveThousands absolute
+    in
+    if number < 0 then
+        "-" ++ formatted
+
+    else
+        formatted
+
+
+formatPositiveThousands : Int -> String
+formatPositiveThousands number =
     if number < 1000 then
         String.fromInt number
 
     else
-        formatThousands (number // 1000) ++ "." ++ pad3 (modBy 1000 number)
+        formatPositiveThousands (number // 1000) ++ "." ++ pad3 (modBy 1000 number)
 
 
 pad3 : Int -> String

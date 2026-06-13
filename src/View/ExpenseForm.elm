@@ -1,6 +1,6 @@
 module View.ExpenseForm exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Form, convert, currencyToString)
+import Accounting exposing (Account, Currency(..), Form, MovementType(..), cashflowFor, currencyToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Html exposing (Html, button, div, input, label, option, p, section, select, strong, text)
 import Html.Attributes exposing (class, step, type_, value)
@@ -29,13 +29,9 @@ type alias Config msg =
 view : Config msg -> Html msg
 view config =
     section [ class "panel" ]
-        [ Html.h2 [ class "section-title" ] [ text "Nuevo gasto" ]
+        [ Html.h2 [ class "section-title" ] [ text "Registrar movimiento" ]
         , Html.form [ class "form-grid", onSubmit config.onSubmit ]
-            [ label []
-                [ text "Descripción"
-                , input [ type_ "text", value config.form.description, onInput config.onDescription ] []
-                ]
-            , div [ class "two-col" ]
+            [ div [ class "two-col" ]
                 [ label []
                     [ text "Importe"
                     , input [ type_ "number", step "0.01", value config.form.amount, onInput config.onAmount ] []
@@ -59,10 +55,14 @@ view config =
                     , input [ type_ "date", value config.form.date, onInput config.onDate ] []
                     ]
                 ]
+            , label []
+                [ text "Descripción"
+                , input [ type_ "text", value config.form.description, onInput config.onDescription ] []
+                ]
             , conversionPreview config.exchangeRate config.form
             , exchangeRateView config
             , p [ class "error" ] [ text config.error ]
-            , button [ class "primary", type_ "submit" ] [ text "Agregar gasto" ]
+            , button [ class "primary", type_ "submit" ] [ text "Registrar movimiento" ]
             ]
         ]
 
@@ -92,11 +92,11 @@ conversionPreview exchangeRate form =
         Just amount ->
             let
                 converted =
-                    convert exchangeRate form.currency amount
+                    cashflowFor ExpenseMovement exchangeRate form.currency amount
             in
             div [ class "conversion" ]
                 [ text
-                    ("Convertido: "
+                    ("Flujo: "
                         ++ formatMoney ARS converted.ars
                         ++ " / "
                         ++ formatMoney USD converted.usd

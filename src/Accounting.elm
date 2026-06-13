@@ -5,10 +5,12 @@ module Accounting exposing
     , FilterWindow(..)
     , Form
     , MoneyTotal
+    , MovementType(..)
     , SortDirection(..)
     , SortField(..)
     , addMoney
     , buildExpense
+    , cashflowFor
     , convert
     , currencyFromString
     , currencyToString
@@ -18,6 +20,8 @@ module Accounting exposing
     , expensesFor
     , fallbackExchangeRate
     , filteredExpenses
+    , movementTypeFromString
+    , movementTypeToString
     , sampleExpenses
     , setAccount
     , setAmount
@@ -65,9 +69,14 @@ type SortDirection
     | Descending
 
 
+type MovementType
+    = ExpenseMovement
+
+
 type alias Expense =
     { id : String
-    , description : String
+    , movementType : MovementType
+    , description : Maybe String
     , accountId : String
     , accountName : String
     , inputAmount : Float
@@ -153,10 +162,7 @@ buildExpense exchangeRate id accounts form =
             Err "Ingresa un monto válido."
 
         Just amount ->
-            if description == "" then
-                Err "Ingresa una descripción."
-
-            else if amount <= 0 then
+            if amount <= 0 then
                 Err "El monto debe ser mayor que cero."
 
             else if Date.dateFromIso form.date == Nothing then
@@ -170,11 +176,17 @@ buildExpense exchangeRate id accounts form =
                     Just account ->
                         let
                             converted =
-                                convert exchangeRate form.currency amount
+                                cashflowFor ExpenseMovement exchangeRate form.currency amount
                         in
                         Ok
                             { id = id
-                            , description = description
+                            , movementType = ExpenseMovement
+                            , description =
+                                if description == "" then
+                                    Nothing
+
+                                else
+                                    Just description
                             , accountId = account.id
                             , accountName = account.name
                             , inputAmount = amount
@@ -195,6 +207,27 @@ convert exchangeRate currency amount =
 
         USD ->
             { ars = amount * exchangeRate, usd = amount }
+
+
+cashflowFor : MovementType -> Float -> Currency -> Float -> { ars : Float, usd : Float }
+cashflowFor movementType exchangeRate currency inputAmount =
+    let
+        converted =
+            convert exchangeRate currency (abs inputAmount)
+
+        multiplier =
+            movementMultiplier movementType
+    in
+    { ars = converted.ars * multiplier
+    , usd = converted.usd * multiplier
+    }
+
+
+movementMultiplier : MovementType -> Float
+movementMultiplier movementType =
+    case movementType of
+        ExpenseMovement ->
+            -1
 
 
 emptyMoney : MoneyTotal
@@ -249,10 +282,11 @@ sampleExpense : Float -> String -> String -> Account -> Float -> Currency -> Str
 sampleExpense exchangeRate id description account amount currency date =
     let
         converted =
-            convert exchangeRate currency amount
+            cashflowFor ExpenseMovement exchangeRate currency amount
     in
     { id = id
-    , description = description
+    , movementType = ExpenseMovement
+    , description = Just description
     , accountId = account.id
     , accountName = account.name
     , inputAmount = amount
@@ -363,7 +397,14 @@ compareByAccount left right =
 
 compareByDescription : Expense -> Expense -> Order
 compareByDescription left right =
-    compareThen left.id right.id (compare (String.toLower left.description) (String.toLower right.description))
+    compareThen left.id right.id (compare (descriptionText left) (descriptionText right))
+
+
+descriptionText : Expense -> String
+descriptionText expense =
+    expense.description
+        |> Maybe.withDefault ""
+        |> String.toLower
 
 
 compareByExchangeRate : Expense -> Expense -> Order
@@ -408,3 +449,20 @@ currencyToString currency =
 
         USD ->
             "USD"
+
+
+movementTypeFromString : String -> MovementType
+movementTypeFromString movementType =
+    case movementType of
+        "Expense" ->
+            ExpenseMovement
+
+        _ ->
+            ExpenseMovement
+
+
+movementTypeToString : MovementType -> String
+movementTypeToString movementType =
+    case movementType of
+        ExpenseMovement ->
+            "Expense"

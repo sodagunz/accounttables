@@ -12,7 +12,7 @@ module Ledger exposing
     , encodeLedgerRequest
     )
 
-import Accounting exposing (Account, Expense, currencyFromString, currencyToString)
+import Accounting exposing (Account, Expense, currencyFromString, currencyToString, movementTypeFromString, movementTypeToString)
 import Json.Decode as Decode
 import Json.Encode as Encode
 
@@ -97,7 +97,8 @@ encodeExpenseRecord : Expense -> Encode.Value
 encodeExpenseRecord expense =
     Encode.object
         [ ( "id", Encode.string expense.id )
-        , ( "description", Encode.string expense.description )
+        , ( "movementType", Encode.string (movementTypeToString expense.movementType) )
+        , ( "description", encodeMaybeString expense.description )
         , ( "accountId", Encode.string expense.accountId )
         , ( "accountName", Encode.string expense.accountName )
         , ( "inputAmount", Encode.float expense.inputAmount )
@@ -107,6 +108,16 @@ encodeExpenseRecord expense =
         , ( "usd", Encode.float expense.usd )
         , ( "date", Encode.string expense.date )
         ]
+
+
+encodeMaybeString : Maybe String -> Encode.Value
+encodeMaybeString maybeString =
+    case maybeString of
+        Just value ->
+            Encode.string value
+
+        Nothing ->
+            Encode.null
 
 
 decodeLedger : Decode.Value -> Result String { expenses : List Expense, accounts : List Account, ledgers : List LedgerSummary, currentLedgerId : String }
@@ -172,9 +183,10 @@ memberDecoder =
 expenseDecoder : Decode.Decoder Expense
 expenseDecoder =
     Decode.map8
-        (\id description accountId accountName inputAmount inputCurrency exchangeRate ars ->
-            \usd date deletedAt ->
+        (\id movementType description accountId accountName inputAmount inputCurrency exchangeRate ->
+            \ars usd date deletedAt ->
                 { id = id
+                , movementType = movementType
                 , description = description
                 , accountId = accountId
                 , accountName = accountName
@@ -188,16 +200,17 @@ expenseDecoder =
                 }
         )
         (Decode.field "id" Decode.string)
-        (Decode.field "description" Decode.string)
+        (Decode.field "movementType" (Decode.map movementTypeFromString Decode.string))
+        (Decode.field "description" (Decode.nullable Decode.string))
         (Decode.field "accountId" Decode.string)
         (Decode.field "accountName" Decode.string)
         (Decode.field "inputAmount" Decode.float)
         (Decode.field "inputCurrency" (Decode.map currencyFromString Decode.string))
         (Decode.field "exchangeRate" Decode.float)
-        (Decode.field "ars" Decode.float)
         |> Decode.andThen
             (\buildExpense ->
-                Decode.map3 buildExpense
+                Decode.map4 buildExpense
+                    (Decode.field "ars" Decode.float)
                     (Decode.field "usd" Decode.float)
                     (Decode.field "date" Decode.string)
                     (Decode.maybe (Decode.field "deletedAt" Decode.string))

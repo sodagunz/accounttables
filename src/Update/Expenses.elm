@@ -1,6 +1,6 @@
 module Update.Expenses exposing (add)
 
-import Accounting exposing (Currency(..), Expense)
+import Accounting exposing (Expense)
 import Auth exposing (AuthState(..))
 import Json.Encode as Encode
 import Ledger
@@ -17,7 +17,7 @@ add expense model =
                     { description = ""
                     , amount = ""
                     , accountId = model.form.accountId
-                    , currency = ARS
+                    , currency = model.form.currency
                     , date = model.form.date
                     }
                 , error = ""

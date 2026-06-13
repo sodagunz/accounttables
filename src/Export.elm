@@ -75,7 +75,7 @@ expenseRow dateDisplay expense =
     , cells =
         [ formatDate dateDisplay expense.date
         , expense.accountName
-        , expense.description
+        , Maybe.withDefault "-" expense.description
         , formatMoney expense.inputCurrency expense.inputAmount
         , formatMoney ARS expense.exchangeRate
         , formatMoney ARS expense.ars

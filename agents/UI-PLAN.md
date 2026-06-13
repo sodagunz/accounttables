@@ -58,9 +58,11 @@
 
     Implemented by making the ledger panel show only the active ledger context by default and moving ledger switching plus owner renaming into an explicit `Libro contable` disclosure. The existing member and invitation controls remain visible for now because item 12 owns hiding invitation/member administration.
 
-11. [ ] Hide caja/account management by default
+11. [x] Hide caja/account management by default
 
     Caja management is closer to configuration than daily entry. Keep the selected caja visible in the movement form, but move create/delete/rename actions into a secondary `Cajas` section inside the settings/admin area. This keeps the entry flow fast while still making caja setup discoverable when someone needs to adjust the ledger structure.
+
+    Implemented by leaving the movement form caja selector visible and moving caja creation/deletion into a closed-by-default `Cajas` disclosure. The existing add/delete behavior is unchanged once the section is opened. Invitations and member administration remain visible because item 12 owns that scope, and the broader settings/admin grouping remains for item 19.
 
 12. [ ] Hide workspace invitations by default
 

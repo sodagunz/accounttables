@@ -270,11 +270,6 @@ select:focus {
   min-width: 0;
 }
 
-.accounts-panel {
-  display: grid;
-  gap: 12px;
-}
-
 .ledger-panel {
   display: grid;
   gap: 12px;
@@ -297,12 +292,14 @@ select:focus {
   overflow-wrap: anywhere;
 }
 
+.accounts-disclosure,
 .ledger-disclosure {
   border: 1px solid #d7e4df;
   border-radius: 6px;
   background: #f8faf9;
 }
 
+.accounts-disclosure__summary,
 .ledger-disclosure__summary {
   display: flex;
   align-items: center;
@@ -315,11 +312,13 @@ select:focus {
   list-style-position: inside;
 }
 
+.accounts-disclosure__summary strong,
 .ledger-disclosure__summary strong {
   color: #17352c;
   font-size: 0.84rem;
 }
 
+.accounts-disclosure__content,
 .ledger-disclosure__content {
   display: grid;
   gap: 12px;

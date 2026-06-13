@@ -1,7 +1,7 @@
 module View.LedgerAccounts exposing (Config, view)
 
 import Accounting exposing (Account)
-import Html exposing (Html, button, div, input, li, p, section, text, ul)
+import Html exposing (Html, button, div, input, li, p, section, span, strong, text, ul)
 import Html.Attributes exposing (class, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 
@@ -19,23 +19,31 @@ type alias Config msg =
 view : Config msg -> Html msg
 view config =
     section [ class "panel accounts-panel" ]
-        [ Html.h2 [ class "section-title" ] [ text "Cajas" ]
-        , Html.form [ class "inline-form", onSubmit config.onAdd ]
-            [ input
-                [ type_ "text"
-                , placeholder "Caja"
-                , value config.newAccountName
-                , onInput config.onName
+        [ Html.details [ class "accounts-disclosure" ]
+            [ Html.summary [ class "accounts-disclosure__summary" ]
+                [ span [] [ text "Crear o eliminar" ]
+                , strong [] [ text "Cajas" ]
                 ]
-                []
-            , button [ class "primary", type_ "submit" ] [ text "Agregar" ]
-            ]
-        , p [ class "error" ] [ text config.error ]
-        , if List.isEmpty config.accounts then
-            p [ class "empty empty--compact" ] [ text "No hay cajas activas." ]
+            , div [ class "accounts-disclosure__content" ]
+                [ Html.h2 [ class "section-title" ] [ text "Cajas" ]
+                , Html.form [ class "inline-form", onSubmit config.onAdd ]
+                    [ input
+                        [ type_ "text"
+                        , placeholder "Caja"
+                        , value config.newAccountName
+                        , onInput config.onName
+                        ]
+                        []
+                    , button [ class "primary", type_ "submit" ] [ text "Agregar" ]
+                    ]
+                , p [ class "error" ] [ text config.error ]
+                , if List.isEmpty config.accounts then
+                    p [ class "empty empty--compact" ] [ text "No hay cajas activas." ]
 
-          else
-            ul [ class "account-list" ] (List.map (accountRow config) config.accounts)
+                  else
+                    ul [ class "account-list" ] (List.map (accountRow config) config.accounts)
+                ]
+            ]
         ]
 
 

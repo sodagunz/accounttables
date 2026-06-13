@@ -64,9 +64,11 @@
 
     Implemented by leaving the movement form caja selector visible and moving caja creation/deletion into a closed-by-default `Cajas` disclosure. The existing add/delete behavior is unchanged once the section is opened. Invitations and member administration remain visible because item 12 owns that scope, and the broader settings/admin grouping remains for item 19.
 
-12. [ ] Hide workspace invitations by default
+12. [x] Hide workspace invitations by default
 
     Invitations are ownership/admin actions, so they should live behind an explicit `Miembros` or `Invitaciones` section in the same settings/admin area. Avoid putting invite controls in the main navigation or expense entry surface. The main screen can show no invite UI unless there is a pending state that directly affects access, such as an invite acceptance prompt.
+
+    Implemented by moving the member list, remove-member buttons, and invite-by-email form into a closed-by-default `Miembros` disclosure inside the ledger panel. The active ledger context remains visible, and all invitation/removal behavior is preserved once the section is opened.
 
 13. [ ] Keep new movement entry to at most two clicks after typing
 

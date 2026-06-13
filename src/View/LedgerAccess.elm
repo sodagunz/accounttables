@@ -33,8 +33,7 @@ view config =
                 ]
             ]
         , ledgerControls config
-        , memberList config
-        , inviteForm config
+        , memberControls config
         , p [ class "error" ] [ text config.error ]
         ]
 
@@ -88,6 +87,20 @@ ledgerNameForm config =
 
         Nothing ->
             text ""
+
+
+memberControls : Config msg -> Html msg
+memberControls config =
+    Html.details [ class "members-disclosure" ]
+        [ Html.summary [ class "members-disclosure__summary" ]
+            [ span [] [ text "Invitaciones y acceso" ]
+            , strong [] [ text "Miembros" ]
+            ]
+        , div [ class "members-disclosure__content" ]
+            [ memberList config
+            , inviteForm config
+            ]
+        ]
 
 
 memberList : Config msg -> Html msg

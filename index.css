@@ -293,14 +293,16 @@ select:focus {
 }
 
 .accounts-disclosure,
-.ledger-disclosure {
+.ledger-disclosure,
+.members-disclosure {
   border: 1px solid #d7e4df;
   border-radius: 6px;
   background: #f8faf9;
 }
 
 .accounts-disclosure__summary,
-.ledger-disclosure__summary {
+.ledger-disclosure__summary,
+.members-disclosure__summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -313,13 +315,15 @@ select:focus {
 }
 
 .accounts-disclosure__summary strong,
-.ledger-disclosure__summary strong {
+.ledger-disclosure__summary strong,
+.members-disclosure__summary strong {
   color: #17352c;
   font-size: 0.84rem;
 }
 
 .accounts-disclosure__content,
-.ledger-disclosure__content {
+.ledger-disclosure__content,
+.members-disclosure__content {
   display: grid;
   gap: 12px;
   border-top: 1px solid #d7e4df;

@@ -1,6 +1,6 @@
 module View.ExpenseTable exposing (Config, view)
 
-import Accounting exposing (Currency(..), Expense, FilterWindow(..), MoneyTotal, SortDirection(..), SortField(..), WorkspaceUser, expensesFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, SortDirection(..), SortField(..), expensesFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
@@ -10,7 +10,7 @@ import Util.Format exposing (formatMoney)
 
 type alias Config msg =
     { expenses : List Expense
-    , users : List WorkspaceUser
+    , accounts : List Account
     , filterWindow : FilterWindow
     , dateDisplay : DateDisplay
     , customStart : String
@@ -41,7 +41,7 @@ view config =
                     [ thead []
                         [ tr []
                             [ sortableHeader config SortByDate "" "Fecha"
-                            , sortableHeader config SortByPerson "" "Nombre"
+                            , sortableHeader config SortByAccount "" "Caja"
                             , sortableHeader config SortByDescription "" "Descripción"
                             , th [ class "numeric" ] [ text "Ingresado" ]
                             , sortableHeader config SortByExchangeRate "numeric" "Cotización"
@@ -50,7 +50,7 @@ view config =
                             , sortableHeader config SortByDollars "numeric" "Dólar"
                             ]
                         ]
-                    , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.users config.expenses)
+                    , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.accounts config.expenses)
                     ]
                 ]
         ]
@@ -146,7 +146,7 @@ expenseRow : DateDisplay -> Expense -> Html msg
 expenseRow dateDisplay expense =
     tr []
         [ td [] [ text (formatDate dateDisplay expense.date) ]
-        , td [] [ text expense.userName ]
+        , td [] [ text expense.accountName ]
         , td [] [ text expense.description ]
         , td [ class "numeric" ] [ text (formatMoney expense.inputCurrency expense.inputAmount) ]
         , td [ class "numeric" ] [ text (formatMoney ARS expense.exchangeRate) ]
@@ -190,13 +190,13 @@ sortableHeader config sortField alignment labelText =
         ]
 
 
-subtotalRows : List WorkspaceUser -> List Expense -> List (Html msg)
-subtotalRows users expenses =
+subtotalRows : List Account -> List Expense -> List (Html msg)
+subtotalRows accounts expenses =
     let
         grandTotal =
             summarizeMoney expenses
     in
-    List.map (\user -> totalRow ("Subtotal " ++ user.name) "subtotal" (summarizeMoney (expensesFor user expenses))) users
+    List.map (\account -> totalRow ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (expensesFor account expenses))) accounts
         ++ [ totalRow "Total" "grand-total" grandTotal ]
 
 

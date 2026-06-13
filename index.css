@@ -230,7 +230,7 @@ select:focus {
   min-width: 0;
 }
 
-.users-panel {
+.accounts-panel {
   display: grid;
   gap: 12px;
 }
@@ -240,14 +240,14 @@ select:focus {
   gap: 12px;
 }
 
-.user-form {
+.inline-form {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) auto;
   gap: 10px;
 }
 
 .member-list,
-.user-list {
+.account-list {
   display: grid;
   gap: 8px;
   list-style: none;
@@ -256,7 +256,7 @@ select:focus {
 }
 
 .member-list__item,
-.user-list__item {
+.account-list__item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -267,7 +267,7 @@ select:focus {
 }
 
 .member-list__item div,
-.user-list__item div {
+.account-list__item div {
   display: grid;
   gap: 2px;
   min-width: 0;
@@ -481,7 +481,7 @@ th:first-child {
     grid-template-columns: 1fr;
   }
 
-  .user-form {
+  .inline-form {
     grid-template-columns: 1fr;
   }
 }

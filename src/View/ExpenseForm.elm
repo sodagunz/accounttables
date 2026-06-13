@@ -1,6 +1,6 @@
 module View.ExpenseForm exposing (Config, view)
 
-import Accounting exposing (Currency(..), Form, WorkspaceUser, convert, currencyToString)
+import Accounting exposing (Account, Currency(..), Form, convert, currencyToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Html exposing (Html, button, div, input, label, option, p, section, select, strong, text)
 import Html.Attributes exposing (class, step, type_, value)
@@ -12,14 +12,14 @@ import Util.Format exposing (formatMoney)
 
 type alias Config msg =
     { form : Form
-    , users : List WorkspaceUser
+    , accounts : List Account
     , exchangeRate : Float
     , exchangeRateStatus : ExchangeRateStatus
     , zone : Time.Zone
     , error : String
     , onDescription : String -> msg
     , onAmount : String -> msg
-    , onPerson : String -> msg
+    , onAccount : String -> msg
     , onCurrency : String -> msg
     , onDate : String -> msg
     , onSubmit : msg
@@ -50,9 +50,9 @@ view config =
                 ]
             , div [ class "two-col" ]
                 [ label []
-                    [ text "Nombre"
-                    , select [ value config.form.userId, onInput config.onPerson ]
-                        (userOptions config.users)
+                    [ text "Caja"
+                    , select [ value config.form.accountId, onInput config.onAccount ]
+                        (accountOptions config.accounts)
                     ]
                 , label []
                     [ text "Fecha"
@@ -67,20 +67,20 @@ view config =
         ]
 
 
-userOptions : List WorkspaceUser -> List (Html msg)
-userOptions users =
-    case users of
+accountOptions : List Account -> List (Html msg)
+accountOptions accounts =
+    case accounts of
         [] ->
-            [ option [ value "" ] [ text "Agrega una persona" ] ]
+            [ option [ value "" ] [ text "Agrega una caja" ] ]
 
         _ ->
             option [ value "" ] [ text "Seleccionar" ]
-                :: List.map userOption users
+                :: List.map accountOption accounts
 
 
-userOption : WorkspaceUser -> Html msg
-userOption user =
-    option [ value user.id ] [ text user.name ]
+accountOption : Account -> Html msg
+accountOption account =
+    option [ value account.id ] [ text account.name ]
 
 
 conversionPreview : Float -> Form -> Html msg

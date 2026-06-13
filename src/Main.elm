@@ -1,6 +1,6 @@
 port module Main exposing (main)
 
-import Accounting exposing (Currency(..), Expense, FilterWindow(..), Form, SortDirection(..), SortField(..), WorkspaceUser)
+import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), Form, SortDirection(..), SortField(..))
 import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
 import Auth exposing (AuthState(..))
 import Browser
@@ -18,21 +18,21 @@ import View.AuthStatus as AuthStatus
 import View.ExpenseForm as ExpenseForm
 import View.ExpenseTable as ExpenseTable
 import View.WorkspaceAccess as WorkspaceAccess
-import View.WorkspaceUsers as WorkspaceUsers
+import View.WorkspaceAccounts as WorkspaceAccounts
 import Workspace exposing (LoadState(..))
 
 
 type alias Model =
     { form : Form
     , expenses : List Expense
-    , users : List WorkspaceUser
+    , accounts : List Account
     , workspaces : List Workspace.WorkspaceSummary
     , currentWorkspaceId : String
     , workspaceName : String
     , inviteEmail : String
     , workspaceError : String
-    , newUserName : String
-    , userError : String
+    , newAccountName : String
+    , accountError : String
     , error : String
     , today : String
     , filterWindow : FilterWindow
@@ -53,7 +53,7 @@ type Msg
     = GotToday Time.Zone Time.Posix
     | UpdateDescription String
     | UpdateAmount String
-    | UpdatePerson String
+    | UpdateAccount String
     | UpdateCurrency String
     | UpdateDate String
     | SelectFilter FilterWindow
@@ -70,9 +70,9 @@ type Msg
     | GotExchangeRate (Result Http.Error OfficialDollar)
     | AddExpense
     | ExpenseIdGenerated Decode.Value
-    | UpdateNewUserName String
-    | AddWorkspaceUser
-    | DeleteWorkspaceUser String
+    | UpdateNewAccountName String
+    | AddAccount
+    | DeleteAccount String
     | SelectWorkspace String
     | UpdateWorkspaceName String
     | SaveWorkspaceName
@@ -105,10 +105,10 @@ port generateExpenseId : () -> Cmd msg
 port expenseIdGenerated : (Decode.Value -> msg) -> Sub msg
 
 
-port saveWorkspaceUser : Encode.Value -> Cmd msg
+port saveAccount : Encode.Value -> Cmd msg
 
 
-port deleteWorkspaceUser : Encode.Value -> Cmd msg
+port deleteAccount : Encode.Value -> Cmd msg
 
 
 port inviteWorkspaceGuest : Encode.Value -> Cmd msg
@@ -137,14 +137,14 @@ init : ( Model, Cmd Msg )
 init =
     ( { form = Accounting.emptyForm
       , expenses = []
-      , users = defaultUsers
+      , accounts = defaultAccounts
       , workspaces = []
       , currentWorkspaceId = ""
       , workspaceName = ""
       , inviteEmail = ""
       , workspaceError = ""
-      , newUserName = ""
-      , userError = ""
+      , newAccountName = ""
+      , accountError = ""
       , error = ""
       , today = ""
       , filterWindow = AllTime
@@ -177,10 +177,10 @@ update msg model =
             ( { model
                 | form = Accounting.setDate today model.form
                 , today = today
-                , expenses = Accounting.sampleExpenses model.exchangeRate today model.users
+                , expenses = Accounting.sampleExpenses model.exchangeRate today model.accounts
                 , zone = zone
               }
-                |> ensureSelectedUser
+                |> ensureSelectedAccount
             , Cmd.none
             )
 
@@ -190,8 +190,8 @@ update msg model =
         UpdateAmount amount ->
             ( { model | form = Accounting.setAmount amount model.form }, Cmd.none )
 
-        UpdatePerson person ->
-            ( { model | form = Accounting.setUser person model.form }, Cmd.none )
+        UpdateAccount accountId ->
+            ( { model | form = Accounting.setAccount accountId model.form }, Cmd.none )
 
         UpdateCurrency currency ->
             ( { model | form = Accounting.setCurrency (Accounting.currencyFromString currency) model.form }, Cmd.none )
@@ -251,7 +251,7 @@ update msg model =
         ExpenseIdGenerated value ->
             case Decode.decodeValue Decode.string value of
                 Ok expenseId ->
-                    case Accounting.buildExpense model.exchangeRate expenseId (activeUsers model) model.form of
+                    case Accounting.buildExpense model.exchangeRate expenseId (activeAccounts model) model.form of
                         Ok expense ->
                             addExpense expense model
 
@@ -261,14 +261,14 @@ update msg model =
                 Err error ->
                     ( { model | error = Decode.errorToString error }, Cmd.none )
 
-        UpdateNewUserName name ->
-            ( { model | newUserName = name }, Cmd.none )
+        UpdateNewAccountName name ->
+            ( { model | newAccountName = name }, Cmd.none )
 
-        AddWorkspaceUser ->
-            addWorkspaceUser model
+        AddAccount ->
+            addAccount model
 
-        DeleteWorkspaceUser userId ->
-            deleteWorkspaceUserById userId model
+        DeleteAccount accountId ->
+            deleteAccountById accountId model
 
         SelectWorkspace workspaceId ->
             ( { model
@@ -276,9 +276,9 @@ update msg model =
                 , workspaceName = workspaceNameFor workspaceId model.workspaces
                 , workspaceLoadState = Loading
                 , expenses = []
-                , users = []
+                , accounts = []
                 , error = ""
-                , userError = ""
+                , accountError = ""
                 , workspaceError = ""
               }
             , loadWorkspaceData (Workspace.encodeWorkspaceRequest workspaceId)
@@ -347,44 +347,44 @@ saveWorkspaceName model =
         )
 
 
-addWorkspaceUser : Model -> ( Model, Cmd Msg )
-addWorkspaceUser model =
+addAccount : Model -> ( Model, Cmd Msg )
+addAccount model =
     let
         name =
-            String.trim model.newUserName
+            String.trim model.newAccountName
     in
     if name == "" then
-        ( { model | userError = "Ingresa un nombre." }, Cmd.none )
+        ( { model | accountError = "Ingresa un nombre." }, Cmd.none )
 
     else
         case model.authState of
             SignedIn _ ->
                 if selectedWorkspaceId model == "" then
-                    ( { model | userError = "Selecciona un workspace." }, Cmd.none )
+                    ( { model | accountError = "Selecciona un workspace." }, Cmd.none )
 
                 else
-                    ( { model | newUserName = "", userError = "" }
-                    , saveWorkspaceUser (Workspace.encodeUserCreate (selectedWorkspaceId model) name)
+                    ( { model | newAccountName = "", accountError = "" }
+                    , saveAccount (Workspace.encodeAccountCreate (selectedWorkspaceId model) name)
                     )
 
             _ ->
-                ( { model | userError = "Ingresa con Google para guardar personas en el workspace." }, Cmd.none )
+                ( { model | accountError = "Ingresa con Google para guardar cajas en el workspace." }, Cmd.none )
 
 
-deleteWorkspaceUserById : String -> Model -> ( Model, Cmd Msg )
-deleteWorkspaceUserById userId model =
+deleteAccountById : String -> Model -> ( Model, Cmd Msg )
+deleteAccountById accountId model =
     case model.authState of
         SignedIn _ ->
             if selectedWorkspaceId model == "" then
-                ( { model | userError = "Selecciona un workspace." }, Cmd.none )
+                ( { model | accountError = "Selecciona un workspace." }, Cmd.none )
 
             else
-                ( { model | userError = "" }
-                , deleteWorkspaceUser (Workspace.encodeUserDelete (selectedWorkspaceId model) userId)
+                ( { model | accountError = "" }
+                , deleteAccount (Workspace.encodeAccountDelete (selectedWorkspaceId model) accountId)
                 )
 
         _ ->
-            ( { model | userError = "Ingresa con Google para modificar personas del workspace." }, Cmd.none )
+            ( { model | accountError = "Ingresa con Google para modificar cajas del workspace." }, Cmd.none )
 
 
 view : Model -> Html Msg
@@ -414,14 +414,14 @@ view model =
             [ div [ class "layout" ]
                 [ ExpenseForm.view
                     { form = model.form
-                    , users = activeUsers model
+                    , accounts = activeAccounts model
                     , exchangeRate = model.exchangeRate
                     , exchangeRateStatus = model.exchangeRateStatus
                     , zone = model.zone
                     , error = model.error
                     , onDescription = UpdateDescription
                     , onAmount = UpdateAmount
-                    , onPerson = UpdatePerson
+                    , onAccount = UpdateAccount
                     , onCurrency = UpdateCurrency
                     , onDate = UpdateDate
                     , onSubmit = AddExpense
@@ -441,17 +441,17 @@ view model =
                         , onInvite = InviteGuest
                         , onRemoveGuest = RemoveGuest
                         }
-                    , WorkspaceUsers.view
-                        { users = activeUsers model
-                        , newUserName = model.newUserName
-                        , error = model.userError
-                        , onName = UpdateNewUserName
-                        , onAdd = AddWorkspaceUser
-                        , onDelete = DeleteWorkspaceUser
+                    , WorkspaceAccounts.view
+                        { accounts = activeAccounts model
+                        , newAccountName = model.newAccountName
+                        , error = model.accountError
+                        , onName = UpdateNewAccountName
+                        , onAdd = AddAccount
+                        , onDelete = DeleteAccount
                         }
                     , ExpenseTable.view
                         { expenses = rows
-                        , users = activeUsers model
+                        , accounts = activeAccounts model
                         , filterWindow = model.filterWindow
                         , dateDisplay = model.dateDisplay
                         , customStart = model.customStart
@@ -497,7 +497,7 @@ defaultSortDirection sortField =
         SortByDate ->
             Descending
 
-        SortByPerson ->
+        SortByAccount ->
             Ascending
 
         SortByDescription ->
@@ -515,7 +515,7 @@ defaultSortDirection sortField =
 
 exportVisibleTable : Export.Format -> Model -> Cmd Msg
 exportVisibleTable format model =
-    exportTable (Export.tablePayload format model.dateDisplay model.today (activeUsers model) (visibleExpenses model))
+    exportTable (Export.tablePayload format model.dateDisplay model.today (activeAccounts model) (visibleExpenses model))
 
 
 visibleExpenses : Model -> List Expense
@@ -541,13 +541,13 @@ handleAuthStateChanged authState model =
                 | authState = authState
                 , workspaceLoadState = Loading
                 , expenses = []
-                , users = []
+                , accounts = []
                 , workspaces = []
                 , currentWorkspaceId = user.uid
                 , workspaceName = ""
                 , inviteEmail = ""
                 , error = ""
-                , userError = ""
+                , accountError = ""
                 , workspaceError = ""
               }
             , loadWorkspaceData (Workspace.encodeWorkspaceRequest user.uid)
@@ -558,16 +558,16 @@ handleAuthStateChanged authState model =
                 | authState = authState
                 , workspaceLoadState = NotLoaded
                 , expenses = sampleExpensesForModel model
-                , users = defaultUsers
+                , accounts = defaultAccounts
                 , workspaces = []
                 , currentWorkspaceId = ""
                 , workspaceName = ""
                 , inviteEmail = ""
                 , error = ""
-                , userError = ""
+                , accountError = ""
                 , workspaceError = ""
               }
-                |> ensureSelectedUser
+                |> ensureSelectedAccount
             , Cmd.none
             )
 
@@ -581,16 +581,16 @@ handleWorkspaceLoaded value model =
         Ok workspace ->
             ( { model
                 | expenses = activeExpenses workspace.expenses
-                , users = activeUsersFromList workspace.users
+                , accounts = activeAccountsFromList workspace.accounts
                 , workspaces = workspace.workspaces
                 , currentWorkspaceId = workspace.currentWorkspaceId
                 , workspaceName = workspaceNameFor workspace.currentWorkspaceId workspace.workspaces
                 , workspaceLoadState = Loaded
                 , error = ""
-                , userError = ""
+                , accountError = ""
                 , workspaceError = ""
               }
-                |> ensureSelectedUser
+                |> ensureSelectedAccount
             , Cmd.none
             )
 
@@ -607,7 +607,7 @@ addExpense expense model =
                 , form =
                     { description = ""
                     , amount = ""
-                    , userId = model.form.userId
+                    , accountId = model.form.accountId
                     , currency = ARS
                     , date = model.form.date
                     }
@@ -615,7 +615,7 @@ addExpense expense model =
             }
     in
     case model.authState of
-        SignedIn user ->
+        SignedIn _ ->
             if selectedWorkspaceId model == "" then
                 ( { updatedModel | error = "Selecciona un workspace." }, Cmd.none )
 
@@ -634,22 +634,22 @@ sampleExpensesForModel model =
         []
 
     else
-        Accounting.sampleExpenses model.exchangeRate model.today model.users
+        Accounting.sampleExpenses model.exchangeRate model.today model.accounts
 
 
-defaultUsers : List WorkspaceUser
-defaultUsers =
+defaultAccounts : List Account
+defaultAccounts =
     []
 
 
-activeUsers : Model -> List WorkspaceUser
-activeUsers model =
-    activeUsersFromList model.users
+activeAccounts : Model -> List Account
+activeAccounts model =
+    activeAccountsFromList model.accounts
 
 
-activeUsersFromList : List WorkspaceUser -> List WorkspaceUser
-activeUsersFromList users =
-    List.filter (\user -> user.deletedAt == Nothing) users
+activeAccountsFromList : List Account -> List Account
+activeAccountsFromList accounts =
+    List.filter (\account -> account.deletedAt == Nothing) accounts
 
 
 activeExpenses : List Expense -> List Expense
@@ -657,18 +657,18 @@ activeExpenses expenses =
     List.filter (\expense -> expense.deletedAt == Nothing) expenses
 
 
-ensureSelectedUser : Model -> Model
-ensureSelectedUser model =
-    if List.any (\user -> user.id == model.form.userId) (activeUsers model) then
+ensureSelectedAccount : Model -> Model
+ensureSelectedAccount model =
+    if List.any (\account -> account.id == model.form.accountId) (activeAccounts model) then
         model
 
     else
-        case activeUsers model of
-            user :: _ ->
-                { model | form = Accounting.setUser user.id model.form }
+        case activeAccounts model of
+            account :: _ ->
+                { model | form = Accounting.setAccount account.id model.form }
 
             [] ->
-                { model | form = Accounting.setUser "" model.form }
+                { model | form = Accounting.setAccount "" model.form }
 
 
 selectedWorkspaceId : Model -> String

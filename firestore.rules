@@ -56,7 +56,7 @@ service cloud.firestore {
         allow read, write: if isWorkspaceMember(workspaceId);
       }
 
-      match /users/{userId} {
+      match /accounts/{accountId} {
         allow read, write: if isWorkspaceMember(workspaceId);
       }
     }

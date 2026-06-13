@@ -206,20 +206,20 @@
           }
         });
 
-        app.ports.saveWorkspaceUser.subscribe(async ({ workspaceId, name }) => {
+        app.ports.saveAccount.subscribe(async ({ workspaceId, name }) => {
           try {
             await ensureWorkspace(auth, db, workspaceId);
             const trimmedName = String(name || "").trim();
 
             if (!trimmedName) {
-              throw new Error("El nombre no puede estar vacío.");
+              throw new Error("El nombre de la caja no puede estar vacío.");
             }
 
-            const userId = uuidv7();
+            const accountId = uuidv7();
             await setDoc(
-              doc(db, "workspaces", workspaceId, "users", userId),
+              doc(db, "workspaces", workspaceId, "accounts", accountId),
               {
-                id: userId,
+                id: accountId,
                 name: trimmedName,
                 createdAt: new Date().toISOString(),
                 updatedAt: serverTimestamp(),
@@ -228,7 +228,7 @@
             );
             await loadWorkspace(app, auth, db, workspaceId);
           } catch (error) {
-            console.error("Firestore user save failed", error);
+            console.error("Firestore account save failed", error);
             app.ports.workspaceLoaded.send({
               status: "error",
               workspaceId,
@@ -237,7 +237,7 @@
           }
         });
 
-        app.ports.deleteWorkspaceUser.subscribe(async ({ workspaceId, userId }) => {
+        app.ports.deleteAccount.subscribe(async ({ workspaceId, accountId }) => {
           try {
             await ensureWorkspace(auth, db, workspaceId);
             const deletedAt = new Date().toISOString();
@@ -255,7 +255,7 @@
               }
             }
 
-            await setInBatch(doc(db, "workspaces", workspaceId, "users", userId), {
+            await setInBatch(doc(db, "workspaces", workspaceId, "accounts", accountId), {
               deletedAt,
               updatedAt: serverTimestamp(),
             });
@@ -265,7 +265,7 @@
             );
             for (const documentSnapshot of expenseSnapshot.docs) {
               const expense = documentSnapshot.data();
-              if (expense.userId === userId && !expense.deletedAt) {
+              if (expense.accountId === accountId && !expense.deletedAt) {
                 await setInBatch(documentSnapshot.ref, {
                   deletedAt,
                   updatedAt: serverTimestamp(),
@@ -278,7 +278,7 @@
             }
             await loadWorkspace(app, auth, db, workspaceId);
           } catch (error) {
-            console.error("Firestore user delete failed", error);
+            console.error("Firestore account delete failed", error);
             app.ports.workspaceLoaded.send({
               status: "error",
               workspaceId,
@@ -403,11 +403,11 @@
           ? workspaceId
           : workspaces[0]?.id || auth.currentUser?.uid || "";
 
-        const [userSnapshot, expenseSnapshot] = await Promise.all([
-          getDocs(collection(db, "workspaces", selectedWorkspaceId, "users")),
+        const [accountSnapshot, expenseSnapshot] = await Promise.all([
+          getDocs(collection(db, "workspaces", selectedWorkspaceId, "accounts")),
           getDocs(collection(db, "workspaces", selectedWorkspaceId, "expenses")),
         ]);
-        const users = userSnapshot.docs.map((documentSnapshot) =>
+        const accounts = accountSnapshot.docs.map((documentSnapshot) =>
           serializeFirestoreDocument(documentSnapshot),
         );
         const expenses = expenseSnapshot.docs.map((documentSnapshot) =>
@@ -418,7 +418,7 @@
           status: "loaded",
           workspaceId: selectedWorkspaceId,
           workspaces,
-          users,
+          accounts,
           expenses,
         });
       }

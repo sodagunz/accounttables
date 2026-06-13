@@ -54,7 +54,7 @@ workspaceNameForm config =
     case currentWorkspace config of
         Just workspace ->
             if isOwner config workspace then
-                Html.form [ class "user-form", onSubmit config.onSaveWorkspaceName ]
+                Html.form [ class "inline-form", onSubmit config.onSaveWorkspaceName ]
                     [ input
                         [ type_ "text"
                         , placeholder "Nombre del workspace"
@@ -120,7 +120,7 @@ inviteForm config =
     case currentWorkspace config of
         Just workspace ->
             if isOwner config workspace then
-                Html.form [ class "user-form", onSubmit config.onInvite ]
+                Html.form [ class "inline-form", onSubmit config.onInvite ]
                     [ input
                         [ type_ "email"
                         , placeholder "Invitar por email"

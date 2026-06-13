@@ -1,12 +1,12 @@
 module Accounting exposing
-    ( Currency(..)
+    ( Account
+    , Currency(..)
     , Expense
     , FilterWindow(..)
     , Form
     , MoneyTotal
     , SortDirection(..)
     , SortField(..)
-    , WorkspaceUser
     , addMoney
     , buildExpense
     , convert
@@ -19,11 +19,11 @@ module Accounting exposing
     , fallbackExchangeRate
     , filteredExpenses
     , sampleExpenses
+    , setAccount
     , setAmount
     , setCurrency
     , setDate
     , setDescription
-    , setUser
     , sortExpenses
     , summarizeMoney
     )
@@ -53,7 +53,7 @@ type FilterWindow
 
 type SortField
     = SortByDate
-    | SortByPerson
+    | SortByAccount
     | SortByDescription
     | SortByExchangeRate
     | SortByPesos
@@ -68,8 +68,8 @@ type SortDirection
 type alias Expense =
     { id : String
     , description : String
-    , userId : String
-    , userName : String
+    , accountId : String
+    , accountName : String
     , inputAmount : Float
     , inputCurrency : Currency
     , exchangeRate : Float
@@ -80,7 +80,7 @@ type alias Expense =
     }
 
 
-type alias WorkspaceUser =
+type alias Account =
     { id : String
     , name : String
     , deletedAt : Maybe String
@@ -90,7 +90,7 @@ type alias WorkspaceUser =
 type alias Form =
     { description : String
     , amount : String
-    , userId : String
+    , accountId : String
     , currency : Currency
     , date : String
     }
@@ -106,7 +106,7 @@ emptyForm : Form
 emptyForm =
     { description = ""
     , amount = ""
-    , userId = ""
+    , accountId = ""
     , currency = ARS
     , date = ""
     }
@@ -122,9 +122,9 @@ setAmount amount form =
     { form | amount = amount }
 
 
-setUser : String -> Form -> Form
-setUser userId form =
-    { form | userId = userId }
+setAccount : String -> Form -> Form
+setAccount accountId form =
+    { form | accountId = accountId }
 
 
 setCurrency : Currency -> Form -> Form
@@ -137,15 +137,15 @@ setDate date form =
     { form | date = date }
 
 
-buildExpense : Float -> String -> List WorkspaceUser -> Form -> Result String Expense
-buildExpense exchangeRate id users form =
+buildExpense : Float -> String -> List Account -> Form -> Result String Expense
+buildExpense exchangeRate id accounts form =
     let
         description =
             String.trim form.description
 
-        selectedUser =
-            users
-                |> List.filter (\user -> user.id == form.userId && user.deletedAt == Nothing)
+        selectedAccount =
+            accounts
+                |> List.filter (\account -> account.id == form.accountId && account.deletedAt == Nothing)
                 |> List.head
     in
     case String.toFloat form.amount of
@@ -163,11 +163,11 @@ buildExpense exchangeRate id users form =
                 Err "Ingresa una fecha válida."
 
             else
-                case selectedUser of
+                case selectedAccount of
                     Nothing ->
-                        Err "Selecciona una persona."
+                        Err "Selecciona una caja."
 
-                    Just user ->
+                    Just account ->
                         let
                             converted =
                                 convert exchangeRate form.currency amount
@@ -175,8 +175,8 @@ buildExpense exchangeRate id users form =
                         Ok
                             { id = id
                             , description = description
-                            , userId = user.id
-                            , userName = user.name
+                            , accountId = account.id
+                            , accountName = account.name
                             , inputAmount = amount
                             , inputCurrency = form.currency
                             , exchangeRate = exchangeRate
@@ -214,13 +214,13 @@ addMoney expense total =
     }
 
 
-expensesFor : WorkspaceUser -> List Expense -> List Expense
-expensesFor user expenses =
-    List.filter (\expense -> expense.userId == user.id) expenses
+expensesFor : Account -> List Expense -> List Expense
+expensesFor account expenses =
+    List.filter (\expense -> expense.accountId == account.id) expenses
 
 
-sampleExpenses : Float -> String -> List WorkspaceUser -> List Expense
-sampleExpenses exchangeRate today users =
+sampleExpenses : Float -> String -> List Account -> List Expense
+sampleExpenses exchangeRate today accounts =
     let
         yesterday =
             Date.addDays -1 today
@@ -228,7 +228,7 @@ sampleExpenses exchangeRate today users =
         lastWeek =
             Date.addDays -7 today
     in
-    case users of
+    case accounts of
         first :: second :: _ ->
             [ sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
             , sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000002" "Nafta" second 42 USD today
@@ -245,16 +245,16 @@ sampleExpenses exchangeRate today users =
             []
 
 
-sampleExpense : Float -> String -> String -> WorkspaceUser -> Float -> Currency -> String -> Expense
-sampleExpense exchangeRate id description user amount currency date =
+sampleExpense : Float -> String -> String -> Account -> Float -> Currency -> String -> Expense
+sampleExpense exchangeRate id description account amount currency date =
     let
         converted =
             convert exchangeRate currency amount
     in
     { id = id
     , description = description
-    , userId = user.id
-    , userName = user.name
+    , accountId = account.id
+    , accountName = account.name
     , inputAmount = amount
     , inputCurrency = currency
     , exchangeRate = exchangeRate
@@ -328,8 +328,8 @@ sortExpenses sortField sortDirection expenses =
                 SortByDate ->
                     List.sortWith compareByDate expenses
 
-                SortByPerson ->
-                    List.sortWith compareByPerson expenses
+                SortByAccount ->
+                    List.sortWith compareByAccount expenses
 
                 SortByDescription ->
                     List.sortWith compareByDescription expenses
@@ -356,9 +356,9 @@ compareByDate left right =
     compareThen left.id right.id (compare left.date right.date)
 
 
-compareByPerson : Expense -> Expense -> Order
-compareByPerson left right =
-    compareThen left.id right.id (compare (String.toLower left.userName) (String.toLower right.userName))
+compareByAccount : Expense -> Expense -> Order
+compareByAccount left right =
+    compareThen left.id right.id (compare (String.toLower left.accountName) (String.toLower right.accountName))
 
 
 compareByDescription : Expense -> Expense -> Order

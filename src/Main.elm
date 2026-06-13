@@ -2,15 +2,18 @@ port module Main exposing (main)
 
 import Accounting exposing (Currency(..), Expense, FilterWindow(..), Form, SortDirection(..), SortField(..))
 import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
+import Auth exposing (AuthState(..))
 import Browser
 import Export
 import Html exposing (Html, div, h1, header, main_, p, text)
 import Html.Attributes exposing (class)
 import Http
+import Json.Decode as Decode
 import Json.Encode as Encode
 import Task
 import Time
 import Util.Date exposing (DateDisplay(..), dateToIso)
+import View.AuthStatus as AuthStatus
 import View.ExpenseForm as ExpenseForm
 import View.ExpenseTable as ExpenseTable
 
@@ -30,6 +33,7 @@ type alias Model =
     , exchangeRate : Float
     , exchangeRateStatus : ExchangeRateStatus
     , zone : Time.Zone
+    , authState : AuthState
     }
 
 
@@ -47,6 +51,9 @@ type Msg
     | SelectSort SortField
     | ExportCsv
     | ExportXlsx
+    | SignInWithGoogle
+    | SignOut
+    | AuthStateChanged Decode.Value
     | GotExchangeRate (Result Http.Error OfficialDollar)
     | AddExpense
 
@@ -54,12 +61,21 @@ type Msg
 port exportTable : Encode.Value -> Cmd msg
 
 
+port signInWithGoogle : () -> Cmd msg
+
+
+port signOutUser : () -> Cmd msg
+
+
+port authStateChanged : (Decode.Value -> msg) -> Sub msg
+
+
 main : Program () Model Msg
 main =
     Browser.element
         { init = \_ -> init
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
         , view = view
         }
 
@@ -80,6 +96,7 @@ init =
       , exchangeRate = Accounting.fallbackExchangeRate
       , exchangeRateStatus = LoadingRate
       , zone = Time.utc
+      , authState = AuthLoading
       }
     , Cmd.batch
         [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
@@ -142,6 +159,15 @@ update msg model =
         ExportXlsx ->
             ( model, exportVisibleTable Export.Xlsx model )
 
+        SignInWithGoogle ->
+            ( model, signInWithGoogle () )
+
+        SignOut ->
+            ( model, signOutUser () )
+
+        AuthStateChanged value ->
+            ( { model | authState = Auth.decodeAuthState value }, Cmd.none )
+
         GotExchangeRate result ->
             case result of
                 Ok officialDollar ->
@@ -186,8 +212,17 @@ view model =
     div [ class "app" ]
         [ header [ class "topbar" ]
             [ div [ class "topbar__inner" ]
-                [ h1 [] [ text "ContabilizAR" ]
-                , p [ class "subtitle" ] [ text "Un registro simple de gastos para Alice y Bob, con conversión AR$/U$D y una tabla filtrable." ]
+                [ div [ class "topbar__content" ]
+                    [ div []
+                        [ h1 [] [ text "ContabilizAR" ]
+                        , p [ class "subtitle" ] [ text "Un registro simple de gastos para Alice y Bob, con conversión AR$/U$D y una tabla filtrable." ]
+                        ]
+                    , AuthStatus.view
+                        { authState = model.authState
+                        , onSignIn = SignInWithGoogle
+                        , onSignOut = SignOut
+                        }
+                    ]
                 ]
             ]
         , main_ []
@@ -281,3 +316,8 @@ visibleExpenses : Model -> List Expense
 visibleExpenses model =
     Accounting.filteredExpenses model
         |> Accounting.sortExpenses model.sortField model.sortDirection
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    authStateChanged AuthStateChanged

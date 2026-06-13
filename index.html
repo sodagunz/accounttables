@@ -10,8 +10,20 @@
     <div id="app"></div>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="elm.js"></script>
-    <script>
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+      import {
+        getAuth,
+        GoogleAuthProvider,
+        onAuthStateChanged,
+        signInWithPopup,
+        signOut,
+      } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+      import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
+
       const app = Elm.Main.init({ node: document.getElementById("app") });
+
+      setupFirebaseAuth(app);
 
       app.ports.exportTable.subscribe((payload) => {
         if (payload.format === "xlsx" && window.XLSX) {
@@ -91,6 +103,63 @@
         link.click();
         link.remove();
         URL.revokeObjectURL(url);
+      }
+
+      function setupFirebaseAuth(app) {
+        if (!hasFirebaseConfig(firebaseConfig)) {
+          app.ports.authStateChanged.send({ status: "unconfigured" });
+          return;
+        }
+
+        const firebaseApp = initializeApp(firebaseConfig);
+        const auth = getAuth(firebaseApp);
+        const provider = new GoogleAuthProvider();
+
+        onAuthStateChanged(auth, (user) => {
+          if (user) {
+            app.ports.authStateChanged.send({
+              status: "signed-in",
+              user: serializeUser(user),
+            });
+          } else {
+            app.ports.authStateChanged.send({ status: "signed-out" });
+          }
+        });
+
+        app.ports.signInWithGoogle.subscribe(() => {
+          signInWithPopup(auth, provider).catch((error) => {
+            app.ports.authStateChanged.send({
+              status: "error",
+              message: firebaseAuthErrorMessage(error),
+            });
+          });
+        });
+
+        app.ports.signOutUser.subscribe(() => {
+          signOut(auth).catch((error) => {
+            app.ports.authStateChanged.send({
+              status: "error",
+              message: firebaseAuthErrorMessage(error),
+            });
+          });
+        });
+      }
+
+      function serializeUser(user) {
+        return {
+          uid: user.uid || "",
+          displayName: user.displayName || "",
+          email: user.email || "",
+          photoUrl: user.photoURL || "",
+        };
+      }
+
+      function firebaseAuthErrorMessage(error) {
+        if (error && error.code === "auth/popup-closed-by-user") {
+          return "Se cerró la ventana de ingreso.";
+        }
+
+        return "No se pudo iniciar sesión con Google.";
       }
     </script>
   </body>

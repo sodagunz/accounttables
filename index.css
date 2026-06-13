@@ -194,6 +194,17 @@ select:focus {
   font-weight: 800;
 }
 
+.description-field {
+  color: #68756f;
+  font-size: 0.84rem;
+}
+
+.description-field__input {
+  min-height: 40px;
+  border-color: #d4ddd9;
+  color: #33413c;
+}
+
 .two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;

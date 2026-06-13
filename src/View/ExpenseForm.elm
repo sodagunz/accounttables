@@ -66,9 +66,9 @@ view config =
                     , input [ type_ "date", value config.form.date, onInput config.onDate ] []
                     ]
                 ]
-            , label []
+            , label [ class "description-field" ]
                 [ text "Descripción"
-                , input [ type_ "text", value config.form.description, onInput config.onDescription ] []
+                , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
                 ]
             , conversionPreview config.exchangeRate config.form
             , exchangeRateView config

@@ -22,9 +22,11 @@
 
    Verified end to end. `Expense.description` is modeled as `Maybe String`, `buildExpense` accepts an empty description and stores it as `Nothing`, Firestore encoding writes `null`, decoding reads nullable descriptions, and table/export rendering falls back to `-`. No code changes were required for this item.
 
-5. [ ] Keep description secondary
+5. [x] Keep description secondary
 
    Description should not appear before amount in the form and should not slow down the default entry flow. Users can add it while entering a movement, but the UI should also support adding or editing it later from the table.
+
+   Implemented by keeping description below amount, currency, caja, and date, and giving it lighter visual treatment than the primary movement controls. The field remains available during entry, but it no longer reads as part of the critical path. Later table editing is intentionally left out of this item because it needs its own interaction design.
 
 6. [ ] Empty descriptions represented as `-`
 

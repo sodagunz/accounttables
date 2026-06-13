@@ -34,9 +34,11 @@
 
    Implemented with a shared `descriptionDisplay` formatter used by both the expense table and export payloads. It renders `Nothing`, empty strings, and whitespace-only descriptions as exactly `-`, while leaving real descriptions unchanged.
 
-7. [ ] Expense-only movement model for now
+7. [x] Expense-only movement model for now
 
    The UI can use the broader word `movimiento`, but every movement created by the current form is an expense. We should avoid exposing income/transfer controls until the model and UX are ready for them. This keeps the product behavior simple while leaving room for future movement types.
+
+   Verified without adding new controls. `MovementType` currently has only `ExpenseMovement`, `buildExpense` always assigns that value, the form exposes no income or transfer selector, and Firestore encoding/decoding persists the movement type as `"Expense"`. The UI keeps the broader `Registrar movimiento` wording while the current behavior remains expense-only.
 
 8. [ ] Positive user-entered `inputAmount`
 

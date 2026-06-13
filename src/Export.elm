@@ -1,6 +1,6 @@
 module Export exposing (Format(..), tablePayload)
 
-import Accounting exposing (Account, Currency(..), Expense, MoneyTotal, expensesFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), Expense, MoneyTotal, descriptionDisplay, expensesFor, summarizeMoney)
 import Json.Encode as Encode
 import Util.Date exposing (DateDisplay, formatDate)
 import Util.Format exposing (formatMoney)
@@ -75,7 +75,7 @@ expenseRow dateDisplay expense =
     , cells =
         [ formatDate dateDisplay expense.date
         , expense.accountName
-        , Maybe.withDefault "-" expense.description
+        , descriptionDisplay expense
         , formatMoney expense.inputCurrency expense.inputAmount
         , formatMoney ARS expense.exchangeRate
         , formatMoney ARS expense.ars

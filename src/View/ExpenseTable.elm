@@ -1,10 +1,9 @@
 module View.ExpenseTable exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, SortDirection(..), SortField(..), expensesFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, SortDirection(..), SortField(..), descriptionDisplay, expensesFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
-import Maybe
 import Util.Date exposing (DateDisplay(..), formatDate)
 import Util.Format exposing (formatMoney)
 
@@ -148,7 +147,7 @@ expenseRow dateDisplay expense =
     tr []
         [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay expense.date) ]
         , td [ attribute "data-label" "Caja" ] [ text expense.accountName ]
-        , td [ attribute "data-label" "Descripción" ] [ text (Maybe.withDefault "-" expense.description) ]
+        , td [ attribute "data-label" "Descripción" ] [ text (descriptionDisplay expense) ]
         , td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney expense.inputCurrency expense.inputAmount) ]
         , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatMoney ARS expense.exchangeRate) ]
         , td [ attribute "data-label" "Pesos", class "numeric" ] [ text (formatMoney ARS expense.ars) ]

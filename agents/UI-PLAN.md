@@ -28,9 +28,11 @@
 
    Implemented by keeping description below amount, currency, caja, and date, and giving it lighter visual treatment than the primary movement controls. The field remains available during entry, but it no longer reads as part of the critical path. Later table editing is intentionally left out of this item because it needs its own interaction design.
 
-6. [ ] Empty descriptions represented as `-`
+6. [x] Empty descriptions represented as `-`
 
    Empty descriptions need a consistent visual placeholder so table rows keep their structure and exports stay readable. Use a single `-` instead of blank cells, muted explanatory text, or generated labels. The placeholder means “no description was provided”, not “unknown data”.
+
+   Implemented with a shared `descriptionDisplay` formatter used by both the expense table and export payloads. It renders `Nothing`, empty strings, and whitespace-only descriptions as exactly `-`, while leaving real descriptions unchanged.
 
 7. [ ] Expense-only movement model for now
 

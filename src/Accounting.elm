@@ -14,6 +14,7 @@ module Accounting exposing
     , convert
     , currencyFromString
     , currencyToString
+    , descriptionDisplay
     , emptyForm
     , emptyMoney
     , expenseMatchesFilter
@@ -405,6 +406,20 @@ descriptionText expense =
     expense.description
         |> Maybe.withDefault ""
         |> String.toLower
+
+
+descriptionDisplay : Expense -> String
+descriptionDisplay expense =
+    case Maybe.map String.trim expense.description of
+        Just description ->
+            if description == "" then
+                "-"
+
+            else
+                description
+
+        Nothing ->
+            "-"
 
 
 compareByExchangeRate : Expense -> Expense -> Order

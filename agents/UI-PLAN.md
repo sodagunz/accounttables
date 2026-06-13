@@ -46,9 +46,11 @@
 
    Implemented and verified by keeping `inputAmount` as the positive amount parsed from the form, rejecting zero or negative values in `buildExpense`, and adding a positive minimum to the browser number input. The accounting sign remains separate: cashflow values are derived through `movementType`, not by asking users to enter a negative amount.
 
-9. [ ] Negative computed cashflow through `movementType = "Expense"`
+9. [x] Negative computed cashflow through `movementType = "Expense"`
 
    The app should compute signed cashflow from `movementType` plus the positive `inputAmount`. For the current expense-only flow, `movementType = "Expense"` means ARS and USD cashflow values are stored as negative numbers. This separates user input from accounting semantics.
+
+   Verified end to end. `buildExpense` keeps the parsed `inputAmount` positive, assigns `ExpenseMovement`, and stores `ars`/`usd` from `cashflowFor`. `cashflowFor` normalizes the raw amount with `abs`, converts it to ARS/USD, and applies the `ExpenseMovement` multiplier of `-1`. Sample expenses and the form preview use the same path, and Firestore encoding/decoding persists the movement type as `"Expense"`.
 
 10. [ ] Hide ledger creation by default
 

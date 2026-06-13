@@ -38,7 +38,7 @@ view config =
 
           else
             div [ class "table-wrap" ]
-                [ table []
+                [ table [ class "expense-table" ]
                     [ thead []
                         [ tr []
                             [ sortableHeader config SortByDate "" "Fecha"
@@ -146,14 +146,14 @@ dateDisplayButton config dateDisplay labelText =
 expenseRow : DateDisplay -> Expense -> Html msg
 expenseRow dateDisplay expense =
     tr []
-        [ td [] [ text (formatDate dateDisplay expense.date) ]
-        , td [] [ text expense.accountName ]
-        , td [] [ text (Maybe.withDefault "-" expense.description) ]
-        , td [ class "numeric" ] [ text (formatMoney expense.inputCurrency expense.inputAmount) ]
-        , td [ class "numeric" ] [ text (formatMoney ARS expense.exchangeRate) ]
-        , td [ class "numeric" ] [ text (formatMoney ARS expense.ars) ]
+        [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay expense.date) ]
+        , td [ attribute "data-label" "Caja" ] [ text expense.accountName ]
+        , td [ attribute "data-label" "Descripción" ] [ text (Maybe.withDefault "-" expense.description) ]
+        , td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney expense.inputCurrency expense.inputAmount) ]
+        , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatMoney ARS expense.exchangeRate) ]
+        , td [ attribute "data-label" "Pesos", class "numeric" ] [ text (formatMoney ARS expense.ars) ]
         , td [ class "equivalence" ] [ text "=" ]
-        , td [ class "numeric" ] [ text (formatMoney USD expense.usd) ]
+        , td [ attribute "data-label" "Dólar", class "numeric" ] [ text (formatMoney USD expense.usd) ]
         ]
 
 
@@ -204,8 +204,8 @@ subtotalRows accounts expenses =
 totalRow : String -> String -> MoneyTotal -> Html msg
 totalRow labelText rowClass total =
     tr [ class rowClass ]
-        [ td [ attribute "colspan" "5" ] [ text labelText ]
-        , td [ class "numeric" ] [ text (formatMoney ARS total.ars) ]
+        [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ text labelText ]
+        , td [ attribute "data-label" "Pesos", class "numeric" ] [ text (formatMoney ARS total.ars) ]
         , td [ class "equivalence" ] [ text "=" ]
-        , td [ class "numeric" ] [ text (formatMoney USD total.usd) ]
+        , td [ attribute "data-label" "Dólar", class "numeric" ] [ text (formatMoney USD total.usd) ]
         ]

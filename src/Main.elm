@@ -315,7 +315,24 @@ view model =
                     , onSubmit = AddExpense
                     }
                 , div [ class "content-stack" ]
-                    [ LedgerAccess.view
+                    [ ExpenseTable.view
+                        { expenses = rows
+                        , accounts = Model.activeAccounts model
+                        , filterWindow = model.filterWindow
+                        , dateDisplay = model.dateDisplay
+                        , customStart = model.customStart
+                        , customEnd = model.customEnd
+                        , sortField = model.sortField
+                        , sortDirection = model.sortDirection
+                        , onSelectFilter = SelectFilter
+                        , onCustomStart = UpdateCustomStart
+                        , onCustomEnd = UpdateCustomEnd
+                        , onSelectDateDisplay = SelectDateDisplay
+                        , onSelectSort = SelectSort
+                        , onExportCsv = ExportCsv
+                        , onExportXlsx = ExportXlsx
+                        }
+                    , LedgerAccess.view
                         { authState = model.authState
                         , ledgers = model.ledgers
                         , currentLedgerId = model.currentLedgerId
@@ -336,23 +353,6 @@ view model =
                         , onName = UpdateNewAccountName
                         , onAdd = AddAccount
                         , onDelete = DeleteAccount
-                        }
-                    , ExpenseTable.view
-                        { expenses = rows
-                        , accounts = Model.activeAccounts model
-                        , filterWindow = model.filterWindow
-                        , dateDisplay = model.dateDisplay
-                        , customStart = model.customStart
-                        , customEnd = model.customEnd
-                        , sortField = model.sortField
-                        , sortDirection = model.sortDirection
-                        , onSelectFilter = SelectFilter
-                        , onCustomStart = UpdateCustomStart
-                        , onCustomEnd = UpdateCustomEnd
-                        , onSelectDateDisplay = SelectDateDisplay
-                        , onSelectSort = SelectSort
-                        , onExportCsv = ExportCsv
-                        , onExportXlsx = ExportXlsx
                         }
                     ]
                 ]

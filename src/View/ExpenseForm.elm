@@ -3,7 +3,7 @@ module View.ExpenseForm exposing (Config, view)
 import Accounting exposing (Account, Currency(..), Form, MovementType(..), cashflowFor, currencyToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Html exposing (Html, button, div, input, label, option, p, section, select, strong, text)
-import Html.Attributes exposing (class, step, type_, value)
+import Html.Attributes exposing (attribute, autofocus, class, step, type_, value)
 import Html.Events exposing (onInput, onSubmit)
 import Time
 import Util.Date as Date
@@ -28,13 +28,24 @@ type alias Config msg =
 
 view : Config msg -> Html msg
 view config =
-    section [ class "panel" ]
-        [ Html.h2 [ class "section-title" ] [ text "Registrar movimiento" ]
+    section [ class "panel movement-panel" ]
+        [ Html.h2 [ class "section-title movement-title" ] [ text "Registrar movimiento" ]
         , Html.form [ class "form-grid", onSubmit config.onSubmit ]
             [ div [ class "two-col" ]
                 [ label []
                     [ text "Importe"
-                    , input [ type_ "number", step "0.01", value config.form.amount, onInput config.onAmount ] []
+                    , input
+                        [ class "amount-input"
+                        , type_ "number"
+                        , attribute "inputmode" "decimal"
+                        , attribute "autocomplete" "off"
+                        , attribute "aria-label" "Importe del movimiento"
+                        , step "0.01"
+                        , autofocus True
+                        , value config.form.amount
+                        , onInput config.onAmount
+                        ]
+                        []
                     ]
                 , label []
                     [ text "Divisa"
@@ -62,7 +73,7 @@ view config =
             , conversionPreview config.exchangeRate config.form
             , exchangeRateView config
             , p [ class "error" ] [ text config.error ]
-            , button [ class "primary", type_ "submit" ] [ text "Registrar movimiento" ]
+            , button [ class "primary primary--movement", type_ "submit" ] [ text "Registrar movimiento" ]
             ]
         ]
 

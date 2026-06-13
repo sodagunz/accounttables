@@ -26,6 +26,12 @@ select {
   font: inherit;
 }
 
+button,
+input,
+select {
+  min-height: 44px;
+}
+
 .app {
   min-height: 100vh;
 }
@@ -33,7 +39,7 @@ select {
 .topbar {
   background: #17352c;
   color: #ffffff;
-  padding: 24px clamp(16px, 4vw, 40px);
+  padding: 14px clamp(16px, 4vw, 40px);
 }
 
 .topbar__inner {
@@ -56,16 +62,17 @@ p {
 }
 
 h1 {
-  font-size: clamp(2rem, 6vw, 4.25rem);
-  line-height: 0.95;
+  font-size: clamp(1.45rem, 3vw, 2.3rem);
+  line-height: 1;
   letter-spacing: 0;
 }
 
 .subtitle {
-  margin-top: 10px;
+  margin-top: 6px;
   color: #d6e6df;
   max-width: 720px;
   line-height: 1.45;
+  font-size: 0.92rem;
 }
 
 .auth-status {
@@ -138,9 +145,19 @@ main {
   padding: 18px;
 }
 
+.movement-panel {
+  border-color: #a8c8bc;
+  box-shadow: 0 10px 26px rgba(20, 34, 30, 0.1);
+}
+
 .section-title {
   font-size: 1rem;
   margin-bottom: 14px;
+}
+
+.movement-title {
+  color: #17352c;
+  font-size: 1.25rem;
 }
 
 .form-grid {
@@ -170,6 +187,11 @@ select:focus {
   outline: 2px solid #2f806c;
   outline-offset: 1px;
   border-color: #2f806c;
+}
+
+.amount-input {
+  font-size: 1.25rem;
+  font-weight: 800;
 }
 
 .two-col {
@@ -218,10 +240,17 @@ select:focus {
   color: #ffffff;
   padding: 11px 14px;
   cursor: pointer;
+  font-weight: 800;
 }
 
 .primary:hover {
   background: #276d5c;
+}
+
+.primary--movement {
+  min-height: 50px;
+  width: 100%;
+  font-size: 1rem;
 }
 
 .content-stack {
@@ -452,16 +481,33 @@ th:first-child {
   .layout {
     grid-template-columns: 1fr;
   }
+
+  .content-stack {
+    gap: 14px;
+  }
 }
 
 @media (max-width: 520px) {
+  body {
+    background: #ffffff;
+  }
+
   .topbar {
-    padding-top: 20px;
-    padding-bottom: 20px;
+    padding: 12px 16px;
   }
 
   .topbar__content {
     display: grid;
+    gap: 14px;
+  }
+
+  h1 {
+    font-size: 1.55rem;
+    line-height: 1;
+  }
+
+  .subtitle {
+    display: none;
   }
 
   .auth-status {
@@ -470,11 +516,40 @@ th:first-child {
   }
 
   main {
-    padding-top: 16px;
+    padding: 12px 0 32px;
+  }
+
+  .layout,
+  .content-stack {
+    gap: 10px;
+  }
+
+  .panel {
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 16px;
+  }
+
+  .movement-panel {
+    border-bottom: 1px solid #cfe0d9;
+    box-shadow: none;
+    padding-top: 18px;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+  }
+
+  .movement-title {
+    font-size: 1.35rem;
   }
 
   .two-col {
     grid-template-columns: 1fr;
+    gap: 10px;
   }
 
   .custom-range {
@@ -483,5 +558,93 @@ th:first-child {
 
   .inline-form {
     grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    gap: 12px;
+  }
+
+  .primary {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .table-controls {
+    display: grid;
+    gap: 12px;
+  }
+
+  .filter-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-button {
+    min-height: 40px;
+    padding: 8px 6px;
+  }
+
+  .date-mode {
+    display: grid;
+    gap: 8px;
+  }
+
+  .table-wrap {
+    overflow: visible;
+  }
+
+  .expense-table {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 10px;
+  }
+
+  .expense-table thead {
+    display: none;
+  }
+
+  .expense-table tr {
+    display: grid;
+    gap: 8px;
+    border: 1px solid #dde7e2;
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .expense-table td {
+    display: grid;
+    grid-template-columns: minmax(86px, 0.42fr) 1fr;
+    gap: 12px;
+    align-items: baseline;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .expense-table td::before {
+    content: attr(data-label);
+    color: #68756f;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .expense-table td.numeric {
+    text-align: left;
+  }
+
+  .expense-table .equivalence {
+    display: none;
+  }
+
+  .expense-table .subtotal,
+  .expense-table .grand-total {
+    background: #f8faf9;
+  }
+
+  .expense-table .subtotal td,
+  .expense-table .grand-total td {
+    background: transparent;
   }
 }

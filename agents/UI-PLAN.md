@@ -52,9 +52,11 @@
 
    Verified end to end. `buildExpense` keeps the parsed `inputAmount` positive, assigns `ExpenseMovement`, and stores `ars`/`usd` from `cashflowFor`. `cashflowFor` normalizes the raw amount with `abs`, converts it to ARS/USD, and applies the `ExpenseMovement` multiplier of `-1`. Sample expenses and the form preview use the same path, and Firestore encoding/decoding persists the movement type as `"Expense"`.
 
-10. [ ] Hide ledger creation by default
+10. [x] Hide ledger creation by default
 
-Ledger creation is administrative and infrequent, so it should not compete with expense entry on the default screen. Use a compact top bar that shows the current ledger name and exposes ledger switching/creation through a clearly labeled control, such as `Libro contable`, rather than a generic hamburger menu. On mobile this can open a bottom sheet; on desktop it can open a popover or side panel.
+    Ledger creation is administrative and infrequent, so it should not compete with expense entry on the default screen. Use a compact top bar that shows the current ledger name and exposes ledger switching/creation through a clearly labeled control, such as `Libro contable`, rather than a generic hamburger menu. On mobile this can open a bottom sheet; on desktop it can open a popover or side panel.
+
+    Implemented by making the ledger panel show only the active ledger context by default and moving ledger switching plus owner renaming into an explicit `Libro contable` disclosure. The existing member and invitation controls remain visible for now because item 12 owns hiding invitation/member administration.
 
 11. [ ] Hide caja/account management by default
 

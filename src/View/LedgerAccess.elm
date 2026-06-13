@@ -1,7 +1,7 @@
 module View.LedgerAccess exposing (Config, view)
 
 import Auth
-import Html exposing (Html, button, div, input, label, li, option, p, section, select, span, text, ul)
+import Html exposing (Html, button, div, input, label, li, option, p, section, select, span, strong, text, ul)
 import Html.Attributes exposing (class, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Ledger exposing (LedgerSummary, Member)
@@ -26,12 +26,30 @@ type alias Config msg =
 view : Config msg -> Html msg
 view config =
     section [ class "panel ledger-panel" ]
-        [ Html.h2 [ class "section-title" ] [ text "Libro contable" ]
-        , ledgerSelect config
-        , ledgerNameForm config
+        [ div [ class "ledger-context" ]
+            [ div []
+                [ Html.h2 [ class "section-title ledger-context__title" ] [ text "Libro contable" ]
+                , p [ class "ledger-context__name" ] [ text (currentLedgerName config) ]
+                ]
+            ]
+        , ledgerControls config
         , memberList config
         , inviteForm config
         , p [ class "error" ] [ text config.error ]
+        ]
+
+
+ledgerControls : Config msg -> Html msg
+ledgerControls config =
+    Html.details [ class "ledger-disclosure" ]
+        [ Html.summary [ class "ledger-disclosure__summary" ]
+            [ span [] [ text "Cambiar o renombrar" ]
+            , strong [] [ text "Libro contable" ]
+            ]
+        , div [ class "ledger-disclosure__content" ]
+            [ ledgerSelect config
+            , ledgerNameForm config
+            ]
         ]
 
 
@@ -158,3 +176,10 @@ currentLedger config =
     config.ledgers
         |> List.filter (\ledger -> ledger.id == config.currentLedgerId)
         |> List.head
+
+
+currentLedgerName : Config msg -> String
+currentLedgerName config =
+    currentLedger config
+        |> Maybe.map .name
+        |> Maybe.withDefault "Sin libro contable activo"

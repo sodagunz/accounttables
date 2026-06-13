@@ -70,9 +70,11 @@
 
     Implemented by moving the member list, remove-member buttons, and invite-by-email form into a closed-by-default `Miembros` disclosure inside the ledger panel. The active ledger context remains visible, and all invitation/removal behavior is preserved once the section is opened.
 
-13. [ ] Keep new movement entry to at most two clicks after typing
+13. [x] Keep new movement entry to at most two clicks after typing
 
     After typing an amount, the user should be able to submit without touching any other field in the common case. The target flow is: type amount, tap `Registrar movimiento`. A second click is acceptable only when changing a default such as caja or currency; repeated same-context entry should stay one submit action after typing.
+
+    Implemented by normalizing the selected caja immediately before expense validation and creation. If active cajas are loaded but the form still has no selected caja, the submit path selects the first active caja and proceeds, so the common flow remains amount plus `Registrar movimiento`. This does not add last-used persistence; items 14 and 15 still own explicit caja and currency default behavior.
 
 14. [ ] Default caja to the last used caja
 

@@ -204,16 +204,20 @@ update msg model =
         ExpenseIdGenerated value ->
             case Decode.decodeValue Decode.string value of
                 Ok expenseId ->
-                    case Accounting.buildExpense model.exchangeRate expenseId (Model.activeAccounts model) model.form of
+                    let
+                        readyModel =
+                            Model.ensureSelectedAccount model
+                    in
+                    case Accounting.buildExpense readyModel.exchangeRate expenseId (Model.activeAccounts readyModel) readyModel.form of
                         Ok expense ->
                             let
                                 ( updatedModel, payload ) =
-                                    Expenses.add expense model
+                                    Expenses.add expense readyModel
                             in
                             ( updatedModel, payloadCmd saveExpense payload )
 
                         Err error ->
-                            ( { model | error = error }, Cmd.none )
+                            ( { readyModel | error = error }, Cmd.none )
 
                 Err error ->
                     ( { model | error = Decode.errorToString error }, Cmd.none )

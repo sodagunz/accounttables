@@ -172,24 +172,24 @@
       }
 
       function setupFirestore(app, auth, db) {
-        app.ports.loadWorkspaceData.subscribe(async ({ workspaceId }) => {
+        app.ports.loadLedgerData.subscribe(async ({ ledgerId }) => {
           try {
-            await loadWorkspace(app, auth, db, workspaceId);
+            await loadLedger(app, auth, db, ledgerId);
           } catch (error) {
-            console.error("Firestore workspace load failed", error);
-            app.ports.workspaceLoaded.send({
+            console.error("Firestore ledger load failed", error);
+            app.ports.ledgerLoaded.send({
               status: "error",
-              workspaceId,
+              ledgerId,
               message: firestoreErrorMessage(error),
             });
           }
         });
 
-        app.ports.saveExpense.subscribe(async ({ workspaceId, expense }) => {
+        app.ports.saveExpense.subscribe(async ({ ledgerId, expense }) => {
           try {
-            await ensureWorkspace(auth, db, workspaceId);
+            await ensureLedger(auth, db, ledgerId);
             await setDoc(
-              doc(db, "workspaces", workspaceId, "expenses", String(expense.id)),
+              doc(db, "ledgers", ledgerId, "expenses", String(expense.id)),
               {
                 ...expense,
                 updatedAt: serverTimestamp(),
@@ -198,17 +198,17 @@
             );
           } catch (error) {
             console.error("Firestore expense save failed", error);
-            app.ports.workspaceLoaded.send({
+            app.ports.ledgerLoaded.send({
               status: "error",
-              workspaceId,
+              ledgerId,
               message: firestoreErrorMessage(error),
             });
           }
         });
 
-        app.ports.saveAccount.subscribe(async ({ workspaceId, name }) => {
+        app.ports.saveAccount.subscribe(async ({ ledgerId, name }) => {
           try {
-            await ensureWorkspace(auth, db, workspaceId);
+            await ensureLedger(auth, db, ledgerId);
             const trimmedName = String(name || "").trim();
 
             if (!trimmedName) {
@@ -217,7 +217,7 @@
 
             const accountId = uuidv7();
             await setDoc(
-              doc(db, "workspaces", workspaceId, "accounts", accountId),
+              doc(db, "ledgers", ledgerId, "accounts", accountId),
               {
                 id: accountId,
                 name: trimmedName,
@@ -226,20 +226,20 @@
               },
               { merge: true },
             );
-            await loadWorkspace(app, auth, db, workspaceId);
+            await loadLedger(app, auth, db, ledgerId);
           } catch (error) {
             console.error("Firestore account save failed", error);
-            app.ports.workspaceLoaded.send({
+            app.ports.ledgerLoaded.send({
               status: "error",
-              workspaceId,
+              ledgerId,
               message: firestoreErrorMessage(error),
             });
           }
         });
 
-        app.ports.deleteAccount.subscribe(async ({ workspaceId, accountId }) => {
+        app.ports.deleteAccount.subscribe(async ({ ledgerId, accountId }) => {
           try {
-            await ensureWorkspace(auth, db, workspaceId);
+            await ensureLedger(auth, db, ledgerId);
             const deletedAt = new Date().toISOString();
             let batch = writeBatch(db);
             let writeCount = 0;
@@ -255,14 +255,12 @@
               }
             }
 
-            await setInBatch(doc(db, "workspaces", workspaceId, "accounts", accountId), {
+            await setInBatch(doc(db, "ledgers", ledgerId, "accounts", accountId), {
               deletedAt,
               updatedAt: serverTimestamp(),
             });
 
-            const expenseSnapshot = await getDocs(
-              collection(db, "workspaces", workspaceId, "expenses"),
-            );
+            const expenseSnapshot = await getDocs(collection(db, "ledgers", ledgerId, "expenses"));
             for (const documentSnapshot of expenseSnapshot.docs) {
               const expense = documentSnapshot.data();
               if (expense.accountId === accountId && !expense.deletedAt) {
@@ -276,36 +274,36 @@
             if (writeCount > 0) {
               await batch.commit();
             }
-            await loadWorkspace(app, auth, db, workspaceId);
+            await loadLedger(app, auth, db, ledgerId);
           } catch (error) {
             console.error("Firestore account delete failed", error);
-            app.ports.workspaceLoaded.send({
+            app.ports.ledgerLoaded.send({
               status: "error",
-              workspaceId,
+              ledgerId,
               message: firestoreErrorMessage(error),
             });
           }
         });
 
-        app.ports.inviteWorkspaceGuest.subscribe(async ({ workspaceId, email }) => {
+        app.ports.inviteLedgerGuest.subscribe(async ({ ledgerId, email }) => {
           try {
-            await ensureWorkspace(auth, db, workspaceId);
+            await ensureLedger(auth, db, ledgerId);
             const normalizedEmail = normalizeEmail(email);
             if (!normalizedEmail) {
               throw new Error("El email no puede estar vacío.");
             }
 
-            const workspaceSnapshot = await getDoc(doc(db, "workspaces", workspaceId));
-            const workspace = workspaceSnapshot.data();
-            if (workspace?.ownerUid !== auth.currentUser?.uid) {
+            const ledgerSnapshot = await getDoc(doc(db, "ledgers", ledgerId));
+            const ledger = ledgerSnapshot.data();
+            if (ledger?.ownerUid !== auth.currentUser?.uid) {
               throw new Error("Solo el owner puede invitar usuarios.");
             }
 
             await setDoc(
-              doc(db, "emailInvites", normalizedEmail, "workspaces", workspaceId),
+              doc(db, "emailInvites", normalizedEmail, "ledgers", ledgerId),
               {
-                workspaceId,
-                workspaceName: workspace?.name || "Workspace",
+                ledgerId,
+                ledgerName: ledger?.name || "Libro contable",
                 ownerUid: auth.currentUser.uid,
                 ownerEmail: normalizeEmail(auth.currentUser.email),
                 invitedEmail: normalizedEmail,
@@ -314,98 +312,98 @@
               },
               { merge: true },
             );
-            await updateDoc(doc(db, "workspaces", workspaceId), {
+            await updateDoc(doc(db, "ledgers", ledgerId), {
               invitedEmails: arrayUnion(normalizedEmail),
               updatedAt: serverTimestamp(),
             });
-            await loadWorkspace(app, auth, db, workspaceId);
+            await loadLedger(app, auth, db, ledgerId);
           } catch (error) {
             console.error("Firestore guest invite failed", error);
-            app.ports.workspaceLoaded.send({
+            app.ports.ledgerLoaded.send({
               status: "error",
-              workspaceId,
+              ledgerId,
               message: firestoreErrorMessage(error),
             });
           }
         });
 
-        app.ports.removeWorkspaceGuest.subscribe(async ({ workspaceId, uid }) => {
+        app.ports.removeLedgerGuest.subscribe(async ({ ledgerId, uid }) => {
           try {
-            await ensureWorkspace(auth, db, workspaceId);
-            const workspaceRef = doc(db, "workspaces", workspaceId);
-            const workspaceSnapshot = await getDoc(workspaceRef);
-            const workspace = workspaceSnapshot.data();
+            await ensureLedger(auth, db, ledgerId);
+            const ledgerRef = doc(db, "ledgers", ledgerId);
+            const ledgerSnapshot = await getDoc(ledgerRef);
+            const ledger = ledgerSnapshot.data();
 
-            if (workspace?.ownerUid !== auth.currentUser?.uid) {
+            if (ledger?.ownerUid !== auth.currentUser?.uid) {
               throw new Error("Solo el owner puede quitar invitados.");
             }
 
-            const member = (workspace.members || []).find((candidate) => candidate.uid === uid);
-            if (!member || uid === workspace.ownerUid) {
+            const member = (ledger.members || []).find((candidate) => candidate.uid === uid);
+            if (!member || uid === ledger.ownerUid) {
               throw new Error("No se puede quitar este miembro.");
             }
 
-            await updateDoc(workspaceRef, {
+            await updateDoc(ledgerRef, {
               memberUids: arrayRemove(uid),
               memberEmails: arrayRemove(normalizeEmail(member.email)),
               members: arrayRemove(member),
               updatedAt: serverTimestamp(),
             });
-            await deleteDoc(doc(db, "userWorkspaces", uid, "workspaces", workspaceId));
-            await loadWorkspace(app, auth, db, workspaceId);
+            await deleteDoc(doc(db, "userLedgers", uid, "ledgers", ledgerId));
+            await loadLedger(app, auth, db, ledgerId);
           } catch (error) {
             console.error("Firestore guest removal failed", error);
-            app.ports.workspaceLoaded.send({
+            app.ports.ledgerLoaded.send({
               status: "error",
-              workspaceId,
+              ledgerId,
               message: firestoreErrorMessage(error),
             });
           }
         });
 
-        app.ports.updateWorkspaceName.subscribe(async ({ workspaceId, name }) => {
+        app.ports.updateLedgerName.subscribe(async ({ ledgerId, name }) => {
           try {
-            await ensureWorkspace(auth, db, workspaceId);
+            await ensureLedger(auth, db, ledgerId);
             const trimmedName = String(name || "").trim();
             if (!trimmedName) {
-              throw new Error("El nombre del workspace no puede estar vacío.");
+              throw new Error("El nombre del libro contable no puede estar vacío.");
             }
 
-            const workspaceRef = doc(db, "workspaces", workspaceId);
-            const workspaceSnapshot = await getDoc(workspaceRef);
-            const workspace = workspaceSnapshot.data();
-            if (workspace?.ownerUid !== auth.currentUser?.uid) {
-              throw new Error("Solo el owner puede renombrar el workspace.");
+            const ledgerRef = doc(db, "ledgers", ledgerId);
+            const ledgerSnapshot = await getDoc(ledgerRef);
+            const ledger = ledgerSnapshot.data();
+            if (ledger?.ownerUid !== auth.currentUser?.uid) {
+              throw new Error("Solo el owner puede renombrar el libro contable.");
             }
 
-            await updateDoc(workspaceRef, {
+            await updateDoc(ledgerRef, {
               name: trimmedName,
               updatedAt: serverTimestamp(),
             });
-            await loadWorkspace(app, auth, db, workspaceId);
+            await loadLedger(app, auth, db, ledgerId);
           } catch (error) {
-            console.error("Firestore workspace rename failed", error);
-            app.ports.workspaceLoaded.send({
+            console.error("Firestore ledger rename failed", error);
+            app.ports.ledgerLoaded.send({
               status: "error",
-              workspaceId,
+              ledgerId,
               message: firestoreErrorMessage(error),
             });
           }
         });
       }
 
-      async function loadWorkspace(app, auth, db, workspaceId) {
-        await ensurePersonalWorkspace(auth, db);
+      async function loadLedger(app, auth, db, ledgerId) {
+        await ensurePersonalLedger(auth, db);
         await acceptPendingInvites(auth, db);
 
-        const workspaces = await loadWorkspaceSummaries(auth, db);
-        const selectedWorkspaceId = workspaces.some((workspace) => workspace.id === workspaceId)
-          ? workspaceId
-          : workspaces[0]?.id || auth.currentUser?.uid || "";
+        const ledgers = await loadLedgerSummaries(auth, db);
+        const selectedLedgerId = ledgers.some((ledger) => ledger.id === ledgerId)
+          ? ledgerId
+          : ledgers[0]?.id || auth.currentUser?.uid || "";
 
         const [accountSnapshot, expenseSnapshot] = await Promise.all([
-          getDocs(collection(db, "workspaces", selectedWorkspaceId, "accounts")),
-          getDocs(collection(db, "workspaces", selectedWorkspaceId, "expenses")),
+          getDocs(collection(db, "ledgers", selectedLedgerId, "accounts")),
+          getDocs(collection(db, "ledgers", selectedLedgerId, "expenses")),
         ]);
         const accounts = accountSnapshot.docs.map((documentSnapshot) =>
           serializeFirestoreDocument(documentSnapshot),
@@ -414,26 +412,26 @@
           serializeFirestoreDocument(documentSnapshot),
         );
 
-        app.ports.workspaceLoaded.send({
+        app.ports.ledgerLoaded.send({
           status: "loaded",
-          workspaceId: selectedWorkspaceId,
-          workspaces,
+          ledgerId: selectedLedgerId,
+          ledgers,
           accounts,
           expenses,
         });
       }
 
-      async function ensureWorkspace(auth, db, workspaceId) {
+      async function ensureLedger(auth, db, ledgerId) {
         if (!auth.currentUser?.uid) {
           throw new Error("No hay una sesión activa.");
         }
 
-        if (workspaceId === auth.currentUser.uid) {
-          await ensurePersonalWorkspace(auth, db);
+        if (ledgerId === auth.currentUser.uid) {
+          await ensurePersonalLedger(auth, db);
         }
       }
 
-      async function ensurePersonalWorkspace(auth, db) {
+      async function ensurePersonalLedger(auth, db) {
         const uid = auth.currentUser?.uid;
 
         if (!uid) {
@@ -446,24 +444,24 @@
           email,
           displayName: auth.currentUser.displayName || email,
         };
-        const workspaceRef = doc(db, "workspaces", uid);
-        const workspaceSnapshot = await getDoc(workspaceRef);
+        const ledgerRef = doc(db, "ledgers", uid);
+        const ledgerSnapshot = await getDoc(ledgerRef);
 
-        if (workspaceSnapshot.exists()) {
+        if (ledgerSnapshot.exists()) {
           await setDoc(
-            workspaceRef,
+            ledgerRef,
             {
               id: uid,
-              name: workspaceSnapshot.data().name || "Mi workspace",
+              name: ledgerSnapshot.data().name || "Mi libro contable",
               ownerUid: uid,
               updatedAt: serverTimestamp(),
             },
             { merge: true },
           );
         } else {
-          await setDoc(workspaceRef, {
+          await setDoc(ledgerRef, {
             id: uid,
-            name: "Mi workspace",
+            name: "Mi libro contable",
             ownerUid: uid,
             memberUids: [uid],
             memberEmails: [email],
@@ -472,9 +470,9 @@
           });
         }
         await setDoc(
-          doc(db, "userWorkspaces", uid, "workspaces", uid),
+          doc(db, "userLedgers", uid, "ledgers", uid),
           {
-            workspaceId: uid,
+            ledgerId: uid,
             role: "owner",
             updatedAt: serverTimestamp(),
           },
@@ -489,17 +487,17 @@
           return;
         }
 
-        const inviteSnapshot = await getDocs(collection(db, "emailInvites", email, "workspaces"));
+        const inviteSnapshot = await getDocs(collection(db, "emailInvites", email, "ledgers"));
         for (const inviteDocument of inviteSnapshot.docs) {
           const invite = inviteDocument.data();
-          const workspaceId = invite.workspaceId || inviteDocument.id;
+          const ledgerId = invite.ledgerId || inviteDocument.id;
           const member = {
             uid,
             email,
             displayName: auth.currentUser.displayName || email,
           };
 
-          await updateDoc(doc(db, "workspaces", workspaceId), {
+          await updateDoc(doc(db, "ledgers", ledgerId), {
             memberUids: arrayUnion(uid),
             memberEmails: arrayUnion(email),
             members: arrayUnion(member),
@@ -507,9 +505,9 @@
             updatedAt: serverTimestamp(),
           });
           await setDoc(
-            doc(db, "userWorkspaces", uid, "workspaces", workspaceId),
+            doc(db, "userLedgers", uid, "ledgers", ledgerId),
             {
-              workspaceId,
+              ledgerId,
               role: "member",
               updatedAt: serverTimestamp(),
             },
@@ -519,21 +517,19 @@
         }
       }
 
-      async function loadWorkspaceSummaries(auth, db) {
+      async function loadLedgerSummaries(auth, db) {
         const uid = auth.currentUser?.uid;
         if (!uid) {
           return [];
         }
 
-        const membershipSnapshot = await getDocs(
-          collection(db, "userWorkspaces", uid, "workspaces"),
-        );
+        const membershipSnapshot = await getDocs(collection(db, "userLedgers", uid, "ledgers"));
         const summaries = [];
         for (const membershipDocument of membershipSnapshot.docs) {
-          const workspaceId = membershipDocument.data().workspaceId || membershipDocument.id;
-          const workspaceSnapshot = await getDoc(doc(db, "workspaces", workspaceId));
-          if (workspaceSnapshot.exists()) {
-            summaries.push(serializeWorkspaceSummary(workspaceSnapshot));
+          const ledgerId = membershipDocument.data().ledgerId || membershipDocument.id;
+          const ledgerSnapshot = await getDoc(doc(db, "ledgers", ledgerId));
+          if (ledgerSnapshot.exists()) {
+            summaries.push(serializeLedgerSummary(ledgerSnapshot));
           } else {
             await deleteDoc(membershipDocument.ref);
           }
@@ -542,11 +538,11 @@
         return summaries.sort((left, right) => left.name.localeCompare(right.name));
       }
 
-      function serializeWorkspaceSummary(documentSnapshot) {
+      function serializeLedgerSummary(documentSnapshot) {
         const data = documentSnapshot.data();
         return {
           id: String(data.id || documentSnapshot.id),
-          name: data.name || "Workspace",
+          name: data.name || "Libro contable",
           ownerUid: data.ownerUid || "",
           members: Array.isArray(data.members) ? data.members.map(serializeMember) : [],
         };
@@ -645,7 +641,7 @@
         const message = error?.message || "Sin detalle técnico.";
 
         if (code === "permission-denied") {
-          return "Firestore rechazó el acceso a este workspace.";
+          return "Firestore rechazó el acceso a este libro contable.";
         }
 
         if (code === "unavailable") {

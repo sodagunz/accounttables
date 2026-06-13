@@ -1,15 +1,15 @@
-module Workspace exposing
-    ( LoadState(..)
+module Ledger exposing
+    ( LedgerSummary
+    , LoadState(..)
     , Member
-    , WorkspaceSummary
-    , decodeWorkspace
+    , decodeLedger
     , encodeAccountCreate
     , encodeAccountDelete
     , encodeExpense
     , encodeGuestInvite
     , encodeGuestRemove
-    , encodeWorkspaceName
-    , encodeWorkspaceRequest
+    , encodeLedgerName
+    , encodeLedgerRequest
     )
 
 import Accounting exposing (Account, Expense, currencyFromString, currencyToString)
@@ -24,7 +24,7 @@ type LoadState
     | LoadError String
 
 
-type alias WorkspaceSummary =
+type alias LedgerSummary =
     { id : String
     , name : String
     , ownerUid : String
@@ -39,56 +39,56 @@ type alias Member =
     }
 
 
-encodeWorkspaceRequest : String -> Encode.Value
-encodeWorkspaceRequest workspaceId =
+encodeLedgerRequest : String -> Encode.Value
+encodeLedgerRequest ledgerId =
     Encode.object
-        [ ( "workspaceId", Encode.string workspaceId ) ]
+        [ ( "ledgerId", Encode.string ledgerId ) ]
 
 
 encodeExpense : String -> Expense -> Encode.Value
-encodeExpense workspaceId expense =
+encodeExpense ledgerId expense =
     Encode.object
-        [ ( "workspaceId", Encode.string workspaceId )
+        [ ( "ledgerId", Encode.string ledgerId )
         , ( "expense", encodeExpenseRecord expense )
         ]
 
 
 encodeAccountCreate : String -> String -> Encode.Value
-encodeAccountCreate workspaceId name =
+encodeAccountCreate ledgerId name =
     Encode.object
-        [ ( "workspaceId", Encode.string workspaceId )
+        [ ( "ledgerId", Encode.string ledgerId )
         , ( "name", Encode.string name )
         ]
 
 
 encodeAccountDelete : String -> String -> Encode.Value
-encodeAccountDelete workspaceId accountId =
+encodeAccountDelete ledgerId accountId =
     Encode.object
-        [ ( "workspaceId", Encode.string workspaceId )
+        [ ( "ledgerId", Encode.string ledgerId )
         , ( "accountId", Encode.string accountId )
         ]
 
 
 encodeGuestInvite : String -> String -> Encode.Value
-encodeGuestInvite workspaceId email =
+encodeGuestInvite ledgerId email =
     Encode.object
-        [ ( "workspaceId", Encode.string workspaceId )
+        [ ( "ledgerId", Encode.string ledgerId )
         , ( "email", Encode.string email )
         ]
 
 
 encodeGuestRemove : String -> String -> Encode.Value
-encodeGuestRemove workspaceId uid =
+encodeGuestRemove ledgerId uid =
     Encode.object
-        [ ( "workspaceId", Encode.string workspaceId )
+        [ ( "ledgerId", Encode.string ledgerId )
         , ( "uid", Encode.string uid )
         ]
 
 
-encodeWorkspaceName : String -> String -> Encode.Value
-encodeWorkspaceName workspaceId name =
+encodeLedgerName : String -> String -> Encode.Value
+encodeLedgerName ledgerId name =
     Encode.object
-        [ ( "workspaceId", Encode.string workspaceId )
+        [ ( "ledgerId", Encode.string ledgerId )
         , ( "name", Encode.string name )
         ]
 
@@ -109,29 +109,29 @@ encodeExpenseRecord expense =
         ]
 
 
-decodeWorkspace : Decode.Value -> Result String { expenses : List Expense, accounts : List Account, workspaces : List WorkspaceSummary, currentWorkspaceId : String }
-decodeWorkspace value =
-    Decode.decodeValue workspacePayloadDecoder value
+decodeLedger : Decode.Value -> Result String { expenses : List Expense, accounts : List Account, ledgers : List LedgerSummary, currentLedgerId : String }
+decodeLedger value =
+    Decode.decodeValue ledgerPayloadDecoder value
         |> Result.mapError Decode.errorToString
 
 
-workspacePayloadDecoder : Decode.Decoder { expenses : List Expense, accounts : List Account, workspaces : List WorkspaceSummary, currentWorkspaceId : String }
-workspacePayloadDecoder =
+ledgerPayloadDecoder : Decode.Decoder { expenses : List Expense, accounts : List Account, ledgers : List LedgerSummary, currentLedgerId : String }
+ledgerPayloadDecoder =
     Decode.field "status" Decode.string
         |> Decode.andThen
             (\status ->
                 case status of
                     "loaded" ->
                         Decode.map4
-                            (\workspaces currentWorkspaceId accounts expenses ->
-                                { workspaces = workspaces
-                                , currentWorkspaceId = currentWorkspaceId
+                            (\ledgers currentLedgerId accounts expenses ->
+                                { ledgers = ledgers
+                                , currentLedgerId = currentLedgerId
                                 , accounts = accounts
                                 , expenses = expenses
                                 }
                             )
-                            (Decode.field "workspaces" (Decode.list workspaceSummaryDecoder))
-                            (Decode.field "workspaceId" Decode.string)
+                            (Decode.field "ledgers" (Decode.list ledgerSummaryDecoder))
+                            (Decode.field "ledgerId" Decode.string)
                             (Decode.field "accounts" (Decode.list accountDecoder))
                             (Decode.field "expenses" (Decode.list expenseDecoder))
 
@@ -140,7 +140,7 @@ workspacePayloadDecoder =
                             |> Decode.andThen Decode.fail
 
                     _ ->
-                        Decode.fail ("Estado de workspace desconocido: " ++ status)
+                        Decode.fail ("Estado de libro contable desconocido: " ++ status)
             )
 
 
@@ -152,9 +152,9 @@ accountDecoder =
         (Decode.maybe (Decode.field "deletedAt" Decode.string))
 
 
-workspaceSummaryDecoder : Decode.Decoder WorkspaceSummary
-workspaceSummaryDecoder =
-    Decode.map4 WorkspaceSummary
+ledgerSummaryDecoder : Decode.Decoder LedgerSummary
+ledgerSummaryDecoder =
+    Decode.map4 LedgerSummary
         (Decode.field "id" Decode.string)
         (Decode.field "name" Decode.string)
         (Decode.field "ownerUid" Decode.string)

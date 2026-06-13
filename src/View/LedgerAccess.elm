@@ -1,22 +1,22 @@
-module View.WorkspaceAccess exposing (Config, view)
+module View.LedgerAccess exposing (Config, view)
 
 import Auth
 import Html exposing (Html, button, div, input, label, li, option, p, section, select, span, text, ul)
 import Html.Attributes exposing (class, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
-import Workspace exposing (Member, WorkspaceSummary)
+import Ledger exposing (LedgerSummary, Member)
 
 
 type alias Config msg =
     { authState : Auth.AuthState
-    , workspaces : List WorkspaceSummary
-    , currentWorkspaceId : String
-    , workspaceName : String
+    , ledgers : List LedgerSummary
+    , currentLedgerId : String
+    , ledgerName : String
     , inviteEmail : String
     , error : String
-    , onSelectWorkspace : String -> msg
-    , onWorkspaceName : String -> msg
-    , onSaveWorkspaceName : msg
+    , onSelectLedger : String -> msg
+    , onLedgerName : String -> msg
+    , onSaveLedgerName : msg
     , onInviteEmail : String -> msg
     , onInvite : msg
     , onRemoveGuest : String -> msg
@@ -25,41 +25,41 @@ type alias Config msg =
 
 view : Config msg -> Html msg
 view config =
-    section [ class "panel workspace-panel" ]
-        [ Html.h2 [ class "section-title" ] [ text "Workspace" ]
-        , workspaceSelect config
-        , workspaceNameForm config
+    section [ class "panel ledger-panel" ]
+        [ Html.h2 [ class "section-title" ] [ text "Libro contable" ]
+        , ledgerSelect config
+        , ledgerNameForm config
         , memberList config
         , inviteForm config
         , p [ class "error" ] [ text config.error ]
         ]
 
 
-workspaceSelect : Config msg -> Html msg
-workspaceSelect config =
+ledgerSelect : Config msg -> Html msg
+ledgerSelect config =
     label []
         [ text "Activo"
-        , select [ value config.currentWorkspaceId, onInput config.onSelectWorkspace ]
-            (List.map workspaceOption config.workspaces)
+        , select [ value config.currentLedgerId, onInput config.onSelectLedger ]
+            (List.map ledgerOption config.ledgers)
         ]
 
 
-workspaceOption : WorkspaceSummary -> Html msg
-workspaceOption workspace =
-    option [ value workspace.id ] [ text workspace.name ]
+ledgerOption : LedgerSummary -> Html msg
+ledgerOption ledger =
+    option [ value ledger.id ] [ text ledger.name ]
 
 
-workspaceNameForm : Config msg -> Html msg
-workspaceNameForm config =
-    case currentWorkspace config of
-        Just workspace ->
-            if isOwner config workspace then
-                Html.form [ class "inline-form", onSubmit config.onSaveWorkspaceName ]
+ledgerNameForm : Config msg -> Html msg
+ledgerNameForm config =
+    case currentLedger config of
+        Just ledger ->
+            if isOwner config ledger then
+                Html.form [ class "inline-form", onSubmit config.onSaveLedgerName ]
                     [ input
                         [ type_ "text"
-                        , placeholder "Nombre del workspace"
-                        , value config.workspaceName
-                        , onInput config.onWorkspaceName
+                        , placeholder "Nombre del libro contable"
+                        , value config.ledgerName
+                        , onInput config.onLedgerName
                         ]
                         []
                     , button [ class "primary", type_ "submit" ] [ text "Guardar" ]
@@ -74,26 +74,26 @@ workspaceNameForm config =
 
 memberList : Config msg -> Html msg
 memberList config =
-    case currentWorkspace config of
+    case currentLedger config of
         Nothing ->
-            p [ class "empty empty--compact" ] [ text "No hay workspace activo." ]
+            p [ class "empty empty--compact" ] [ text "No hay libro contable activo." ]
 
-        Just workspace ->
-            ul [ class "member-list" ] (List.map (memberRow config workspace) workspace.members)
+        Just ledger ->
+            ul [ class "member-list" ] (List.map (memberRow config ledger) ledger.members)
 
 
-memberRow : Config msg -> WorkspaceSummary -> Member -> Html msg
-memberRow config workspace member =
+memberRow : Config msg -> LedgerSummary -> Member -> Html msg
+memberRow config ledger member =
     li [ class "member-list__item" ]
         [ div []
             [ span [] [ text (memberLabel member) ]
-            , if member.uid == workspace.ownerUid then
+            , if member.uid == ledger.ownerUid then
                 span [ class "member-role" ] [ text "Owner" ]
 
               else
                 text ""
             ]
-        , if canRemoveMember config workspace member then
+        , if canRemoveMember config ledger member then
             button
                 [ type_ "button"
                 , class "danger-button"
@@ -117,9 +117,9 @@ memberLabel member =
 
 inviteForm : Config msg -> Html msg
 inviteForm config =
-    case currentWorkspace config of
-        Just workspace ->
-            if isOwner config workspace then
+    case currentLedger config of
+        Just ledger ->
+            if isOwner config ledger then
                 Html.form [ class "inline-form", onSubmit config.onInvite ]
                     [ input
                         [ type_ "email"
@@ -138,23 +138,23 @@ inviteForm config =
             text ""
 
 
-canRemoveMember : Config msg -> WorkspaceSummary -> Member -> Bool
-canRemoveMember config workspace member =
-    isOwner config workspace && member.uid /= workspace.ownerUid
+canRemoveMember : Config msg -> LedgerSummary -> Member -> Bool
+canRemoveMember config ledger member =
+    isOwner config ledger && member.uid /= ledger.ownerUid
 
 
-isOwner : Config msg -> WorkspaceSummary -> Bool
-isOwner config workspace =
+isOwner : Config msg -> LedgerSummary -> Bool
+isOwner config ledger =
     case config.authState of
         Auth.SignedIn user ->
-            user.uid == workspace.ownerUid
+            user.uid == ledger.ownerUid
 
         _ ->
             False
 
 
-currentWorkspace : Config msg -> Maybe WorkspaceSummary
-currentWorkspace config =
-    config.workspaces
-        |> List.filter (\workspace -> workspace.id == config.currentWorkspaceId)
+currentLedger : Config msg -> Maybe LedgerSummary
+currentLedger config =
+    config.ledgers
+        |> List.filter (\ledger -> ledger.id == config.currentLedgerId)
         |> List.head

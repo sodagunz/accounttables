@@ -4,12 +4,12 @@ import Auth exposing (AuthState(..))
 import Html exposing (Html, button, div, p, span, text)
 import Html.Attributes exposing (class, type_)
 import Html.Events exposing (onClick)
-import Workspace exposing (LoadState(..))
+import Ledger exposing (LoadState(..))
 
 
 type alias Config msg =
     { authState : AuthState
-    , workspaceLoadState : LoadState
+    , ledgerLoadState : LoadState
     , onSignIn : msg
     , onSignOut : msg
     }
@@ -33,7 +33,7 @@ view config =
                     [ span [] [ text (userLabel user) ]
                     , button [ type_ "button", class "auth-button", onClick config.onSignOut ] [ text "Salir" ]
                     ]
-                , workspaceStatus config.workspaceLoadState
+                , ledgerStatus config.ledgerLoadState
                 ]
 
             AuthError message ->
@@ -43,8 +43,8 @@ view config =
         )
 
 
-workspaceStatus : LoadState -> Html msg
-workspaceStatus loadState =
+ledgerStatus : LoadState -> Html msg
+ledgerStatus loadState =
     case loadState of
         NotLoaded ->
             p [ class "auth-meta" ] [ text "Datos locales" ]

@@ -1,4 +1,4 @@
-module View.WorkspaceAccounts exposing (Config, view)
+module View.LedgerAccounts exposing (Config, view)
 
 import Accounting exposing (Account)
 import Html exposing (Html, button, div, input, li, p, section, text, ul)

@@ -1,6 +1,6 @@
 port module Main exposing (main)
 
-import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), Form, SortDirection(..), SortField(..))
+import Accounting exposing (FilterWindow(..), SortDirection(..), SortField(..))
 import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
 import Auth exposing (AuthState(..))
 import Browser
@@ -10,43 +10,19 @@ import Html.Attributes exposing (class)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
-import String
+import Ledger exposing (LoadState(..))
+import Model exposing (Model)
 import Task
 import Time
+import Update.Accounts as Accounts
+import Update.Expenses as Expenses
+import Update.Ledgers as Ledgers
 import Util.Date exposing (DateDisplay(..), dateToIso)
 import View.AuthStatus as AuthStatus
 import View.ExpenseForm as ExpenseForm
 import View.ExpenseTable as ExpenseTable
-import View.WorkspaceAccess as WorkspaceAccess
-import View.WorkspaceAccounts as WorkspaceAccounts
-import Workspace exposing (LoadState(..))
-
-
-type alias Model =
-    { form : Form
-    , expenses : List Expense
-    , accounts : List Account
-    , workspaces : List Workspace.WorkspaceSummary
-    , currentWorkspaceId : String
-    , workspaceName : String
-    , inviteEmail : String
-    , workspaceError : String
-    , newAccountName : String
-    , accountError : String
-    , error : String
-    , today : String
-    , filterWindow : FilterWindow
-    , customStart : String
-    , customEnd : String
-    , dateDisplay : DateDisplay
-    , sortField : SortField
-    , sortDirection : SortDirection
-    , exchangeRate : Float
-    , exchangeRateStatus : ExchangeRateStatus
-    , zone : Time.Zone
-    , authState : AuthState
-    , workspaceLoadState : LoadState
-    }
+import View.LedgerAccess as LedgerAccess
+import View.LedgerAccounts as LedgerAccounts
 
 
 type Msg
@@ -66,16 +42,16 @@ type Msg
     | SignInWithGoogle
     | SignOut
     | AuthStateChanged Decode.Value
-    | WorkspaceLoaded Decode.Value
+    | LedgerLoaded Decode.Value
     | GotExchangeRate (Result Http.Error OfficialDollar)
     | AddExpense
     | ExpenseIdGenerated Decode.Value
     | UpdateNewAccountName String
     | AddAccount
     | DeleteAccount String
-    | SelectWorkspace String
-    | UpdateWorkspaceName String
-    | SaveWorkspaceName
+    | SelectLedger String
+    | UpdateLedgerName String
+    | SaveLedgerName
     | UpdateInviteEmail String
     | InviteGuest
     | RemoveGuest String
@@ -93,7 +69,7 @@ port signOutUser : () -> Cmd msg
 port authStateChanged : (Decode.Value -> msg) -> Sub msg
 
 
-port loadWorkspaceData : Encode.Value -> Cmd msg
+port loadLedgerData : Encode.Value -> Cmd msg
 
 
 port saveExpense : Encode.Value -> Cmd msg
@@ -111,16 +87,16 @@ port saveAccount : Encode.Value -> Cmd msg
 port deleteAccount : Encode.Value -> Cmd msg
 
 
-port inviteWorkspaceGuest : Encode.Value -> Cmd msg
+port inviteLedgerGuest : Encode.Value -> Cmd msg
 
 
-port removeWorkspaceGuest : Encode.Value -> Cmd msg
+port removeLedgerGuest : Encode.Value -> Cmd msg
 
 
-port updateWorkspaceName : Encode.Value -> Cmd msg
+port updateLedgerName : Encode.Value -> Cmd msg
 
 
-port workspaceLoaded : (Decode.Value -> msg) -> Sub msg
+port ledgerLoaded : (Decode.Value -> msg) -> Sub msg
 
 
 main : Program () Model Msg
@@ -135,30 +111,7 @@ main =
 
 init : ( Model, Cmd Msg )
 init =
-    ( { form = Accounting.emptyForm
-      , expenses = []
-      , accounts = defaultAccounts
-      , workspaces = []
-      , currentWorkspaceId = ""
-      , workspaceName = ""
-      , inviteEmail = ""
-      , workspaceError = ""
-      , newAccountName = ""
-      , accountError = ""
-      , error = ""
-      , today = ""
-      , filterWindow = AllTime
-      , customStart = ""
-      , customEnd = ""
-      , dateDisplay = NumericDate
-      , sortField = SortByDate
-      , sortDirection = Descending
-      , exchangeRate = Accounting.fallbackExchangeRate
-      , exchangeRateStatus = LoadingRate
-      , zone = Time.utc
-      , authState = AuthLoading
-      , workspaceLoadState = NotLoaded
-      }
+    ( Model.initial
     , Cmd.batch
         [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
         , Dolar.fetchOfficialDollar GotExchangeRate
@@ -180,7 +133,7 @@ update msg model =
                 , expenses = Accounting.sampleExpenses model.exchangeRate today model.accounts
                 , zone = zone
               }
-                |> ensureSelectedAccount
+                |> Model.ensureSelectedAccount
             , Cmd.none
             )
 
@@ -229,8 +182,8 @@ update msg model =
         AuthStateChanged value ->
             handleAuthStateChanged (Auth.decodeAuthState value) model
 
-        WorkspaceLoaded value ->
-            handleWorkspaceLoaded value model
+        LedgerLoaded value ->
+            handleLedgerLoaded value model
 
         GotExchangeRate result ->
             case result of
@@ -251,9 +204,13 @@ update msg model =
         ExpenseIdGenerated value ->
             case Decode.decodeValue Decode.string value of
                 Ok expenseId ->
-                    case Accounting.buildExpense model.exchangeRate expenseId (activeAccounts model) model.form of
+                    case Accounting.buildExpense model.exchangeRate expenseId (Model.activeAccounts model) model.form of
                         Ok expense ->
-                            addExpense expense model
+                            let
+                                ( updatedModel, payload ) =
+                                    Expenses.add expense model
+                            in
+                            ( updatedModel, payloadCmd saveExpense payload )
 
                         Err error ->
                             ( { model | error = error }, Cmd.none )
@@ -265,133 +222,64 @@ update msg model =
             ( { model | newAccountName = name }, Cmd.none )
 
         AddAccount ->
-            addAccount model
+            let
+                ( updatedModel, payload ) =
+                    Accounts.add model
+            in
+            ( updatedModel, payloadCmd saveAccount payload )
 
         DeleteAccount accountId ->
-            deleteAccountById accountId model
+            let
+                ( updatedModel, payload ) =
+                    Accounts.delete accountId model
+            in
+            ( updatedModel, payloadCmd deleteAccount payload )
 
-        SelectWorkspace workspaceId ->
-            ( { model
-                | currentWorkspaceId = workspaceId
-                , workspaceName = workspaceNameFor workspaceId model.workspaces
-                , workspaceLoadState = Loading
-                , expenses = []
-                , accounts = []
-                , error = ""
-                , accountError = ""
-                , workspaceError = ""
-              }
-            , loadWorkspaceData (Workspace.encodeWorkspaceRequest workspaceId)
+        SelectLedger ledgerId ->
+            ( Ledgers.select ledgerId model
+            , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
             )
 
-        UpdateWorkspaceName name ->
-            ( { model | workspaceName = name }, Cmd.none )
+        UpdateLedgerName name ->
+            ( { model | ledgerName = name }, Cmd.none )
 
-        SaveWorkspaceName ->
-            saveWorkspaceName model
+        SaveLedgerName ->
+            let
+                ( updatedModel, payload ) =
+                    Ledgers.rename model
+            in
+            ( updatedModel, payloadCmd updateLedgerName payload )
 
         UpdateInviteEmail email ->
             ( { model | inviteEmail = email }, Cmd.none )
 
         InviteGuest ->
-            inviteGuest model
+            let
+                ( updatedModel, payload ) =
+                    Ledgers.inviteGuest model
+            in
+            ( updatedModel, payloadCmd inviteLedgerGuest payload )
 
         RemoveGuest uid ->
-            removeGuest uid model
+            let
+                ( updatedModel, payload ) =
+                    Ledgers.removeGuest uid model
+            in
+            ( updatedModel, payloadCmd removeLedgerGuest payload )
 
 
-inviteGuest : Model -> ( Model, Cmd Msg )
-inviteGuest model =
-    let
-        email =
-            String.toLower (String.trim model.inviteEmail)
-    in
-    if email == "" then
-        ( { model | workspaceError = "Ingresa un email." }, Cmd.none )
-
-    else if selectedWorkspaceId model == "" then
-        ( { model | workspaceError = "Selecciona un workspace." }, Cmd.none )
-
-    else
-        ( { model | inviteEmail = "", workspaceError = "" }
-        , inviteWorkspaceGuest (Workspace.encodeGuestInvite (selectedWorkspaceId model) email)
-        )
-
-
-removeGuest : String -> Model -> ( Model, Cmd Msg )
-removeGuest uid model =
-    if selectedWorkspaceId model == "" then
-        ( { model | workspaceError = "Selecciona un workspace." }, Cmd.none )
-
-    else
-        ( { model | workspaceError = "" }
-        , removeWorkspaceGuest (Workspace.encodeGuestRemove (selectedWorkspaceId model) uid)
-        )
-
-
-saveWorkspaceName : Model -> ( Model, Cmd Msg )
-saveWorkspaceName model =
-    let
-        name =
-            String.trim model.workspaceName
-    in
-    if name == "" then
-        ( { model | workspaceError = "Ingresa un nombre para el workspace." }, Cmd.none )
-
-    else if selectedWorkspaceId model == "" then
-        ( { model | workspaceError = "Selecciona un workspace." }, Cmd.none )
-
-    else
-        ( { model | workspaceName = name, workspaceError = "" }
-        , updateWorkspaceName (Workspace.encodeWorkspaceName (selectedWorkspaceId model) name)
-        )
-
-
-addAccount : Model -> ( Model, Cmd Msg )
-addAccount model =
-    let
-        name =
-            String.trim model.newAccountName
-    in
-    if name == "" then
-        ( { model | accountError = "Ingresa un nombre." }, Cmd.none )
-
-    else
-        case model.authState of
-            SignedIn _ ->
-                if selectedWorkspaceId model == "" then
-                    ( { model | accountError = "Selecciona un workspace." }, Cmd.none )
-
-                else
-                    ( { model | newAccountName = "", accountError = "" }
-                    , saveAccount (Workspace.encodeAccountCreate (selectedWorkspaceId model) name)
-                    )
-
-            _ ->
-                ( { model | accountError = "Ingresa con Google para guardar cajas en el workspace." }, Cmd.none )
-
-
-deleteAccountById : String -> Model -> ( Model, Cmd Msg )
-deleteAccountById accountId model =
-    case model.authState of
-        SignedIn _ ->
-            if selectedWorkspaceId model == "" then
-                ( { model | accountError = "Selecciona un workspace." }, Cmd.none )
-
-            else
-                ( { model | accountError = "" }
-                , deleteAccount (Workspace.encodeAccountDelete (selectedWorkspaceId model) accountId)
-                )
-
-        _ ->
-            ( { model | accountError = "Ingresa con Google para modificar cajas del workspace." }, Cmd.none )
+payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
+payloadCmd toCmd payload =
+    payload
+        |> Maybe.map toCmd
+        |> Maybe.withDefault Cmd.none
 
 
 view : Model -> Html Msg
 view model =
     let
         rows =
-            visibleExpenses model
+            Model.visibleExpenses model
     in
     div [ class "app" ]
         [ header [ class "topbar" ]
@@ -399,11 +287,11 @@ view model =
                 [ div [ class "topbar__content" ]
                     [ div []
                         [ h1 [] [ text "ContabilizAR" ]
-                        , p [ class "subtitle" ] [ text "Un registro simple de gastos por workspace, con conversión AR$/U$D y una tabla filtrable." ]
+                        , p [ class "subtitle" ] [ text "Un registro simple de gastos por libro contable, con conversión AR$/U$D y una tabla filtrable." ]
                         ]
                     , AuthStatus.view
                         { authState = model.authState
-                        , workspaceLoadState = model.workspaceLoadState
+                        , ledgerLoadState = model.ledgerLoadState
                         , onSignIn = SignInWithGoogle
                         , onSignOut = SignOut
                         }
@@ -414,7 +302,7 @@ view model =
             [ div [ class "layout" ]
                 [ ExpenseForm.view
                     { form = model.form
-                    , accounts = activeAccounts model
+                    , accounts = Model.activeAccounts model
                     , exchangeRate = model.exchangeRate
                     , exchangeRateStatus = model.exchangeRateStatus
                     , zone = model.zone
@@ -427,22 +315,22 @@ view model =
                     , onSubmit = AddExpense
                     }
                 , div [ class "content-stack" ]
-                    [ WorkspaceAccess.view
+                    [ LedgerAccess.view
                         { authState = model.authState
-                        , workspaces = model.workspaces
-                        , currentWorkspaceId = model.currentWorkspaceId
-                        , workspaceName = model.workspaceName
+                        , ledgers = model.ledgers
+                        , currentLedgerId = model.currentLedgerId
+                        , ledgerName = model.ledgerName
                         , inviteEmail = model.inviteEmail
-                        , error = model.workspaceError
-                        , onSelectWorkspace = SelectWorkspace
-                        , onWorkspaceName = UpdateWorkspaceName
-                        , onSaveWorkspaceName = SaveWorkspaceName
+                        , error = model.ledgerError
+                        , onSelectLedger = SelectLedger
+                        , onLedgerName = UpdateLedgerName
+                        , onSaveLedgerName = SaveLedgerName
                         , onInviteEmail = UpdateInviteEmail
                         , onInvite = InviteGuest
                         , onRemoveGuest = RemoveGuest
                         }
-                    , WorkspaceAccounts.view
-                        { accounts = activeAccounts model
+                    , LedgerAccounts.view
+                        { accounts = Model.activeAccounts model
                         , newAccountName = model.newAccountName
                         , error = model.accountError
                         , onName = UpdateNewAccountName
@@ -451,7 +339,7 @@ view model =
                         }
                     , ExpenseTable.view
                         { expenses = rows
-                        , accounts = activeAccounts model
+                        , accounts = Model.activeAccounts model
                         , filterWindow = model.filterWindow
                         , dateDisplay = model.dateDisplay
                         , customStart = model.customStart
@@ -515,20 +403,14 @@ defaultSortDirection sortField =
 
 exportVisibleTable : Export.Format -> Model -> Cmd Msg
 exportVisibleTable format model =
-    exportTable (Export.tablePayload format model.dateDisplay model.today (activeAccounts model) (visibleExpenses model))
-
-
-visibleExpenses : Model -> List Expense
-visibleExpenses model =
-    Accounting.filteredExpenses { model | expenses = activeExpenses model.expenses }
-        |> Accounting.sortExpenses model.sortField model.sortDirection
+    exportTable (Export.tablePayload format model.dateDisplay model.today (Model.activeAccounts model) (Model.visibleExpenses model))
 
 
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.batch
         [ authStateChanged AuthStateChanged
-        , workspaceLoaded WorkspaceLoaded
+        , ledgerLoaded LedgerLoaded
         , expenseIdGenerated ExpenseIdGenerated
         ]
 
@@ -539,35 +421,35 @@ handleAuthStateChanged authState model =
         SignedIn user ->
             ( { model
                 | authState = authState
-                , workspaceLoadState = Loading
+                , ledgerLoadState = Loading
                 , expenses = []
                 , accounts = []
-                , workspaces = []
-                , currentWorkspaceId = user.uid
-                , workspaceName = ""
+                , ledgers = []
+                , currentLedgerId = user.uid
+                , ledgerName = ""
                 , inviteEmail = ""
                 , error = ""
                 , accountError = ""
-                , workspaceError = ""
+                , ledgerError = ""
               }
-            , loadWorkspaceData (Workspace.encodeWorkspaceRequest user.uid)
+            , loadLedgerData (Ledger.encodeLedgerRequest user.uid)
             )
 
         SignedOut ->
             ( { model
                 | authState = authState
-                , workspaceLoadState = NotLoaded
-                , expenses = sampleExpensesForModel model
-                , accounts = defaultAccounts
-                , workspaces = []
-                , currentWorkspaceId = ""
-                , workspaceName = ""
+                , ledgerLoadState = NotLoaded
+                , expenses = Model.sampleExpensesForModel model
+                , accounts = Model.defaultAccounts
+                , ledgers = []
+                , currentLedgerId = ""
+                , ledgerName = ""
                 , inviteEmail = ""
                 , error = ""
                 , accountError = ""
-                , workspaceError = ""
+                , ledgerError = ""
               }
-                |> ensureSelectedAccount
+                |> Model.ensureSelectedAccount
             , Cmd.none
             )
 
@@ -575,111 +457,24 @@ handleAuthStateChanged authState model =
             ( { model | authState = authState }, Cmd.none )
 
 
-handleWorkspaceLoaded : Decode.Value -> Model -> ( Model, Cmd Msg )
-handleWorkspaceLoaded value model =
-    case Workspace.decodeWorkspace value of
-        Ok workspace ->
+handleLedgerLoaded : Decode.Value -> Model -> ( Model, Cmd Msg )
+handleLedgerLoaded value model =
+    case Ledger.decodeLedger value of
+        Ok ledger ->
             ( { model
-                | expenses = activeExpenses workspace.expenses
-                , accounts = activeAccountsFromList workspace.accounts
-                , workspaces = workspace.workspaces
-                , currentWorkspaceId = workspace.currentWorkspaceId
-                , workspaceName = workspaceNameFor workspace.currentWorkspaceId workspace.workspaces
-                , workspaceLoadState = Loaded
+                | expenses = Model.activeExpenses ledger.expenses
+                , accounts = Model.activeAccountsFromList ledger.accounts
+                , ledgers = ledger.ledgers
+                , currentLedgerId = ledger.currentLedgerId
+                , ledgerName = Model.ledgerNameFor ledger.currentLedgerId ledger.ledgers
+                , ledgerLoadState = Loaded
                 , error = ""
                 , accountError = ""
-                , workspaceError = ""
+                , ledgerError = ""
               }
-                |> ensureSelectedAccount
+                |> Model.ensureSelectedAccount
             , Cmd.none
             )
 
         Err error ->
-            ( { model | workspaceLoadState = LoadError error }, Cmd.none )
-
-
-addExpense : Expense -> Model -> ( Model, Cmd Msg )
-addExpense expense model =
-    let
-        updatedModel =
-            { model
-                | expenses = expense :: model.expenses
-                , form =
-                    { description = ""
-                    , amount = ""
-                    , accountId = model.form.accountId
-                    , currency = ARS
-                    , date = model.form.date
-                    }
-                , error = ""
-            }
-    in
-    case model.authState of
-        SignedIn _ ->
-            if selectedWorkspaceId model == "" then
-                ( { updatedModel | error = "Selecciona un workspace." }, Cmd.none )
-
-            else
-                ( updatedModel
-                , saveExpense (Workspace.encodeExpense (selectedWorkspaceId model) expense)
-                )
-
-        _ ->
-            ( updatedModel, Cmd.none )
-
-
-sampleExpensesForModel : Model -> List Expense
-sampleExpensesForModel model =
-    if model.today == "" then
-        []
-
-    else
-        Accounting.sampleExpenses model.exchangeRate model.today model.accounts
-
-
-defaultAccounts : List Account
-defaultAccounts =
-    []
-
-
-activeAccounts : Model -> List Account
-activeAccounts model =
-    activeAccountsFromList model.accounts
-
-
-activeAccountsFromList : List Account -> List Account
-activeAccountsFromList accounts =
-    List.filter (\account -> account.deletedAt == Nothing) accounts
-
-
-activeExpenses : List Expense -> List Expense
-activeExpenses expenses =
-    List.filter (\expense -> expense.deletedAt == Nothing) expenses
-
-
-ensureSelectedAccount : Model -> Model
-ensureSelectedAccount model =
-    if List.any (\account -> account.id == model.form.accountId) (activeAccounts model) then
-        model
-
-    else
-        case activeAccounts model of
-            account :: _ ->
-                { model | form = Accounting.setAccount account.id model.form }
-
-            [] ->
-                { model | form = Accounting.setAccount "" model.form }
-
-
-selectedWorkspaceId : Model -> String
-selectedWorkspaceId model =
-    model.currentWorkspaceId
-
-
-workspaceNameFor : String -> List Workspace.WorkspaceSummary -> String
-workspaceNameFor workspaceId workspaces =
-    workspaces
-        |> List.filter (\workspace -> workspace.id == workspaceId)
-        |> List.head
-        |> Maybe.map .name
-        |> Maybe.withDefault ""
+            ( { model | ledgerLoadState = LoadError error }, Cmd.none )

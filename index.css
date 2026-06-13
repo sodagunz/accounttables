@@ -235,7 +235,7 @@ select:focus {
   gap: 12px;
 }
 
-.workspace-panel {
+.ledger-panel {
   display: grid;
   gap: 12px;
 }

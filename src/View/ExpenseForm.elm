@@ -40,6 +40,7 @@ view config =
                         , attribute "inputmode" "decimal"
                         , attribute "autocomplete" "off"
                         , attribute "aria-label" "Importe del movimiento"
+                        , attribute "min" "0.01"
                         , step "0.01"
                         , autofocus True
                         , value config.form.amount

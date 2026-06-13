@@ -40,9 +40,11 @@
 
    Verified without adding new controls. `MovementType` currently has only `ExpenseMovement`, `buildExpense` always assigns that value, the form exposes no income or transfer selector, and Firestore encoding/decoding persists the movement type as `"Expense"`. The UI keeps the broader `Registrar movimiento` wording while the current behavior remains expense-only.
 
-8. [ ] Positive user-entered `inputAmount`
+8. [x] Positive user-entered `inputAmount`
 
    Users should never need to type a minus sign for expenses. The amount field accepts the natural number they see on a receipt or bill, and the accounting sign is derived internally. This is friendlier for non-accounting users and avoids accidental double negatives.
+
+   Implemented and verified by keeping `inputAmount` as the positive amount parsed from the form, rejecting zero or negative values in `buildExpense`, and adding a positive minimum to the browser number input. The accounting sign remains separate: cashflow values are derived through `movementType`, not by asking users to enter a negative amount.
 
 9. [ ] Negative computed cashflow through `movementType = "Expense"`
 

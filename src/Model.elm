@@ -37,6 +37,7 @@ type alias Model =
     , customStart : String
     , customEnd : String
     , dateDisplay : DateDisplay
+    , displayCurrency : Currency
     , sortField : SortField
     , sortDirection : SortDirection
     , exchangeRate : Float
@@ -66,6 +67,7 @@ initial =
     , customStart = ""
     , customEnd = ""
     , dateDisplay = NumericDate
+    , displayCurrency = ARS
     , sortField = SortByDate
     , sortDirection = Descending
     , exchangeRate = Accounting.fallbackExchangeRate

@@ -587,7 +587,7 @@ select:focus {
 table {
     width: 100%;
     border-collapse: collapse;
-    min-width: 980px;
+    min-width: 750px;
 }
 
 th,
@@ -656,13 +656,6 @@ td.numeric,
 th.numeric {
     font-variant-numeric: tabular-nums;
     text-align: right;
-    white-space: nowrap;
-}
-
-.equivalence {
-    width: 32px;
-    color: #68756f;
-    text-align: center;
     white-space: nowrap;
 }
 
@@ -898,10 +891,6 @@ th:first-child {
 
     .expense-table td.numeric {
         text-align: left;
-    }
-
-    .expense-table .equivalence {
-        display: none;
     }
 
     .expense-table .subtotal,

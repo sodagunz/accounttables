@@ -1,11 +1,11 @@
 module View.ExpenseTable exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), descriptionDisplay, expensesFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, expensesFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Util.Date exposing (DateDisplay(..), formatDate)
-import Util.Format exposing (formatMoney)
+import Util.Format exposing (formatMoney, formatNumber)
 
 
 type alias Config msg =
@@ -14,6 +14,7 @@ type alias Config msg =
     , filterWindow : FilterWindow
     , hiddenAccountIds : List String
     , dateDisplay : DateDisplay
+    , displayCurrency : Currency
     , customStart : String
     , customEnd : String
     , sortField : SortField
@@ -23,6 +24,7 @@ type alias Config msg =
     , onCustomStart : String -> msg
     , onCustomEnd : String -> msg
     , onSelectDateDisplay : DateDisplay -> msg
+    , onSelectDisplayCurrency : Currency -> msg
     , onSelectSort : SortField -> msg
     , onExportCsv : msg
     , onExportXlsx : msg
@@ -59,13 +61,11 @@ expenseTableBody config =
                             , sortableHeader config SortByAccount "" "Caja"
                             , sortableHeader config SortByDescription "" "Descripción"
                             , th [ class "numeric" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Ingresado" ] ]
-                            , sortableHeader config SortByExchangeRate "numeric" "Cotización"
-                            , sortableHeader config SortByPesos "numeric" "Pesos"
-                            , th [ class "equivalence" ] [ button [ type_ "button", class "non-sort-button" ] [ text "=" ] ]
-                            , sortableHeader config SortByDollars "numeric" "Dólar"
+                            , sortableHeader config SortByExchangeRate "numeric" "Cotización (USD/ARS)"
+                            , toggleHeader config
                             ]
                         ]
-                    , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows visibleAccounts config.expenses)
+                    , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
                     ]
                 ]
             , exportControls config
@@ -178,26 +178,72 @@ accountFilterButton config account =
         [ text account.name ]
 
 
-expenseRow : DateDisplay -> Expense -> Html msg
-expenseRow dateDisplay expense =
+expenseRow : DateDisplay -> Currency -> Expense -> Html msg
+expenseRow dateDisplay displayCurrency expense =
     tr []
         [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay expense.date) ]
         , td [ attribute "data-label" "Caja" ] [ text expense.accountName ]
         , td [ attribute "data-label" "Descripción" ] [ text (descriptionDisplay expense) ]
         , let
-            arrow =
+            displayAmount =
                 case expense.movementType of
                     ExpenseMovement ->
-                        " ↓ "
+                        -expense.inputAmount
 
                     IncomeMovement ->
-                        " ↑ "
+                        expense.inputAmount
           in
-          td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (arrow ++ formatMoney expense.inputCurrency expense.inputAmount) ]
-        , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatMoney ARS expense.exchangeRate) ]
-        , td [ attribute "data-label" "Pesos", class "numeric" ] [ text (formatMoney ARS expense.ars) ]
-        , td [ class "equivalence" ] [ text "=" ]
-        , td [ attribute "data-label" "Dólar", class "numeric" ] [ text (formatMoney USD expense.usd) ]
+          td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney expense.inputCurrency displayAmount) ]
+        , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber expense.exchangeRate) ]
+        , let
+            label =
+                case displayCurrency of
+                    ARS ->
+                        "Pesos"
+
+                    USD ->
+                        "Dólar"
+          in
+          td [ attribute "data-label" label, class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency expense)) ]
+        ]
+
+
+valueForCurrency : Currency -> { a | ars : Float, usd : Float } -> Float
+valueForCurrency currency record =
+    case currency of
+        ARS ->
+            record.ars
+
+        USD ->
+            record.usd
+
+
+toggleHeader : Config msg -> Html msg
+toggleHeader config =
+    let
+        labelText =
+            case config.displayCurrency of
+                ARS ->
+                    "Pesos (ARS) ↑"
+
+                USD ->
+                    "Dólar (USD) ↑"
+
+        otherCurrency =
+            case config.displayCurrency of
+                ARS ->
+                    USD
+
+                USD ->
+                    ARS
+    in
+    th [ class "numeric" ]
+        [ button
+            [ type_ "button"
+            , class "sort-button"
+            , onClick (config.onSelectDisplayCurrency otherCurrency)
+            ]
+            [ text labelText ]
         ]
 
 
@@ -235,21 +281,28 @@ sortableHeader config sortField alignment labelText =
         ]
 
 
-subtotalRows : List Account -> List Expense -> List (Html msg)
-subtotalRows accounts expenses =
+subtotalRows : List Account -> List Expense -> Currency -> List (Html msg)
+subtotalRows accounts expenses displayCurrency =
     let
         grandTotal =
             summarizeMoney expenses
     in
-    List.map (\account -> totalRow ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (expensesFor account expenses))) accounts
-        ++ [ totalRow "Total" "grand-total" grandTotal ]
+    List.map (\account -> totalRow displayCurrency ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (expensesFor account expenses))) accounts
+        ++ [ totalRow displayCurrency "Total" "grand-total" grandTotal ]
 
 
-totalRow : String -> String -> MoneyTotal -> Html msg
-totalRow labelText rowClass total =
+totalRow : Currency -> String -> String -> MoneyTotal -> Html msg
+totalRow displayCurrency labelText rowClass total =
     tr [ class rowClass ]
         [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ text labelText ]
-        , td [ attribute "data-label" "Pesos", class "numeric" ] [ text (formatMoney ARS total.ars) ]
-        , td [ class "equivalence" ] [ text "=" ]
-        , td [ attribute "data-label" "Dólar", class "numeric" ] [ text (formatMoney USD total.usd) ]
+        , let
+            label =
+                case displayCurrency of
+                    ARS ->
+                        "Pesos"
+
+                    USD ->
+                        "Dólar"
+          in
+          td [ attribute "data-label" label, class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency total)) ]
         ]

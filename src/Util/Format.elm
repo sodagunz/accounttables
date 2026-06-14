@@ -1,4 +1,4 @@
-module Util.Format exposing (formatMoney)
+module Util.Format exposing (formatMoney, formatNumber)
 
 import Accounting exposing (Currency(..))
 import Util.Date exposing (pad2)
@@ -10,13 +10,26 @@ formatMoney currency amount =
         prefix =
             case currency of
                 ARS ->
-                    "AR$ "
+                    "ARS "
 
                 USD ->
                     "U$D "
 
         formatted =
             prefix ++ formatFloat (abs amount)
+    in
+    if amount < 0 then
+        "(" ++ formatted ++ ")"
+
+    else
+        formatted
+
+
+formatNumber : Float -> String
+formatNumber amount =
+    let
+        formatted =
+            formatFloat (abs amount)
     in
     if amount < 0 then
         "(" ++ formatted ++ ")"

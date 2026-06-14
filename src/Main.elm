@@ -37,6 +37,7 @@ type Msg
     | UpdateCustomStart String
     | UpdateCustomEnd String
     | SelectDateDisplay DateDisplay
+    | SelectDisplayCurrency Accounting.Currency
     | SelectSort SortField
     | ExportCsv
     | ExportXlsx
@@ -182,6 +183,9 @@ update msg model =
 
         SelectDateDisplay dateDisplay ->
             ( { model | dateDisplay = dateDisplay }, Cmd.none )
+
+        SelectDisplayCurrency currency ->
+            ( { model | displayCurrency = currency }, Cmd.none )
 
         SelectSort sortField ->
             ( selectSort sortField model, Cmd.none )
@@ -367,6 +371,7 @@ view model =
                         , filterWindow = model.filterWindow
                         , hiddenAccountIds = model.hiddenAccountIds
                         , dateDisplay = model.dateDisplay
+                        , displayCurrency = model.displayCurrency
                         , customStart = model.customStart
                         , customEnd = model.customEnd
                         , sortField = model.sortField
@@ -376,6 +381,7 @@ view model =
                         , onCustomStart = UpdateCustomStart
                         , onCustomEnd = UpdateCustomEnd
                         , onSelectDateDisplay = SelectDateDisplay
+                        , onSelectDisplayCurrency = SelectDisplayCurrency
                         , onSelectSort = SelectSort
                         , onExportCsv = ExportCsv
                         , onExportXlsx = ExportXlsx

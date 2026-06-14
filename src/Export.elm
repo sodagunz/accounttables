@@ -57,10 +57,9 @@ headers =
     , "Caja"
     , "Descripción"
     , "Ingresado"
-    , "Cotización"
-    , "Pesos"
-    , "="
-    , "Dólar"
+    , "Cotización (USD/ARS)"
+    , "Pesos (ARS)"
+    , "Dólar (USD)"
     ]
 
 
@@ -79,7 +78,6 @@ expenseRow dateDisplay expense =
         , formatMoney expense.inputCurrency expense.inputAmount
         , formatMoney ARS expense.exchangeRate
         , formatMoney ARS expense.ars
-        , "="
         , formatMoney USD expense.usd
         ]
     }
@@ -105,7 +103,6 @@ totalRow labelText label total =
         , ""
         , ""
         , formatMoney ARS total.ars
-        , "="
         , formatMoney USD total.usd
         ]
     }

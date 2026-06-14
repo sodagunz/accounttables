@@ -100,7 +100,7 @@ view config =
                 , label []
                     [ text "Divisa"
                     , select [ value (currencyToString config.form.currency), onInput config.onCurrency ]
-                        [ option [ value "ARS" ] [ text "AR$" ]
+                        [ option [ value "ARS" ] [ text "ARS" ]
                         , option [ value "USD" ] [ text "U$D" ]
                         ]
                     ]

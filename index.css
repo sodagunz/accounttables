@@ -67,14 +67,6 @@ h1 {
   letter-spacing: 0;
 }
 
-.subtitle {
-  margin-top: 6px;
-  color: #d6e6df;
-  max-width: 720px;
-  line-height: 1.45;
-  font-size: 0.92rem;
-}
-
 .auth-status {
   display: grid;
   justify-items: end;
@@ -649,10 +641,6 @@ th:first-child {
   h1 {
     font-size: 1.55rem;
     line-height: 1;
-  }
-
-  .subtitle {
-    display: none;
   }
 
   .auth-status {

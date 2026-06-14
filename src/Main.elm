@@ -309,9 +309,7 @@ view model =
             [ div [ class "topbar__inner" ]
                 [ div [ class "topbar__content" ]
                     [ div []
-                        [ h1 [] [ text "ContabilizAR" ]
-                        , p [ class "subtitle" ] [ text "Carga gastos rapido, confirma el ultimo movimiento y revisa el flujo por caja." ]
-                        ]
+                        [ h1 [] [ text "ContabilizAR" ] ]
                     , AuthStatus.view
                         { authState = model.authState
                         , ledgerLoadState = model.ledgerLoadState

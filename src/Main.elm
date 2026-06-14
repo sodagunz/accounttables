@@ -291,7 +291,7 @@ view model =
                 [ div [ class "topbar__content" ]
                     [ div []
                         [ h1 [] [ text "ContabilizAR" ]
-                        , p [ class "subtitle" ] [ text "Un registro simple de gastos por libro contable, con conversión AR$/U$D y una tabla filtrable." ]
+                        , p [ class "subtitle" ] [ text "Carga gastos rapido, confirma el ultimo movimiento y revisa el flujo por caja." ]
                         ]
                     , AuthStatus.view
                         { authState = model.authState

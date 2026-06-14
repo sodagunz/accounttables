@@ -112,6 +112,8 @@
 
     Implemented with a single closed-by-default `Administrar` disclosure after the expenses section. It groups the existing `Libro contable`, `Cajas`, and `Miembros` controls into one secondary admin area while preserving their current behavior. The movement form and recent expenses remain the default visible workflow.
 
-20. [ ] Default screen priority
+20. [x] Default screen priority
 
     The default screen should answer one question first: “what do I need to enter now?” Recent expenses are the second priority because they provide confirmation and correction. Everything else should be reachable, but subordinate to fast expense capture and review.
+
+    Implemented with a final hierarchy pass. The page renders the movement form first, recent expenses second, and the closed `Administrar` area after both. Header copy now reinforces the default task of loading an expense, confirming the latest movement, and reviewing cashflow by caja. No Firestore behavior or new feature surface was changed.

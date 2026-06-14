@@ -36,8 +36,8 @@ view config =
             SignedIn user ->
                 [ div [ class "auth-user" ]
                     [ syncDot config.ledgerLoadState
-                    , span [] [ text (userLabel user) ]
-                    , button [ type_ "button", class "auth-button", onClick config.onSignOut ] [ text "Salir" ]
+                    , span [ class "auth-user__name" ] [ text (userLabel user) ]
+                    , button [ type_ "button", class "auth-button", attribute "aria-label" "Cerrar sesión", onClick config.onSignOut ] [ text "\u{23FB}" ]
                     ]
                 , ledgerStatus config.ledgerLoadState
                 ]

@@ -653,8 +653,10 @@ th:first-child {
   }
 
   .topbar__content {
-    display: grid;
-    gap: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
 
   h1 {
@@ -663,8 +665,14 @@ th:first-child {
   }
 
   .auth-status {
-    justify-items: start;
-    text-align: left;
+    justify-items: end;
+    text-align: right;
+    min-width: auto;
+  }
+
+  .sync-dot,
+  .auth-user__name {
+    display: none;
   }
 
   main {

@@ -745,14 +745,12 @@ th {
 }
 
 td.action-cell {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100px;
+    text-align: center;
+    vertical-align: middle;
 }
 
 .action-buttons {
-    display: flex;
+    display: inline-flex;
     border: 1px solid #c8d4cf;
     border-radius: 6px;
     overflow: hidden;
@@ -1030,6 +1028,7 @@ th:first-child {
 
     td.action-cell {
         display: flex;
+        justify-content: center;
         padding: 8px 0 0;
         width: auto;
     }

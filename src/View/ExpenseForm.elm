@@ -35,22 +35,35 @@ view config =
     section [ class "panel movement-panel" ]
         [ Html.h2 [ class "section-title movement-title" ] [ text "Registrar movimiento" ]
         , Html.form [ class "form-grid", onSubmit config.onSubmit ]
-            [ div [ class "two-col" ]
+            [ label []
+                [ text "Importe"
+                , input
+                    [ class "amount-input"
+                    , type_ "number"
+                    , attribute "inputmode" "decimal"
+                    , attribute "autocomplete" "off"
+                    , attribute "aria-label" "Importe del movimiento"
+                    , attribute "min" "0.01"
+                    , step "0.01"
+                    , autofocus True
+                    , value config.form.amount
+                    , onInput config.onAmount
+                    ]
+                    []
+                ]
+            , label [ class "description-field" ]
+                [ text "Descripción"
+                , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
+                ]
+            , label []
+                [ text "Caja"
+                , select [ value selectedAccountId, onInput config.onAccount ]
+                    (accountOptions config.accounts)
+                ]
+            , div [ class "two-col" ]
                 [ label []
-                    [ text "Importe"
-                    , input
-                        [ class "amount-input"
-                        , type_ "number"
-                        , attribute "inputmode" "decimal"
-                        , attribute "autocomplete" "off"
-                        , attribute "aria-label" "Importe del movimiento"
-                        , attribute "min" "0.01"
-                        , step "0.01"
-                        , autofocus True
-                        , value config.form.amount
-                        , onInput config.onAmount
-                        ]
-                        []
+                    [ text "Fecha"
+                    , input [ type_ "date", value config.form.date, onInput config.onDate ] []
                     ]
                 , label []
                     [ text "Divisa"
@@ -59,21 +72,6 @@ view config =
                         , option [ value "USD" ] [ text "U$D" ]
                         ]
                     ]
-                ]
-            , div [ class "two-col" ]
-                [ label []
-                    [ text "Caja"
-                    , select [ value selectedAccountId, onInput config.onAccount ]
-                        (accountOptions config.accounts)
-                    ]
-                , label []
-                    [ text "Fecha"
-                    , input [ type_ "date", value config.form.date, onInput config.onDate ] []
-                    ]
-                ]
-            , label [ class "description-field" ]
-                [ text "Descripción"
-                , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
                 ]
             , conversionPreview config.exchangeRate config.form
             , exchangeRateView config

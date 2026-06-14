@@ -719,11 +719,6 @@ th:first-child {
     font-size: 1.35rem;
   }
 
-  .two-col {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
   .custom-range {
     grid-template-columns: 1fr;
   }

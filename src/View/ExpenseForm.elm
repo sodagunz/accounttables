@@ -28,6 +28,10 @@ type alias Config msg =
 
 view : Config msg -> Html msg
 view config =
+    let
+        selectedAccountId =
+            selectedOrDefaultAccountId config.form.accountId config.accounts
+    in
     section [ class "panel movement-panel" ]
         [ Html.h2 [ class "section-title movement-title" ] [ text "Registrar movimiento" ]
         , Html.form [ class "form-grid", onSubmit config.onSubmit ]
@@ -59,7 +63,7 @@ view config =
             , div [ class "two-col" ]
                 [ label []
                     [ text "Caja"
-                    , select [ value config.form.accountId, onInput config.onAccount ]
+                    , select [ value selectedAccountId, onInput config.onAccount ]
                         (accountOptions config.accounts)
                     ]
                 , label []
@@ -79,6 +83,18 @@ view config =
         ]
 
 
+selectedOrDefaultAccountId : String -> List Account -> String
+selectedOrDefaultAccountId selectedAccountId accounts =
+    if List.any (\account -> account.id == selectedAccountId) accounts then
+        selectedAccountId
+
+    else
+        accounts
+            |> List.head
+            |> Maybe.map .id
+            |> Maybe.withDefault ""
+
+
 accountOptions : List Account -> List (Html msg)
 accountOptions accounts =
     case accounts of
@@ -86,8 +102,7 @@ accountOptions accounts =
             [ option [ value "" ] [ text "Agrega una caja" ] ]
 
         _ ->
-            option [ value "" ] [ text "Seleccionar" ]
-                :: List.map accountOption accounts
+            List.map accountOption accounts
 
 
 accountOption : Account -> Html msg

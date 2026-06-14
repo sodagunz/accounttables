@@ -76,9 +76,11 @@
 
     Implemented by normalizing the selected caja immediately before expense validation and creation. If active cajas are loaded but the form still has no selected caja, the submit path selects the first active caja and proceeds, so the common flow remains amount plus `Registrar movimiento`. This does not add last-used persistence; items 14 and 15 still own explicit caja and currency default behavior.
 
-14. [ ] Default caja to the last used caja
+14. [x] Default caja to the last used caja
 
     The selected caja should persist after each movement so repeated entries do not require re-selection. If there is no previous selection, choose a sensible default such as the first active caja, while still making the selected caja visible enough to prevent silent misclassification.
+
+    Implemented by preserving the normalized form caja after each movement and making the selector visibly fall back to the first active caja whenever the form has no valid selected caja. The submit path already normalizes through `Model.ensureSelectedAccount`, so the displayed default and the saved movement use the same caja without requiring a separate selection step.
 
 15. [ ] Default currency to the last used currency
 

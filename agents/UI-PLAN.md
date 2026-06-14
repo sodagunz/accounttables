@@ -119,3 +119,5 @@
     The default screen should answer one question first: “what do I need to enter now?” Recent expenses are the second priority because they provide confirmation and correction. Everything else should be reachable, but subordinate to fast expense capture and review.
 
     Implemented with a final hierarchy pass. The page renders the movement form first, recent expenses second, and the closed `Administrar` area after both. Header copy now reinforces the default task of loading an expense, confirming the latest movement, and reviewing cashflow by caja. No Firestore behavior or new feature surface was changed.
+
+    Follow-up cache behavior: ledger payloads are cached in `localStorage` and rendered before the Firestore roundtrip completes. Firestore remains authoritative: each remote load overwrites the cached payload, while expense/caja writes update the cache optimistically so refreshes during a slow write still show the latest local action.

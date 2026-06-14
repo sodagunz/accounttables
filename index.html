@@ -35,6 +35,8 @@
       } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
       import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
 
+      const LEDGER_CACHE_SCHEMA_VERSION = 1;
+
       const app = Elm.Main.init({ node: document.getElementById("app") });
 
       setupFirebaseAuth(app);
@@ -181,6 +183,7 @@
       function setupFirestore(app, auth, db) {
         app.ports.loadLedgerData.subscribe(async ({ ledgerId }) => {
           try {
+            emitCachedLedger(app, auth, ledgerId);
             await loadLedger(app, auth, db, ledgerId);
           } catch (error) {
             console.error("Firestore ledger load failed", error);
@@ -195,6 +198,7 @@
         app.ports.saveExpense.subscribe(async ({ ledgerId, expense }) => {
           try {
             await ensureLedger(auth, db, ledgerId);
+            upsertCachedExpense(auth.currentUser?.uid, ledgerId, expense);
             await setDoc(
               doc(db, "ledgers", ledgerId, "expenses", String(expense.id)),
               {
@@ -224,12 +228,17 @@
             }
 
             const accountId = uuidv7();
+            const account = {
+              id: accountId,
+              name: trimmedName,
+              createdAt: new Date().toISOString(),
+            };
+            const cachedLedger = upsertCachedAccount(auth.currentUser?.uid, ledgerId, account);
+            emitLedgerPayload(app, cachedLedger);
             await setDoc(
               doc(db, "ledgers", ledgerId, "accounts", accountId),
               {
-                id: accountId,
-                name: trimmedName,
-                createdAt: new Date().toISOString(),
+                ...account,
                 updatedAt: serverTimestamp(),
               },
               { merge: true },
@@ -249,6 +258,13 @@
           try {
             await ensureLedger(auth, db, ledgerId);
             const deletedAt = new Date().toISOString();
+            const cachedLedger = softDeleteCachedAccount(
+              auth.currentUser?.uid,
+              ledgerId,
+              accountId,
+              deletedAt,
+            );
+            emitLedgerPayload(app, cachedLedger);
             let batch = writeBatch(db);
             let writeCount = 0;
 
@@ -420,14 +436,17 @@
           serializeFirestoreDocument(documentSnapshot),
         );
 
-        app.ports.ledgerLoaded.send({
-          status: "loaded",
-          ledgerId: selectedLedgerId,
-          lastAccountId: loadLastAccountId(selectedLedgerId),
-          ledgers,
-          accounts,
-          expenses,
-        });
+        emitLedgerPayload(
+          app,
+          cacheLedgerPayload(auth.currentUser?.uid, {
+            status: "loaded",
+            ledgerId: selectedLedgerId,
+            lastAccountId: loadLastAccountId(selectedLedgerId),
+            ledgers,
+            accounts,
+            expenses,
+          }),
+        );
       }
 
       async function ensureLedger(auth, db, ledgerId) {
@@ -545,6 +564,134 @@
         }
 
         return summaries.sort((left, right) => left.name.localeCompare(right.name));
+      }
+
+      function emitCachedLedger(app, auth, ledgerId) {
+        emitLedgerPayload(app, loadLedgerCache(auth.currentUser?.uid, ledgerId));
+      }
+
+      function emitLedgerPayload(app, payload) {
+        if (payload) {
+          app.ports.ledgerLoaded.send(payload);
+        }
+      }
+
+      function ledgerCacheKey(uid, ledgerId) {
+        return `contabilizar:ledger:${uid}:${ledgerId}`;
+      }
+
+      function cacheLedgerPayload(uid, payload) {
+        if (!uid || !payload?.ledgerId) {
+          return payload;
+        }
+
+        const cachedPayload = {
+          status: "loaded",
+          ledgerId: payload.ledgerId,
+          lastAccountId: payload.lastAccountId || loadLastAccountId(payload.ledgerId),
+          ledgers: Array.isArray(payload.ledgers) ? payload.ledgers : [],
+          accounts: Array.isArray(payload.accounts) ? payload.accounts : [],
+          expenses: Array.isArray(payload.expenses) ? payload.expenses : [],
+        };
+
+        try {
+          localStorage.setItem(
+            ledgerCacheKey(uid, payload.ledgerId),
+            JSON.stringify({
+              schemaVersion: LEDGER_CACHE_SCHEMA_VERSION,
+              cachedAt: new Date().toISOString(),
+              payload: cachedPayload,
+            }),
+          );
+        } catch (error) {
+          console.warn("Could not cache ledger data", error);
+        }
+
+        return cachedPayload;
+      }
+
+      function loadLedgerCache(uid, ledgerId) {
+        if (!uid || !ledgerId) {
+          return null;
+        }
+
+        try {
+          const rawCache = localStorage.getItem(ledgerCacheKey(uid, ledgerId));
+          if (!rawCache) {
+            return null;
+          }
+
+          const cache = JSON.parse(rawCache);
+          if (
+            cache?.schemaVersion !== LEDGER_CACHE_SCHEMA_VERSION ||
+            cache?.payload?.ledgerId !== ledgerId
+          ) {
+            localStorage.removeItem(ledgerCacheKey(uid, ledgerId));
+            return null;
+          }
+
+          return {
+            ...cache.payload,
+            lastAccountId: loadLastAccountId(ledgerId) || cache.payload.lastAccountId || null,
+          };
+        } catch (error) {
+          console.warn("Could not load cached ledger data", error);
+          return null;
+        }
+      }
+
+      function updateLedgerCache(uid, ledgerId, updatePayload) {
+        const payload = loadLedgerCache(uid, ledgerId);
+        if (!payload) {
+          return null;
+        }
+
+        return cacheLedgerPayload(uid, updatePayload(payload));
+      }
+
+      function upsertCachedExpense(uid, ledgerId, expense) {
+        return updateLedgerCache(uid, ledgerId, (payload) => ({
+          ...payload,
+          lastAccountId: expense.accountId || payload.lastAccountId,
+          expenses: upsertById(payload.expenses, {
+            ...expense,
+            updatedAt: new Date().toISOString(),
+          }),
+        }));
+      }
+
+      function upsertCachedAccount(uid, ledgerId, account) {
+        return updateLedgerCache(uid, ledgerId, (payload) => ({
+          ...payload,
+          accounts: upsertById(payload.accounts, account),
+        }));
+      }
+
+      function softDeleteCachedAccount(uid, ledgerId, accountId, deletedAt) {
+        return updateLedgerCache(uid, ledgerId, (payload) => ({
+          ...payload,
+          accounts: payload.accounts.map((account) =>
+            account.id === accountId ? { ...account, deletedAt } : account,
+          ),
+          expenses: payload.expenses.map((expense) =>
+            expense.accountId === accountId && !expense.deletedAt
+              ? { ...expense, deletedAt }
+              : expense,
+          ),
+        }));
+      }
+
+      function upsertById(items, item) {
+        const id = String(item.id || "");
+        const index = items.findIndex((candidate) => String(candidate.id || "") === id);
+
+        if (index === -1) {
+          return [item, ...items];
+        }
+
+        return items.map((candidate, candidateIndex) =>
+          candidateIndex === index ? item : candidate,
+        );
       }
 
       function lastAccountStorageKey(ledgerId) {

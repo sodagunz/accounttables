@@ -730,7 +730,22 @@ th {
 
 .action-cell {
     text-align: center;
-    width: 40px;
+    white-space: nowrap;
+    width: 70px;
+}
+
+.edit-button {
+    background: none;
+    border: none;
+    color: #2f806c;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    padding: 4px 6px;
+}
+
+.edit-button:hover {
+    color: #1a5c4c;
 }
 
 .delete-button {
@@ -740,7 +755,7 @@ th {
     cursor: pointer;
     font-size: 1.2rem;
     line-height: 1;
-    padding: 4px 8px;
+    padding: 4px 6px;
 }
 
 .delete-button:hover {

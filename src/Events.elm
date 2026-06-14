@@ -47,7 +47,16 @@ type alias MovementDeletedData =
 
 type alias MovementUpdatedData =
     { movementId : String
-    , changes : Encode.Value
+    , movementType : MovementType
+    , description : Maybe String
+    , accountId : String
+    , accountName : String
+    , inputAmount : Float
+    , inputCurrency : Currency
+    , exchangeRate : Float
+    , ars : Float
+    , usd : Float
+    , date : String
     }
 
 
@@ -116,7 +125,16 @@ dataEncoder event =
         MovementUpdatedEvent _ data ->
             Encode.object
                 [ ( "movementId", Encode.string data.movementId )
-                , ( "changes", data.changes )
+                , ( "movementType", Encode.string (movementTypeToString data.movementType) )
+                , ( "description", encodeMaybeString data.description )
+                , ( "accountId", Encode.string data.accountId )
+                , ( "accountName", Encode.string data.accountName )
+                , ( "inputAmount", Encode.float data.inputAmount )
+                , ( "inputCurrency", Encode.string (currencyToString data.inputCurrency) )
+                , ( "exchangeRate", Encode.float data.exchangeRate )
+                , ( "ars", Encode.float data.ars )
+                , ( "usd", Encode.float data.usd )
+                , ( "date", Encode.string data.date )
                 ]
 
 
@@ -197,6 +215,16 @@ movementDeletedDecoder =
 movementUpdatedDecoder : Decoder MovementUpdatedData
 movementUpdatedDecoder =
     field "data" <|
-        Decode.map2 MovementUpdatedData
-            (field "movementId" string)
-            (field "changes" Decode.value)
+        (Decode.succeed MovementUpdatedData
+            |> required "movementId" string
+            |> required "movementType" (Decode.map movementTypeFromString string)
+            |> required "description" (maybe string)
+            |> required "accountId" string
+            |> required "accountName" string
+            |> required "inputAmount" float
+            |> required "inputCurrency" (Decode.map currencyFromString string)
+            |> required "exchangeRate" float
+            |> required "ars" float
+            |> required "usd" float
+            |> required "date" string
+        )

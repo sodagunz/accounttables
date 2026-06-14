@@ -110,12 +110,17 @@ view config =
             , p [ class "error" ] [ text config.error ]
             , let
                 buttonText =
-                    case config.form.movementType of
-                        ExpenseMovement ->
-                            "Registrar gasto"
+                    case config.form.editingId of
+                        Just _ ->
+                            "Guardar cambios"
 
-                        IncomeMovement ->
-                            "Registrar ingreso"
+                        Nothing ->
+                            case config.form.movementType of
+                                ExpenseMovement ->
+                                    "Registrar gasto"
+
+                                IncomeMovement ->
+                                    "Registrar ingreso"
               in
               button [ class "primary primary--movement", type_ "submit" ] [ text buttonText ]
             ]

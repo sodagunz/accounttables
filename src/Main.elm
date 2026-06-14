@@ -58,6 +58,7 @@ type Msg
     | RemoveGuest String
     | ToggleAccountFilter String
     | DeleteExpense String
+    | EditExpense String
     | EventsLoaded Decode.Value
 
 
@@ -232,37 +233,79 @@ update msg model =
                     case Accounting.buildExpense readyModel.exchangeRate expenseId (Model.activeAccounts readyModel) readyModel.form of
                         Ok expense ->
                             let
-                                event =
-                                    Events.MovementCreatedEvent 0
-                                        { id = expense.id
-                                        , movementType = expense.movementType
-                                        , description = expense.description
-                                        , accountId = expense.accountId
-                                        , accountName = expense.accountName
-                                        , inputAmount = expense.inputAmount
-                                        , inputCurrency = expense.inputCurrency
-                                        , exchangeRate = expense.exchangeRate
-                                        , ars = expense.ars
-                                        , usd = expense.usd
-                                        , date = expense.date
-                                        }
+                                ( event, updatedModel ) =
+                                    case readyModel.form.editingId of
+                                        Just editingId ->
+                                            let
+                                                updateEvent =
+                                                    Events.MovementUpdatedEvent 0
+                                                        { movementId = editingId
+                                                        , movementType = expense.movementType
+                                                        , description = expense.description
+                                                        , accountId = expense.accountId
+                                                        , accountName = expense.accountName
+                                                        , inputAmount = expense.inputAmount
+                                                        , inputCurrency = expense.inputCurrency
+                                                        , exchangeRate = expense.exchangeRate
+                                                        , ars = expense.ars
+                                                        , usd = expense.usd
+                                                        , date = expense.date
+                                                        }
 
-                                updatedModel =
-                                    { readyModel
-                                        | events = event :: readyModel.events
-                                        , expenses = expense :: Model.activeExpenses readyModel.expenses
-                                        , form =
-                                            { description = ""
-                                            , amount = ""
-                                            , accountId = readyModel.form.accountId
-                                            , currency = readyModel.form.currency
-                                            , date = readyModel.form.date
-                                            , movementType = readyModel.form.movementType
-                                            }
-                                        , error = ""
-                                    }
+                                                updatedExpenses =
+                                                    List.map
+                                                        (\e ->
+                                                            if e.id == editingId then
+                                                                expense
+
+                                                            else
+                                                                e
+                                                        )
+                                                        readyModel.expenses
+                                            in
+                                            ( updateEvent
+                                            , { readyModel
+                                                | events = updateEvent :: readyModel.events
+                                                , expenses = Model.activeExpenses updatedExpenses
+                                              }
+                                            )
+
+                                        Nothing ->
+                                            let
+                                                createEvent =
+                                                    Events.MovementCreatedEvent 0
+                                                        { id = expense.id
+                                                        , movementType = expense.movementType
+                                                        , description = expense.description
+                                                        , accountId = expense.accountId
+                                                        , accountName = expense.accountName
+                                                        , inputAmount = expense.inputAmount
+                                                        , inputCurrency = expense.inputCurrency
+                                                        , exchangeRate = expense.exchangeRate
+                                                        , ars = expense.ars
+                                                        , usd = expense.usd
+                                                        , date = expense.date
+                                                        }
+                                            in
+                                            ( createEvent
+                                            , { readyModel
+                                                | events = createEvent :: readyModel.events
+                                                , expenses = expense :: Model.activeExpenses readyModel.expenses
+                                              }
+                                            )
                             in
-                            ( updatedModel
+                            ( { updatedModel
+                                | form =
+                                    { description = ""
+                                    , amount = ""
+                                    , accountId = readyModel.form.accountId
+                                    , currency = readyModel.form.currency
+                                    , date = readyModel.form.date
+                                    , movementType = readyModel.form.movementType
+                                    , editingId = Nothing
+                                    }
+                                , error = ""
+                              }
                             , Cmd.batch
                                 [ appendEvent
                                     (Encode.object
@@ -371,6 +414,19 @@ update msg model =
                 )
             )
 
+        EditExpense expenseId ->
+            case List.head (List.filter (\e -> e.id == expenseId) model.expenses) of
+                Just expense ->
+                    ( { model
+                        | form = Accounting.expenseToForm expense model.form
+                        , error = ""
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( { model | error = "No se encontró el gasto a editar" }, Cmd.none )
+
         EventsLoaded value ->
             case Decode.decodeValue (Decode.list Events.eventDecoder) value of
                 Ok events ->
@@ -457,6 +513,7 @@ view model =
                         , onExportCsv = ExportCsv
                         , onExportXlsx = ExportXlsx
                         , onDelete = DeleteExpense
+                        , onEdit = EditExpense
                         }
                     ]
                 ]

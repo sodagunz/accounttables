@@ -20,8 +20,8 @@ applyEvent event expenses =
         MovementDeletedEvent _ data ->
             List.map (markDeleted data.movementId) expenses
 
-        MovementUpdatedEvent _ _ ->
-            expenses
+        MovementUpdatedEvent _ data ->
+            List.map (applyUpdate data) expenses
 
 
 movementCreated : MovementCreatedData -> Expense
@@ -45,6 +45,27 @@ markDeleted : String -> Expense -> Expense
 markDeleted movementId expense =
     if expense.id == movementId then
         { expense | deletedAt = Just "deleted" }
+
+    else
+        expense
+
+
+applyUpdate : MovementUpdatedData -> Expense -> Expense
+applyUpdate data expense =
+    if expense.id == data.movementId then
+        { id = data.movementId
+        , movementType = data.movementType
+        , description = data.description
+        , accountId = data.accountId
+        , accountName = data.accountName
+        , inputAmount = data.inputAmount
+        , inputCurrency = data.inputCurrency
+        , exchangeRate = data.exchangeRate
+        , ars = data.ars
+        , usd = data.usd
+        , date = data.date
+        , deletedAt = expense.deletedAt
+        }
 
     else
         expense

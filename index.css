@@ -512,6 +512,65 @@ select:focus {
     background: #ffecec;
 }
 
+.filters-toggle {
+    display: contents;
+}
+
+.filters-toggle__input {
+    display: none;
+}
+
+.filters-toggle__button {
+    display: none;
+}
+
+.filters-toggle__content {
+    display: contents;
+}
+
+@media (max-width: 820px) {
+    .filters-toggle {
+        display: block;
+    }
+
+    .filters-toggle__button {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 14px;
+        border: 1px solid #c8d4cf;
+        border-radius: 6px;
+        background: #ffffff;
+        color: #33413c;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+
+    .filters-toggle__button:hover {
+        border-color: #2f806c;
+    }
+
+    .filters-toggle__arrow {
+        transition: transform 0.2s;
+        font-size: 0.75rem;
+    }
+
+    .filters-toggle__input:checked ~ .filters-toggle__button .filters-toggle__arrow {
+        transform: rotate(180deg);
+    }
+
+    .filters-toggle__content {
+        display: none;
+        margin-top: 12px;
+    }
+
+    .filters-toggle__input:checked ~ .filters-toggle__content {
+        display: block;
+    }
+}
+
 .filters {
     display: flex;
     flex-wrap: wrap;

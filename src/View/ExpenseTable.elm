@@ -2,7 +2,7 @@ module View.ExpenseTable exposing (Config, view)
 
 import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, expensesFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
-import Html.Attributes exposing (attribute, checked, class, classList, name, type_, value)
+import Html.Attributes exposing (attribute, checked, class, classList, for, id, name, type_, value)
 import Html.Events exposing (onClick)
 import Util.Date exposing (DateDisplay(..), formatDate)
 import Util.Format exposing (formatMoney, formatNumber)
@@ -32,7 +32,24 @@ view config =
     section [ class "panel" ]
         [ Html.h2 [ class "section-title" ] [ text "Gastos" ]
         , div [ class "expense-table-layout" ]
-            [ filterControls config
+            [ div [ class "filters-toggle" ]
+                [ input
+                    [ type_ "checkbox"
+                    , id "filters-toggle-input"
+                    , class "filters-toggle__input"
+                    ]
+                    []
+                , label
+                    [ class "filters-toggle__button"
+                    , for "filters-toggle-input"
+                    ]
+                    [ span [] [ text "Filtros" ]
+                    , span [ class "filters-toggle__arrow" ] [ text "▼" ]
+                    ]
+                , div [ class "filters-toggle__content" ]
+                    [ filterControls config
+                    ]
+                ]
             , expenseTableBody config
             ]
         ]

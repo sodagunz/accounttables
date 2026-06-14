@@ -91,26 +91,33 @@ filterControls : Config msg -> Html msg
 filterControls config =
     div [ class "filters" ]
         [ div [ class "report-options" ]
-            [ p [] [ text "Filtros" ]
-            , div [ class "segmented-control" ]
-                (List.map (filterSegment config) allFilterWindows)
+            [ div [ class "segmented-control" ]
+                [ span [ class "segmented-control__label" ] [ text "Filtros" ]
+                , filterSegment config AllTime "Completo"
+                , filterSegment config ThisYear "Año"
+                , filterSegment config ThisMonth "Mes"
+                , filterSegment config ThisWeek "Semana"
+                , filterSegment config Today "Día"
+                , filterSegment config Custom "Personalizado"
+                ]
             ]
         , div [ class "report-options" ]
-            [ p [] [ text "Caja" ]
-            , div [ class "segmented-control" ]
-                (List.map (accountSegment config) config.accounts)
+            [ div [ class "segmented-control" ]
+                ([ span [ class "segmented-control__label" ] [ text "Caja" ] ]
+                    ++ List.map (accountSegment config) config.accounts
+                )
             ]
         , div [ class "report-options" ]
-            [ p [] [ text "Fecha" ]
-            , div [ class "segmented-control" ]
-                [ dateSegment config NumericDate "DD/MM/AAAA"
+            [ div [ class "segmented-control" ]
+                [ span [ class "segmented-control__label" ] [ text "Fecha" ]
+                , dateSegment config NumericDate "DD/MM/AAAA"
                 , dateSegment config LongDate "Texto"
                 ]
             ]
         , div [ class "report-options" ]
-            [ p [] [ text "Divisa" ]
-            , div [ class "segmented-control" ]
-                [ radioSegment config.onSelectDisplayCurrency ARS (config.displayCurrency == ARS) "ARS"
+            [ div [ class "segmented-control" ]
+                [ span [ class "segmented-control__label" ] [ text "Divisa" ]
+                , radioSegment config.onSelectDisplayCurrency ARS (config.displayCurrency == ARS) "ARS"
                 , radioSegment config.onSelectDisplayCurrency USD (config.displayCurrency == USD) "USD"
                 ]
             ]
@@ -131,34 +138,8 @@ filterControls config =
         ]
 
 
-allFilterWindows : List FilterWindow
-allFilterWindows =
-    [ AllTime, ThisYear, ThisMonth, ThisWeek, Today, Custom ]
-
-
-filterSegment : Config msg -> FilterWindow -> Html msg
-filterSegment config filterWindow =
-    let
-        labelText =
-            case filterWindow of
-                AllTime ->
-                    "Completo"
-
-                ThisYear ->
-                    "Año"
-
-                ThisMonth ->
-                    "Mes"
-
-                ThisWeek ->
-                    "Semana"
-
-                Today ->
-                    "Día"
-
-                Custom ->
-                    "Personalizado"
-    in
+filterSegment : Config msg -> FilterWindow -> String -> Html msg
+filterSegment config filterWindow labelText =
     label
         [ classList
             [ ( "segmented-control__option", True )

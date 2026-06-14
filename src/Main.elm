@@ -102,24 +102,34 @@ port saveLastAccountSelection : Encode.Value -> Cmd msg
 port ledgerLoaded : (Decode.Value -> msg) -> Sub msg
 
 
-main : Program () Model Msg
+main : Program Decode.Value Model Msg
 main =
     Browser.element
-        { init = \_ -> init
+        { init = init
         , update = update
         , subscriptions = subscriptions
         , view = view
         }
 
 
-init : ( Model, Cmd Msg )
-init =
-    ( Model.initial
+init : Decode.Value -> ( Model, Cmd Msg )
+init flags =
+    ( modelFromFlags flags
     , Cmd.batch
         [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
         , Dolar.fetchOfficialDollar GotExchangeRate
         ]
     )
+
+
+modelFromFlags : Decode.Value -> Model
+modelFromFlags flags =
+    case Ledger.decodeLedger flags of
+        Ok ledger ->
+            applyLedgerData ledger Model.initial
+
+        Err _ ->
+            Model.initial
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -133,7 +143,6 @@ update msg model =
             ( { model
                 | form = Accounting.setDate today model.form
                 , today = today
-                , expenses = Accounting.sampleExpenses model.exchangeRate today model.accounts
                 , zone = zone
               }
                 |> Model.ensureSelectedAccount
@@ -448,20 +457,24 @@ handleAuthStateChanged : AuthState -> Model -> ( Model, Cmd Msg )
 handleAuthStateChanged authState model =
     case authState of
         SignedIn user ->
+            let
+                ledgerId =
+                    if model.currentLedgerId == "" then
+                        user.uid
+
+                    else
+                        model.currentLedgerId
+            in
             ( { model
                 | authState = authState
                 , ledgerLoadState = Loading
-                , expenses = []
-                , accounts = []
-                , ledgers = []
-                , currentLedgerId = user.uid
-                , ledgerName = ""
+                , currentLedgerId = ledgerId
                 , inviteEmail = ""
                 , error = ""
                 , accountError = ""
                 , ledgerError = ""
               }
-            , loadLedgerData (Ledger.encodeLedgerRequest user.uid)
+            , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
             )
 
         SignedOut ->
@@ -490,31 +503,34 @@ handleLedgerLoaded : Decode.Value -> Model -> ( Model, Cmd Msg )
 handleLedgerLoaded value model =
     case Ledger.decodeLedger value of
         Ok ledger ->
-            let
-                accounts =
-                    Model.activeAccountsFromList ledger.accounts
-
-                form =
-                    formWithLoadedAccount ledger.lastAccountId accounts model.form
-            in
-            ( { model
-                | expenses = Model.activeExpenses ledger.expenses
-                , accounts = accounts
-                , ledgers = ledger.ledgers
-                , currentLedgerId = ledger.currentLedgerId
-                , ledgerName = Model.ledgerNameFor ledger.currentLedgerId ledger.ledgers
-                , form = form
-                , ledgerLoadState = Loaded
-                , error = ""
-                , accountError = ""
-                , ledgerError = ""
-              }
-                |> Model.ensureSelectedAccount
-            , Cmd.none
-            )
+            ( applyLedgerData ledger model, Cmd.none )
 
         Err error ->
             ( { model | ledgerLoadState = LoadError error }, Cmd.none )
+
+
+applyLedgerData : Ledger.LedgerData -> Model -> Model
+applyLedgerData ledger model =
+    let
+        accounts =
+            Model.activeAccountsFromList ledger.accounts
+
+        form =
+            formWithLoadedAccount ledger.lastAccountId accounts model.form
+    in
+    { model
+        | expenses = Model.activeExpenses ledger.expenses
+        , accounts = accounts
+        , ledgers = ledger.ledgers
+        , currentLedgerId = ledger.currentLedgerId
+        , ledgerName = Model.ledgerNameFor ledger.currentLedgerId ledger.ledgers
+        , form = form
+        , ledgerLoadState = Loaded
+        , error = ""
+        , accountError = ""
+        , ledgerError = ""
+    }
+        |> Model.ensureSelectedAccount
 
 
 formWithLoadedAccount : Maybe String -> List Accounting.Account -> Accounting.Form -> Accounting.Form

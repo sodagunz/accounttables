@@ -36,8 +36,12 @@
       import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
 
       const LEDGER_CACHE_SCHEMA_VERSION = 1;
+      const LAST_SESSION_KEY = "contabilizar:lastSession";
 
-      const app = Elm.Main.init({ node: document.getElementById("app") });
+      const app = Elm.Main.init({
+        node: document.getElementById("app"),
+        flags: loadStartupLedgerCache(),
+      });
 
       setupFirebaseAuth(app);
       setupLastAccountStorage(app);
@@ -149,6 +153,7 @@
               user: serializeUser(user),
             });
           } else {
+            clearLastSession();
             app.ports.authStateChanged.send({ status: "signed-out" });
           }
         });
@@ -164,6 +169,7 @@
         });
 
         app.ports.signOutUser.subscribe(() => {
+          clearLastSession();
           signOut(auth).catch((error) => {
             console.error("Firebase sign-out failed", error);
             app.ports.authStateChanged.send({
@@ -603,6 +609,7 @@
               payload: cachedPayload,
             }),
           );
+          saveLastSession(uid, payload.ledgerId);
         } catch (error) {
           console.warn("Could not cache ledger data", error);
         }
@@ -637,6 +644,41 @@
         } catch (error) {
           console.warn("Could not load cached ledger data", error);
           return null;
+        }
+      }
+
+      function loadStartupLedgerCache() {
+        try {
+          const rawSession = localStorage.getItem(LAST_SESSION_KEY);
+          if (!rawSession) {
+            return null;
+          }
+
+          const session = JSON.parse(rawSession);
+          return loadLedgerCache(session?.uid, session?.ledgerId);
+        } catch (error) {
+          console.warn("Could not load startup ledger cache", error);
+          return null;
+        }
+      }
+
+      function saveLastSession(uid, ledgerId) {
+        if (!uid || !ledgerId) {
+          return;
+        }
+
+        try {
+          localStorage.setItem(LAST_SESSION_KEY, JSON.stringify({ uid, ledgerId }));
+        } catch (error) {
+          console.warn("Could not save last session", error);
+        }
+      }
+
+      function clearLastSession() {
+        try {
+          localStorage.removeItem(LAST_SESSION_KEY);
+        } catch (error) {
+          console.warn("Could not clear last session", error);
         }
       }
 

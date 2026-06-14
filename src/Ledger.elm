@@ -1,5 +1,6 @@
 module Ledger exposing
-    ( LedgerSummary
+    ( LedgerData
+    , LedgerSummary
     , LoadState(..)
     , Member
     , decodeLedger
@@ -36,6 +37,15 @@ type alias Member =
     { uid : String
     , email : String
     , displayName : String
+    }
+
+
+type alias LedgerData =
+    { expenses : List Expense
+    , accounts : List Account
+    , ledgers : List LedgerSummary
+    , currentLedgerId : String
+    , lastAccountId : Maybe String
     }
 
 
@@ -120,13 +130,13 @@ encodeMaybeString maybeString =
             Encode.null
 
 
-decodeLedger : Decode.Value -> Result String { expenses : List Expense, accounts : List Account, ledgers : List LedgerSummary, currentLedgerId : String, lastAccountId : Maybe String }
+decodeLedger : Decode.Value -> Result String LedgerData
 decodeLedger value =
     Decode.decodeValue ledgerPayloadDecoder value
         |> Result.mapError Decode.errorToString
 
 
-ledgerPayloadDecoder : Decode.Decoder { expenses : List Expense, accounts : List Account, ledgers : List LedgerSummary, currentLedgerId : String, lastAccountId : Maybe String }
+ledgerPayloadDecoder : Decode.Decoder LedgerData
 ledgerPayloadDecoder =
     Decode.field "status" Decode.string
         |> Decode.andThen

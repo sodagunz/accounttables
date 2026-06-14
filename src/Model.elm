@@ -44,6 +44,7 @@ type alias Model =
     , zone : Time.Zone
     , authState : AuthState
     , ledgerLoadState : LoadState
+    , hiddenAccountIds : List String
     }
 
 
@@ -72,12 +73,14 @@ initial =
     , zone = Time.utc
     , authState = AuthLoading
     , ledgerLoadState = NotLoaded
+    , hiddenAccountIds = []
     }
 
 
 visibleExpenses : Model -> List Expense
 visibleExpenses model =
     Accounting.filteredExpenses { model | expenses = activeExpenses model.expenses }
+        |> List.filter (\e -> not (List.member e.accountId model.hiddenAccountIds))
         |> Accounting.sortExpenses model.sortField model.sortDirection
 
 

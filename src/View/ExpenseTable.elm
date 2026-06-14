@@ -12,12 +12,14 @@ type alias Config msg =
     { expenses : List Expense
     , accounts : List Account
     , filterWindow : FilterWindow
+    , hiddenAccountIds : List String
     , dateDisplay : DateDisplay
     , customStart : String
     , customEnd : String
     , sortField : SortField
     , sortDirection : SortDirection
     , onSelectFilter : FilterWindow -> msg
+    , onToggleAccount : String -> msg
     , onCustomStart : String -> msg
     , onCustomEnd : String -> msg
     , onSelectDateDisplay : DateDisplay -> msg
@@ -44,6 +46,10 @@ expenseTableBody config =
         p [ class "empty" ] [ text "Todavía no hay gastos." ]
 
     else
+        let
+            visibleAccounts =
+                List.filter (\a -> not (List.member a.id config.hiddenAccountIds)) config.accounts
+        in
         div [ class "table-wrap" ]
             [ table [ class "expense-table" ]
                 [ thead []
@@ -58,7 +64,7 @@ expenseTableBody config =
                         , sortableHeader config SortByDollars "numeric" "Dólar"
                         ]
                     ]
-                , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.accounts config.expenses)
+                , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows visibleAccounts config.expenses)
                 ]
             ]
 
@@ -84,6 +90,11 @@ filterControls config =
                 , filterButton config Today "Día"
                 , filterButton config Custom "Personalizado"
                 ]
+            ]
+        , div [ class "report-options" ]
+            [ p [] [ text "Caja" ]
+            , div [ class "filter-buttons" ]
+                (List.map (accountFilterButton config) config.accounts)
             ]
         , div [ class "report-options" ]
             [ p [] [ text "Fecha" ]
@@ -150,6 +161,26 @@ dateDisplayButton config dateDisplay labelText =
         , onClick (config.onSelectDateDisplay dateDisplay)
         ]
         [ text labelText ]
+
+
+accountFilterButton : Config msg -> Account -> Html msg
+accountFilterButton config account =
+    let
+        hidden =
+            List.member account.id config.hiddenAccountIds
+    in
+    button
+        [ type_ "button"
+        , class
+            (if hidden then
+                "filter-button"
+
+             else
+                "filter-button filter-button--active"
+            )
+        , onClick (config.onToggleAccount account.id)
+        ]
+        [ text account.name ]
 
 
 expenseRow : DateDisplay -> Expense -> Html msg

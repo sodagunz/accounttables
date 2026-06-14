@@ -55,6 +55,7 @@ type Msg
     | UpdateInviteEmail String
     | InviteGuest
     | RemoveGuest String
+    | ToggleAccountFilter String
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -290,6 +291,20 @@ update msg model =
             in
             ( updatedModel, payloadCmd removeLedgerGuest payload )
 
+        ToggleAccountFilter accountId ->
+            let
+                hidden =
+                    model.hiddenAccountIds
+
+                updatedHidden =
+                    if List.member accountId hidden then
+                        List.filter (\id -> id /= accountId) hidden
+
+                    else
+                        accountId :: hidden
+            in
+            ( { model | hiddenAccountIds = updatedHidden }, Cmd.none )
+
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
 payloadCmd toCmd payload =
@@ -340,12 +355,14 @@ view model =
                         { expenses = rows
                         , accounts = Model.activeAccounts model
                         , filterWindow = model.filterWindow
+                        , hiddenAccountIds = model.hiddenAccountIds
                         , dateDisplay = model.dateDisplay
                         , customStart = model.customStart
                         , customEnd = model.customEnd
                         , sortField = model.sortField
                         , sortDirection = model.sortDirection
                         , onSelectFilter = SelectFilter
+                        , onToggleAccount = ToggleAccountFilter
                         , onCustomStart = UpdateCustomStart
                         , onCustomEnd = UpdateCustomEnd
                         , onSelectDateDisplay = SelectDateDisplay

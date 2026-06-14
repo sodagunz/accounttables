@@ -59,6 +59,7 @@ type Msg
     | ToggleAccountFilter String
     | DeleteExpense String
     | EditExpense String
+    | CancelEdit
     | EventsLoaded Decode.Value
 
 
@@ -229,8 +230,21 @@ update msg model =
                     let
                         readyModel =
                             Model.ensureSelectedAccount model
+
+                        rate =
+                            case readyModel.form.editingId of
+                                Just editingId ->
+                                    case List.head (List.filter (\e -> e.id == editingId) readyModel.expenses) of
+                                        Just expense ->
+                                            expense.exchangeRate
+
+                                        Nothing ->
+                                            readyModel.exchangeRate
+
+                                Nothing ->
+                                    readyModel.exchangeRate
                     in
-                    case Accounting.buildExpense readyModel.exchangeRate expenseId (Model.activeAccounts readyModel) readyModel.form of
+                    case Accounting.buildExpense rate expenseId (Model.activeAccounts readyModel) readyModel.form of
                         Ok expense ->
                             let
                                 ( event, updatedModel ) =
@@ -427,6 +441,15 @@ update msg model =
                 Nothing ->
                     ( { model | error = "No se encontró el gasto a editar" }, Cmd.none )
 
+        CancelEdit ->
+            ( { model
+                | form = Accounting.emptyForm
+                , error = ""
+              }
+                |> Model.ensureSelectedAccount
+            , Cmd.none
+            )
+
         EventsLoaded value ->
             case Decode.decodeValue (Decode.list Events.eventDecoder) value of
                 Ok events ->
@@ -490,6 +513,7 @@ view model =
                         , onDate = UpdateDate
                         , onMovementType = UpdateMovementType
                         , onSubmit = AddExpense
+                        , onCancel = CancelEdit
                         }
                     ]
                 , div [ class "admin-area" ]

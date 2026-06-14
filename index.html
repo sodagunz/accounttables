@@ -38,7 +38,7 @@
       } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
       import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
 
-      const LEDGER_CACHE_SCHEMA_VERSION = 2;
+      const LEDGER_CACHE_SCHEMA_VERSION = 3;
       const LAST_SESSION_KEY = "contabilizar:lastSession";
 
       const app = Elm.Main.init({
@@ -219,13 +219,14 @@
             const eventId = uuidv7();
             const eventRef = doc(db, "ledgers", ledgerId, "events", eventId);
 
+            let nextSeq;
             await runTransaction(db, async (transaction) => {
               const ledgerSnapshot = await transaction.get(ledgerRef);
               if (!ledgerSnapshot.exists()) {
                 throw new Error("Ledger does not exist");
               }
 
-              const nextSeq = (ledgerSnapshot.data().nextEventSequence || 0) + 1;
+              nextSeq = (ledgerSnapshot.data().nextEventSequence || 0) + 1;
 
               transaction.set(eventRef, {
                 ...event,
@@ -239,6 +240,18 @@
                 updatedAt: serverTimestamp(),
               });
             });
+
+            const uid = auth.currentUser?.uid;
+            if (uid && nextSeq) {
+              const cachedPayload = loadLedgerCache(uid, ledgerId);
+              if (cachedPayload) {
+                const newEvent = { ...event, sequence: nextSeq, id: eventId };
+                cacheLedgerPayload(uid, {
+                  ...cachedPayload,
+                  events: [...cachedPayload.events, newEvent],
+                });
+              }
+            }
           } catch (error) {
             console.error("Firestore event append failed", error);
           }
@@ -470,11 +483,35 @@
           serializeFirestoreDocument(documentSnapshot),
         );
 
-        const newEvents = remoteEvents.filter(
-          (event) => event.sequence > lastEventSequence,
-        );
         const cachedEvents = cachedPayload?.events || [];
-        const mergedEvents = [...cachedEvents, ...newEvents];
+        const cachedIds = new Set(cachedEvents.map((e) => e.id));
+        const remoteIds = new Set(remoteEvents.map((e) => e.id));
+
+        // Push cached events missing from Firestore
+        const pushBatch = writeBatch(db);
+        let pushCount = 0;
+        for (const event of cachedEvents) {
+          if (event.id && !remoteIds.has(event.id)) {
+            pushBatch.set(doc(db, "ledgers", selectedLedgerId, "events", event.id), event, { merge: true });
+            pushCount += 1;
+            if (pushCount >= 450) {
+              await pushBatch.commit();
+              pushCount = 0;
+            }
+          }
+        }
+        if (pushCount > 0) {
+          await pushBatch.commit();
+        }
+
+        // Merge: start with all cached events, then add remote events not in cache
+        const mergedEvents = [...cachedEvents];
+        for (const event of remoteEvents) {
+          if (event.id && !cachedIds.has(event.id)) {
+            mergedEvents.push(event);
+          }
+        }
+        mergedEvents.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
 
         const ledgerData = {
           status: "loaded",
@@ -654,7 +691,7 @@
             ledgerCacheKey(uid, payload.ledgerId),
             JSON.stringify({
               schemaVersion: LEDGER_CACHE_SCHEMA_VERSION,
-              cachedAt: new Date().toISOString(),
+              syncedAt: new Date().toISOString(),
               payload: cachedPayload,
             }),
           );

@@ -24,6 +24,7 @@ type alias Config msg =
     , onDate : String -> msg
     , onMovementType : MovementType -> msg
     , onSubmit : msg
+    , onCancel : msg
     }
 
 
@@ -105,7 +106,12 @@ view config =
                         ]
                     ]
                 ]
-            , conversionPreview config.exchangeRate config.form
+            , case config.form.editingId of
+                Just _ ->
+                    text ""
+
+                Nothing ->
+                    conversionPreview config.exchangeRate config.form
             , exchangeRateView config
             , p [ class "error" ] [ text config.error ]
             , let
@@ -123,6 +129,12 @@ view config =
                                     "Registrar ingreso"
               in
               button [ class "primary primary--movement", type_ "submit" ] [ text buttonText ]
+            , case config.form.editingId of
+                Just _ ->
+                    button [ class "cancel-button", type_ "button", onClick config.onCancel ] [ text "Cancelar" ]
+
+                Nothing ->
+                    text ""
             ]
         ]
 

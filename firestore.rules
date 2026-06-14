@@ -59,6 +59,10 @@ service cloud.firestore {
       match /accounts/{accountId} {
         allow read, write: if isLedgerMember(ledgerId);
       }
+
+      match /events/{eventId} {
+        allow read, write: if isLedgerMember(ledgerId);
+      }
     }
 
     match /userLedgers/{uid}/ledgers/{ledgerId} {

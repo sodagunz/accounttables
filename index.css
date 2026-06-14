@@ -353,6 +353,22 @@ select:focus {
     font-size: 1rem;
 }
 
+.cancel-button {
+    background: #ffffff;
+    border: 1px solid #cfe0d9;
+    border-radius: 8px;
+    color: #2f3d38;
+    cursor: pointer;
+    font-size: 0.95rem;
+    min-height: 44px;
+    padding: 10px 18px;
+    width: 100%;
+}
+
+.cancel-button:hover {
+    background: #f5f8f7;
+}
+
 .content-stack {
     display: grid;
     gap: 18px;

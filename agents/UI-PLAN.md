@@ -82,9 +82,11 @@
 
     Implemented by preserving the normalized form caja after each movement and making the selector visibly fall back to the first active caja whenever the form has no valid selected caja. The submit path already normalizes through `Model.ensureSelectedAccount`, so the displayed default and the saved movement use the same caja without requiring a separate selection step.
 
-15. [ ] Default currency to the last used currency
+15. [x] Default currency to the last used currency
 
     Currency should behave like caja: preserve the last selected value after submitting. This matters because people often enter a batch of receipts in the same currency. Resetting to ARS after every submit creates friction and risks wrong entries for USD-heavy sessions.
+
+    Verified in the submit path. `Update.Expenses.add` clears the transient amount and description after a movement is registered, but it preserves `model.form.currency`, so the next entry keeps the last selected currency. The initial empty form can still default to ARS; this item is about repeated-entry behavior after the user chooses a currency.
 
 16. [ ] Default date behavior
 

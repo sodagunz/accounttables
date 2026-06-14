@@ -513,8 +513,10 @@ select:focus {
 }
 
 .filters {
-    display: grid;
+    display: flex;
+    flex-wrap: wrap;
     gap: 12px;
+    justify-content: space-between;
 }
 
 .table-controls {
@@ -593,11 +595,6 @@ select:focus {
     color: #5e6b66;
     font-size: 0.9rem;
     font-weight: 700;
-}
-
-.report-options--export {
-    border-top: 1px solid #dce4e0;
-    padding-top: 12px;
 }
 
 .table-wrap {

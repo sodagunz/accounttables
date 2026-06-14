@@ -79,7 +79,6 @@ expenseTableBody config =
                     , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
                     ]
                 ]
-            , exportControls config
             ]
 
 
@@ -116,6 +115,7 @@ filterControls config =
                 , radioSegment config.onSelectDisplayCurrency USD (config.displayCurrency == USD) "USD"
                 ]
             ]
+        , exportControls config
         ]
 
 

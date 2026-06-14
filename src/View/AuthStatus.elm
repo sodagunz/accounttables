@@ -22,7 +22,8 @@ view config =
             AuthLoading ->
                 [ div [ class "auth-user" ]
                     [ syncDot Loading
-                    , span [ class "auth-user__skeleton", attribute "aria-label" "Comprobando sesión" ] []
+                    , span [ class "auth-user__skeleton auth-user__skeleton-name", attribute "aria-label" "Comprobando sesión" ] []
+                    , span [ class "auth-user__skeleton auth-user__skeleton-button", attribute "aria-hidden" "true" ] []
                     ]
                 ]
 

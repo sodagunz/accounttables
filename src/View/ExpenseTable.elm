@@ -1,6 +1,6 @@
 module View.ExpenseTable exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, SortDirection(..), SortField(..), descriptionDisplay, expensesFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), descriptionDisplay, expensesFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
@@ -184,7 +184,16 @@ expenseRow dateDisplay expense =
         [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay expense.date) ]
         , td [ attribute "data-label" "Caja" ] [ text expense.accountName ]
         , td [ attribute "data-label" "Descripción" ] [ text (descriptionDisplay expense) ]
-        , td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney expense.inputCurrency expense.inputAmount) ]
+        , let
+            arrow =
+                case expense.movementType of
+                    ExpenseMovement ->
+                        " ↓ "
+
+                    IncomeMovement ->
+                        " ↑ "
+          in
+          td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (arrow ++ formatMoney expense.inputCurrency expense.inputAmount) ]
         , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatMoney ARS expense.exchangeRate) ]
         , td [ attribute "data-label" "Pesos", class "numeric" ] [ text (formatMoney ARS expense.ars) ]
         , td [ class "equivalence" ] [ text "=" ]

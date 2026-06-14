@@ -19,6 +19,7 @@ add expense model =
                     , accountId = model.form.accountId
                     , currency = model.form.currency
                     , date = model.form.date
+                    , movementType = model.form.movementType
                     }
                 , error = ""
             }

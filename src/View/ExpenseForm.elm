@@ -1,10 +1,10 @@
 module View.ExpenseForm exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Form, MovementType(..), cashflowFor, currencyToString)
+import Accounting exposing (Account, Currency(..), Form, MovementType(..), cashflowFor, currencyToString, movementTypeToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
-import Html exposing (Html, button, div, input, label, option, p, section, select, strong, text)
-import Html.Attributes exposing (attribute, autofocus, class, step, type_, value)
-import Html.Events exposing (onInput, onSubmit)
+import Html exposing (Html, button, div, input, label, option, p, section, select, span, strong, text)
+import Html.Attributes exposing (attribute, autofocus, checked, class, classList, for, id, name, step, type_, value)
+import Html.Events exposing (onClick, onInput, onSubmit)
 import Time
 import Util.Date as Date
 import Util.Format exposing (formatMoney)
@@ -22,6 +22,7 @@ type alias Config msg =
     , onAccount : String -> msg
     , onCurrency : String -> msg
     , onDate : String -> msg
+    , onMovementType : MovementType -> msg
     , onSubmit : msg
     }
 
@@ -55,6 +56,37 @@ view config =
                 [ text "Descripción"
                 , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
                 ]
+            , div [ class "movement-type" ]
+                [ span [ class "movement-type__label" ] [ text "Tipo" ]
+                , label
+                    [ class "movement-type__option"
+                    , classList [ ( "movement-type__option--active", config.form.movementType == ExpenseMovement ) ]
+                    ]
+                    [ input
+                        [ type_ "radio"
+                        , name "movement-type"
+                        , value (movementTypeToString ExpenseMovement)
+                        , checked (config.form.movementType == ExpenseMovement)
+                        , onClick (config.onMovementType ExpenseMovement)
+                        ]
+                        []
+                    , span [] [ text "Gasto" ]
+                    ]
+                , label
+                    [ class "movement-type__option"
+                    , classList [ ( "movement-type__option--active", config.form.movementType == IncomeMovement ) ]
+                    ]
+                    [ input
+                        [ type_ "radio"
+                        , name "movement-type"
+                        , value (movementTypeToString IncomeMovement)
+                        , checked (config.form.movementType == IncomeMovement)
+                        , onClick (config.onMovementType IncomeMovement)
+                        ]
+                        []
+                    , span [] [ text "Ingreso" ]
+                    ]
+                ]
             , label []
                 [ text "Caja"
                 , select [ value selectedAccountId, onInput config.onAccount ]
@@ -76,7 +108,16 @@ view config =
             , conversionPreview config.exchangeRate config.form
             , exchangeRateView config
             , p [ class "error" ] [ text config.error ]
-            , button [ class "primary primary--movement", type_ "submit" ] [ text "Registrar movimiento" ]
+            , let
+                buttonText =
+                    case config.form.movementType of
+                        ExpenseMovement ->
+                            "Registrar gasto"
+
+                        IncomeMovement ->
+                            "Registrar ingreso"
+              in
+              button [ class "primary primary--movement", type_ "submit" ] [ text buttonText ]
             ]
         ]
 
@@ -117,7 +158,7 @@ conversionPreview exchangeRate form =
         Just amount ->
             let
                 converted =
-                    cashflowFor ExpenseMovement exchangeRate form.currency amount
+                    cashflowFor form.movementType exchangeRate form.currency amount
             in
             div [ class "conversion" ]
                 [ text

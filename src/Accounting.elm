@@ -29,6 +29,7 @@ module Accounting exposing
     , setCurrency
     , setDate
     , setDescription
+    , setMovementType
     , sortExpenses
     , summarizeMoney
     )
@@ -72,6 +73,7 @@ type SortDirection
 
 type MovementType
     = ExpenseMovement
+    | IncomeMovement
 
 
 type alias Expense =
@@ -103,6 +105,7 @@ type alias Form =
     , accountId : String
     , currency : Currency
     , date : String
+    , movementType : MovementType
     }
 
 
@@ -119,6 +122,7 @@ emptyForm =
     , accountId = ""
     , currency = ARS
     , date = ""
+    , movementType = ExpenseMovement
     }
 
 
@@ -145,6 +149,10 @@ setCurrency currency form =
 setDate : String -> Form -> Form
 setDate date form =
     { form | date = date }
+
+setMovementType : MovementType -> Form -> Form
+setMovementType movementType form =
+    { form | movementType = movementType }
 
 
 buildExpense : Float -> String -> List Account -> Form -> Result String Expense
@@ -177,11 +185,11 @@ buildExpense exchangeRate id accounts form =
                     Just account ->
                         let
                             converted =
-                                cashflowFor ExpenseMovement exchangeRate form.currency amount
+                                cashflowFor form.movementType exchangeRate form.currency amount
                         in
                         Ok
                             { id = id
-                            , movementType = ExpenseMovement
+                            , movementType = form.movementType
                             , description =
                                 if description == "" then
                                     Nothing
@@ -229,6 +237,9 @@ movementMultiplier movementType =
     case movementType of
         ExpenseMovement ->
             -1
+
+        IncomeMovement ->
+            1
 
 
 emptyMoney : MoneyTotal
@@ -472,6 +483,9 @@ movementTypeFromString movementType =
         "Expense" ->
             ExpenseMovement
 
+        "Income" ->
+            IncomeMovement
+
         _ ->
             ExpenseMovement
 
@@ -481,3 +495,6 @@ movementTypeToString movementType =
     case movementType of
         ExpenseMovement ->
             "Expense"
+
+        IncomeMovement ->
+            "Income"

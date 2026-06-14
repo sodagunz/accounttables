@@ -32,6 +32,7 @@ type Msg
     | UpdateAccount String
     | UpdateCurrency String
     | UpdateDate String
+    | UpdateMovementType Accounting.MovementType
     | SelectFilter FilterWindow
     | UpdateCustomStart String
     | UpdateCustomEnd String
@@ -166,6 +167,9 @@ update msg model =
 
         UpdateDate date ->
             ( { model | form = Accounting.setDate date model.form }, Cmd.none )
+
+        UpdateMovementType movementType ->
+            ( { model | form = Accounting.setMovementType movementType model.form }, Cmd.none )
 
         SelectFilter filterWindow ->
             ( { model | filterWindow = filterWindow }, Cmd.none )
@@ -349,6 +353,7 @@ view model =
                         , onAccount = UpdateAccount
                         , onCurrency = UpdateCurrency
                         , onDate = UpdateDate
+                        , onMovementType = UpdateMovementType
                         , onSubmit = AddExpense
                         }
                     ]

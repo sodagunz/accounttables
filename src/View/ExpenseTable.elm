@@ -34,7 +34,7 @@ view config =
     section [ class "panel" ]
         [ Html.h2 [ class "section-title" ] [ text "Gastos" ]
         , div [ class "expense-table-layout" ]
-            [ tableControls config
+            [ filterControls config
             , expenseTableBody config
             ]
         ]
@@ -50,31 +50,26 @@ expenseTableBody config =
             visibleAccounts =
                 List.filter (\a -> not (List.member a.id config.hiddenAccountIds)) config.accounts
         in
-        div [ class "table-wrap" ]
-            [ table [ class "expense-table" ]
-                [ thead []
-                    [ tr []
-                        [ sortableHeader config SortByDate "" "Fecha"
-                        , sortableHeader config SortByAccount "" "Caja"
-                        , sortableHeader config SortByDescription "" "Descripción"
-                        , th [ class "numeric" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Ingresado" ] ]
-                        , sortableHeader config SortByExchangeRate "numeric" "Cotización"
-                        , sortableHeader config SortByPesos "numeric" "Pesos"
-                        , th [ class "equivalence" ] [ button [ type_ "button", class "non-sort-button" ] [ text "=" ] ]
-                        , sortableHeader config SortByDollars "numeric" "Dólar"
+        div []
+            [ div [ class "table-wrap" ]
+                [ table [ class "expense-table" ]
+                    [ thead []
+                        [ tr []
+                            [ sortableHeader config SortByDate "" "Fecha"
+                            , sortableHeader config SortByAccount "" "Caja"
+                            , sortableHeader config SortByDescription "" "Descripción"
+                            , th [ class "numeric" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Ingresado" ] ]
+                            , sortableHeader config SortByExchangeRate "numeric" "Cotización"
+                            , sortableHeader config SortByPesos "numeric" "Pesos"
+                            , th [ class "equivalence" ] [ button [ type_ "button", class "non-sort-button" ] [ text "=" ] ]
+                            , sortableHeader config SortByDollars "numeric" "Dólar"
+                            ]
                         ]
+                    , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows visibleAccounts config.expenses)
                     ]
-                , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows visibleAccounts config.expenses)
                 ]
+            , exportControls config
             ]
-
-
-tableControls : Config msg -> Html msg
-tableControls config =
-    div [ class "table-controls" ]
-        [ filterControls config
-        , exportControls config
-        ]
 
 
 filterControls : Config msg -> Html msg
@@ -122,7 +117,7 @@ filterControls config =
 
 exportControls : Config msg -> Html msg
 exportControls config =
-    div [ class "export-controls" ]
+    div [ class "report-options report-options--export" ]
         [ p [] [ text "Exportar" ]
         , div [ class "filter-buttons" ]
             [ button [ type_ "button", class "filter-button", onClick config.onExportCsv ] [ text "CSV" ]

@@ -744,14 +744,15 @@ th {
     text-underline-offset: 3px;
 }
 
-.action-cell {
-    text-align: center;
+td.action-cell {
+    display: flex;
+    justify-content: center;
+    align-items: center;
     width: 100px;
-    vertical-align: middle;
 }
 
 .action-buttons {
-    display: inline-flex;
+    display: flex;
     border: 1px solid #c8d4cf;
     border-radius: 6px;
     overflow: hidden;
@@ -1027,9 +1028,8 @@ th:first-child {
         text-align: left;
     }
 
-    .expense-table td.action-cell {
+    td.action-cell {
         display: flex;
-        justify-content: center;
         padding: 8px 0 0;
         width: auto;
     }

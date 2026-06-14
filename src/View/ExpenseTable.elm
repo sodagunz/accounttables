@@ -93,6 +93,7 @@ expenseTableBody config =
                                     USD ->
                                         "Total (USD)"
                                 )
+                            , th [] []
                             ]
                         ]
                     , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
@@ -346,6 +347,6 @@ subtotalRows accounts expenses displayCurrency =
 totalRow : Currency -> String -> String -> MoneyTotal -> Html msg
 totalRow displayCurrency labelText rowClass total =
     tr [ class rowClass ]
-        [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ text labelText ]
+        [ td [ attribute "colspan" "6", attribute "data-label" "Total" ] [ text labelText ]
         , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatTotal (valueForCurrency displayCurrency total) displayCurrency) ]
         ]

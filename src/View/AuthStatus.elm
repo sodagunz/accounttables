@@ -2,7 +2,7 @@ module View.AuthStatus exposing (Config, view)
 
 import Auth exposing (AuthState(..))
 import Html exposing (Html, button, div, p, span, text)
-import Html.Attributes exposing (class, type_)
+import Html.Attributes exposing (attribute, class, title, type_)
 import Html.Events exposing (onClick)
 import Ledger exposing (LoadState(..))
 
@@ -30,7 +30,8 @@ view config =
 
             SignedIn user ->
                 [ div [ class "auth-user" ]
-                    [ span [] [ text (userLabel user) ]
+                    [ syncDot config.ledgerLoadState
+                    , span [] [ text (userLabel user) ]
                     , button [ type_ "button", class "auth-button", onClick config.onSignOut ] [ text "Salir" ]
                     ]
                 , ledgerStatus config.ledgerLoadState
@@ -47,16 +48,41 @@ ledgerStatus : LoadState -> Html msg
 ledgerStatus loadState =
     case loadState of
         NotLoaded ->
-            p [ class "auth-meta" ] [ text "Datos locales" ]
+            text ""
 
         Loading ->
-            p [ class "auth-meta" ] [ text "Cargando datos..." ]
+            text ""
 
         Loaded ->
-            p [ class "auth-meta" ] [ text "Datos sincronizados" ]
+            text ""
 
         LoadError message ->
             p [ class "auth-error" ] [ text message ]
+
+
+syncDot : LoadState -> Html msg
+syncDot loadState =
+    let
+        ( statusClass, statusLabel ) =
+            case loadState of
+                NotLoaded ->
+                    ( "sync-dot--syncing", "Sincronizando" )
+
+                Loading ->
+                    ( "sync-dot--syncing", "Sincronizando" )
+
+                Loaded ->
+                    ( "sync-dot--synced", "Sincronizado" )
+
+                LoadError _ ->
+                    ( "sync-dot--error", "Error de sincronización" )
+    in
+    span
+        [ class ("sync-dot " ++ statusClass)
+        , title statusLabel
+        , attribute "aria-label" statusLabel
+        ]
+        []
 
 
 userLabel : Auth.User -> String

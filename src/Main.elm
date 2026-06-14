@@ -336,20 +336,25 @@ view model =
             ]
         , main_ []
             [ div [ class "layout" ]
-                [ ExpenseForm.view
-                    { form = model.form
-                    , accounts = Model.activeAccounts model
-                    , exchangeRate = model.exchangeRate
-                    , exchangeRateStatus = model.exchangeRateStatus
-                    , zone = model.zone
-                    , error = model.error
-                    , onDescription = UpdateDescription
-                    , onAmount = UpdateAmount
-                    , onAccount = UpdateAccount
-                    , onCurrency = UpdateCurrency
-                    , onDate = UpdateDate
-                    , onSubmit = AddExpense
-                    }
+                [ div [ class "input-area" ]
+                    [ ExpenseForm.view
+                        { form = model.form
+                        , accounts = Model.activeAccounts model
+                        , exchangeRate = model.exchangeRate
+                        , exchangeRateStatus = model.exchangeRateStatus
+                        , zone = model.zone
+                        , error = model.error
+                        , onDescription = UpdateDescription
+                        , onAmount = UpdateAmount
+                        , onAccount = UpdateAccount
+                        , onCurrency = UpdateCurrency
+                        , onDate = UpdateDate
+                        , onSubmit = AddExpense
+                        }
+                    ]
+                , div [ class "admin-area" ]
+                    [ adminArea model
+                    ]
                 , div [ class "content-stack" ]
                     [ ExpenseTable.view
                         { expenses = rows
@@ -370,7 +375,6 @@ view model =
                         , onExportCsv = ExportCsv
                         , onExportXlsx = ExportXlsx
                         }
-                    , adminArea model
                     ]
                 ]
             ]

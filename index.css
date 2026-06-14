@@ -165,6 +165,21 @@ main {
     align-items: start;
 }
 
+.input-area {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.admin-area {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+.content-stack {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+}
+
 .panel {
     background: #ffffff;
     border: 1px solid #dce4e0;
@@ -550,6 +565,17 @@ th {
     background: #f3f6f5;
 }
 
+@media (min-width: 821px) {
+    .expense-table td:nth-child(5) {
+        border-right: 2px solid #dce4e0;
+        padding-right: 18px;
+    }
+
+    .expense-table td:nth-child(6) {
+        padding-left: 18px;
+    }
+}
+
 .sort-button {
     border: 0;
     background: transparent;
@@ -649,7 +675,19 @@ th:first-child {
         grid-template-columns: 1fr;
     }
 
+    .input-area,
+    .admin-area,
     .content-stack {
+        grid-column: auto;
+        grid-row: auto;
+    }
+
+    .admin-area {
+        order: 99;
+    }
+
+    .content-stack {
+        order: 2;
         gap: 14px;
     }
 }

@@ -48,9 +48,9 @@ movement_updated.data   → { movementId: string, changes: { ...partial fields }
 
 11. [x] Add `MovementDeleted` event and delete expense flow
 
-12. [ ] Add `MovementUpdated` event and edit expense flow
+12. [x] Add `MovementUpdated` event and edit expense flow
 
-13. [ ] Migration — one-time JS helper: convert existing expenses to `movement_created` events
+13. [x] Migration — not needed (fresh start)
 
 ## Notes
 

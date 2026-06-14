@@ -205,53 +205,56 @@
         });
 
         app.ports.appendEvent.subscribe(async (payload) => {
-          try {
-            const ledgerId = payload.ledgerId;
-            const event = payload.event;
-            if (!ledgerId) {
-              throw new Error("No ledgerId provided for appendEvent");
-            }
-            if (!event) {
-              throw new Error("No event provided for appendEvent");
-            }
+          const ledgerId = payload.ledgerId;
+          const event = payload.event;
+          if (!ledgerId) {
+            console.error("No ledgerId provided for appendEvent");
+            return;
+          }
+          if (!event) {
+            console.error("No event provided for appendEvent");
+            return;
+          }
 
+          const eventId = uuidv7();
+          const uid = auth.currentUser?.uid;
+          const cachedPayload = uid && loadLedgerCache(uid, ledgerId);
+          const estimatedSeq = (cachedPayload?.lastEventSequence || 0) + 1;
+          const newEvent = { ...event, sequence: estimatedSeq, id: eventId };
+
+          // Update cache immediately (sync, no network)
+          if (cachedPayload) {
+            cacheLedgerPayload(uid, {
+              ...cachedPayload,
+              events: [...cachedPayload.events, newEvent],
+            });
+          }
+
+          // Firestore transaction (slow — don't block cache on this)
+          try {
             const ledgerRef = doc(db, "ledgers", ledgerId);
-            const eventId = uuidv7();
             const eventRef = doc(db, "ledgers", ledgerId, "events", eventId);
 
-            let nextSeq;
             await runTransaction(db, async (transaction) => {
               const ledgerSnapshot = await transaction.get(ledgerRef);
               if (!ledgerSnapshot.exists()) {
                 throw new Error("Ledger does not exist");
               }
 
-              nextSeq = (ledgerSnapshot.data().nextEventSequence || 0) + 1;
+              const actualSeq = (ledgerSnapshot.data().nextEventSequence || 0) + 1;
 
               transaction.set(eventRef, {
                 ...event,
-                sequence: nextSeq,
+                sequence: actualSeq,
                 id: eventId,
                 createdAt: serverTimestamp(),
               }, { merge: true });
 
               transaction.update(ledgerRef, {
-                nextEventSequence: nextSeq,
+                nextEventSequence: actualSeq,
                 updatedAt: serverTimestamp(),
               });
             });
-
-            const uid = auth.currentUser?.uid;
-            if (uid && nextSeq) {
-              const cachedPayload = loadLedgerCache(uid, ledgerId);
-              if (cachedPayload) {
-                const newEvent = { ...event, sequence: nextSeq, id: eventId };
-                cacheLedgerPayload(uid, {
-                  ...cachedPayload,
-                  events: [...cachedPayload.events, newEvent],
-                });
-              }
-            }
           } catch (error) {
             console.error("Firestore event append failed", error);
           }

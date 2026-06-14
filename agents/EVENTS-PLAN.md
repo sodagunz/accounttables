@@ -42,11 +42,11 @@ movement_updated.data   → { movementId: string, changes: { ...partial fields }
 
 8. [x] Update `Ledger.elm` decoders — add all event decoders via `Events.eventDecoder`, update `LedgerData` to carry events
 
-9. [ ] Switch read side: replace direct expense fetching with event-based projection; remove `saveExpense` (currently dual-write)
+9. [x] Switch read side: replace direct expense fetching with event-based projection; remove `saveExpense`
 
 10. [ ] Update localStorage caching — cache the projected read model + `lastEventSequence` for incremental sync
 
-11. [ ] Add `MovementDeleted` event and delete expense flow
+11. [x] Add `MovementDeleted` event and delete expense flow
 
 12. [ ] Add `MovementUpdated` event and edit expense flow
 

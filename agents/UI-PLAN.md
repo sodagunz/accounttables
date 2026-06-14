@@ -100,9 +100,11 @@
 
     Implemented by keeping the expenses section immediately after the movement form and reordering the table internals on small screens so the latest rows appear before filters, date display controls, and exports. Desktop keeps the original control-first table layout; this item only changes the mobile confirmation path.
 
-18. [ ] Large-screen form and table layout
+18. [x] Large-screen form and table layout
 
     On wider screens, place the entry form and table in the same working area. The form can sit in a narrower left column while the table uses the wider right side for scanning and comparison. This should feel like an operational tool, not a landing page or stacked marketing layout.
+
+    Implemented by tightening the large-screen grid into a fixed narrow movement column and a flexible table column. The movement form stays visible with desktop sticky positioning, while the table keeps the wider scan/comparison area on the right. The existing mobile order and stacked mobile table behavior are unchanged.
 
 19. [ ] Secondary settings/admin area
 

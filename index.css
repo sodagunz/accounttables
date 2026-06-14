@@ -543,6 +543,26 @@ th:first-child {
   padding: 4px 0;
 }
 
+@media (min-width: 1080px) {
+  .layout {
+    grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+    gap: 22px;
+  }
+
+  .movement-panel {
+    position: sticky;
+    top: 24px;
+  }
+
+  .content-stack {
+    align-content: start;
+  }
+
+  .content-stack > .panel:first-child {
+    min-width: 0;
+  }
+}
+
 @media (max-width: 820px) {
   .layout {
     grid-template-columns: 1fr;

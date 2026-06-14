@@ -605,6 +605,7 @@ select:focus {
 .expense-table-layout {
     display: flex;
     flex-direction: column;
+    gap: 12px;
 }
 
 .segmented-control {
@@ -816,7 +817,9 @@ th:first-child {
     font-weight: 800;
 }
 
-.is-negative {
+td.is-negative,
+.subtotal td.is-negative,
+.grand-total td.is-negative {
     color: #b91c1c;
 }
 

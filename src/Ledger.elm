@@ -14,6 +14,7 @@ module Ledger exposing
     )
 
 import Accounting exposing (Account, Expense, currencyFromString, currencyToString, movementTypeFromString, movementTypeToString)
+import Events exposing (Event)
 import Json.Decode as Decode
 import Json.Encode as Encode
 
@@ -41,7 +42,8 @@ type alias Member =
 
 
 type alias LedgerData =
-    { expenses : List Expense
+    { events : List Event
+    , expenses : List Expense
     , accounts : List Account
     , ledgers : List LedgerSummary
     , currentLedgerId : String
@@ -143,13 +145,14 @@ ledgerPayloadDecoder =
             (\status ->
                 case status of
                     "loaded" ->
-                        Decode.map5
-                            (\ledgers currentLedgerId accounts expenses lastAccountId ->
+                        Decode.map6
+                            (\ledgers currentLedgerId accounts expenses lastAccountId events ->
                                 { ledgers = ledgers
                                 , currentLedgerId = currentLedgerId
                                 , accounts = accounts
                                 , expenses = expenses
                                 , lastAccountId = lastAccountId
+                                , events = events
                                 }
                             )
                             (Decode.field "ledgers" (Decode.list ledgerSummaryDecoder))
@@ -157,6 +160,7 @@ ledgerPayloadDecoder =
                             (Decode.field "accounts" (Decode.list accountDecoder))
                             (Decode.field "expenses" (Decode.list expenseDecoder))
                             (Decode.maybe (Decode.field "lastAccountId" Decode.string))
+                            (Decode.field "events" (Decode.list Events.eventDecoder))
 
                     "error" ->
                         Decode.field "message" Decode.string

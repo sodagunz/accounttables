@@ -28,6 +28,9 @@
         getDoc,
         getDocs,
         getFirestore,
+        orderBy,
+        query,
+        runTransaction,
         serverTimestamp,
         setDoc,
         updateDoc,
@@ -221,6 +224,46 @@
               ledgerId,
               message: firestoreErrorMessage(error),
             });
+          }
+        });
+
+        app.ports.appendEvent.subscribe(async (payload) => {
+          try {
+            const ledgerId = payload.ledgerId;
+            const event = payload.event;
+            if (!ledgerId) {
+              throw new Error("No ledgerId provided for appendEvent");
+            }
+            if (!event) {
+              throw new Error("No event provided for appendEvent");
+            }
+
+            const ledgerRef = doc(db, "ledgers", ledgerId);
+            const eventId = uuidv7();
+            const eventRef = doc(db, "ledgers", ledgerId, "events", eventId);
+
+            await runTransaction(db, async (transaction) => {
+              const ledgerSnapshot = await transaction.get(ledgerRef);
+              if (!ledgerSnapshot.exists()) {
+                throw new Error("Ledger does not exist");
+              }
+
+              const nextSeq = (ledgerSnapshot.data().nextEventSequence || 0) + 1;
+
+              transaction.set(eventRef, {
+                ...event,
+                sequence: nextSeq,
+                id: eventId,
+                createdAt: serverTimestamp(),
+              }, { merge: true });
+
+              transaction.update(ledgerRef, {
+                nextEventSequence: nextSeq,
+                updatedAt: serverTimestamp(),
+              });
+            });
+          } catch (error) {
+            console.error("Firestore event append failed", error);
           }
         });
 
@@ -431,14 +474,23 @@
           ? ledgerId
           : ledgers[0]?.id || auth.currentUser?.uid || "";
 
-        const [accountSnapshot, expenseSnapshot] = await Promise.all([
+        const [accountSnapshot, expenseSnapshot, eventSnapshot] = await Promise.all([
           getDocs(collection(db, "ledgers", selectedLedgerId, "accounts")),
           getDocs(collection(db, "ledgers", selectedLedgerId, "expenses")),
+          getDocs(
+            query(
+              collection(db, "ledgers", selectedLedgerId, "events"),
+              orderBy("sequence"),
+            ),
+          ),
         ]);
         const accounts = accountSnapshot.docs.map((documentSnapshot) =>
           serializeFirestoreDocument(documentSnapshot),
         );
         const expenses = expenseSnapshot.docs.map((documentSnapshot) =>
+          serializeFirestoreDocument(documentSnapshot),
+        );
+        const events = eventSnapshot.docs.map((documentSnapshot) =>
           serializeFirestoreDocument(documentSnapshot),
         );
 
@@ -451,6 +503,7 @@
             ledgers,
             accounts,
             expenses,
+            events,
           }),
         );
       }
@@ -598,6 +651,7 @@
           ledgers: Array.isArray(payload.ledgers) ? payload.ledgers : [],
           accounts: Array.isArray(payload.accounts) ? payload.accounts : [],
           expenses: Array.isArray(payload.expenses) ? payload.expenses : [],
+          events: Array.isArray(payload.events) ? payload.events : [],
         };
 
         try {

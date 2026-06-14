@@ -15,6 +15,7 @@ module Model exposing
 import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), Form, SortDirection(..), SortField(..))
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Auth exposing (AuthState(..))
+import Events exposing (Event)
 import Ledger exposing (LoadState(..))
 import Time
 import Util.Date exposing (DateDisplay(..))
@@ -22,6 +23,7 @@ import Util.Date exposing (DateDisplay(..))
 
 type alias Model =
     { form : Form
+    , events : List Event
     , expenses : List Expense
     , accounts : List Account
     , ledgers : List Ledger.LedgerSummary
@@ -50,6 +52,7 @@ type alias Model =
 initial : Model
 initial =
     { form = Accounting.emptyForm
+    , events = []
     , expenses = []
     , accounts = defaultAccounts
     , ledgers = []

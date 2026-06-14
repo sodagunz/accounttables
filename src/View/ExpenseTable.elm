@@ -93,7 +93,7 @@ expenseTableBody config =
                                     USD ->
                                         "Total (USD)"
                                 )
-                            , th [ class "actions-header" ] [ text "Acciones" ]
+                            , th [ class "actions-header" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Acciones" ] ]
                             ]
                         ]
                     , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)

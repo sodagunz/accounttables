@@ -28,6 +28,9 @@
         getDoc,
         getDocs,
         getFirestore,
+        orderBy,
+        query,
+        runTransaction,
         serverTimestamp,
         setDoc,
         updateDoc,
@@ -35,7 +38,7 @@
       } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
       import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
 
-      const LEDGER_CACHE_SCHEMA_VERSION = 1;
+      const LEDGER_CACHE_SCHEMA_VERSION = 3;
       const LAST_SESSION_KEY = "contabilizar:lastSession";
 
       const app = Elm.Main.init({
@@ -201,26 +204,59 @@
           }
         });
 
-        app.ports.saveExpense.subscribe(async ({ ledgerId, expense }) => {
-          try {
-            await ensureLedger(auth, db, ledgerId);
-            upsertCachedExpense(auth.currentUser?.uid, ledgerId, expense);
-            await setDoc(
-              doc(db, "ledgers", ledgerId, "expenses", String(expense.id)),
-              {
-                ...expense,
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true },
-            );
-            saveLastAccountId(ledgerId, expense.accountId);
-          } catch (error) {
-            console.error("Firestore expense save failed", error);
-            app.ports.ledgerLoaded.send({
-              status: "error",
-              ledgerId,
-              message: firestoreErrorMessage(error),
+        app.ports.appendEvent.subscribe(async (payload) => {
+          const ledgerId = payload.ledgerId;
+          const event = payload.event;
+          if (!ledgerId) {
+            console.error("No ledgerId provided for appendEvent");
+            return;
+          }
+          if (!event) {
+            console.error("No event provided for appendEvent");
+            return;
+          }
+
+          const eventId = uuidv7();
+          const uid = auth.currentUser?.uid;
+          const cachedPayload = uid && loadLedgerCache(uid, ledgerId);
+          const estimatedSeq = (cachedPayload?.lastEventSequence || 0) + 1;
+          const newEvent = { ...event, sequence: estimatedSeq, id: eventId };
+
+          // Update cache immediately (sync, no network)
+          if (cachedPayload) {
+            cacheLedgerPayload(uid, {
+              ...cachedPayload,
+              events: [...cachedPayload.events, newEvent],
             });
+          }
+
+          // Firestore transaction (slow — don't block cache on this)
+          try {
+            const ledgerRef = doc(db, "ledgers", ledgerId);
+            const eventRef = doc(db, "ledgers", ledgerId, "events", eventId);
+
+            await runTransaction(db, async (transaction) => {
+              const ledgerSnapshot = await transaction.get(ledgerRef);
+              if (!ledgerSnapshot.exists()) {
+                throw new Error("Ledger does not exist");
+              }
+
+              const actualSeq = (ledgerSnapshot.data().nextEventSequence || 0) + 1;
+
+              transaction.set(eventRef, {
+                ...event,
+                sequence: actualSeq,
+                id: eventId,
+                createdAt: serverTimestamp(),
+              }, { merge: true });
+
+              transaction.update(ledgerRef, {
+                nextEventSequence: actualSeq,
+                updatedAt: serverTimestamp(),
+              });
+            });
+          } catch (error) {
+            console.error("Firestore event append failed", error);
           }
         });
 
@@ -431,28 +467,66 @@
           ? ledgerId
           : ledgers[0]?.id || auth.currentUser?.uid || "";
 
-        const [accountSnapshot, expenseSnapshot] = await Promise.all([
+        const cachedPayload = loadLedgerCache(auth.currentUser?.uid, selectedLedgerId);
+        const lastEventSequence = cachedPayload?.lastEventSequence || 0;
+
+        const [accountSnapshot, eventSnapshot] = await Promise.all([
           getDocs(collection(db, "ledgers", selectedLedgerId, "accounts")),
-          getDocs(collection(db, "ledgers", selectedLedgerId, "expenses")),
+          getDocs(
+            query(
+              collection(db, "ledgers", selectedLedgerId, "events"),
+              orderBy("sequence"),
+            ),
+          ),
         ]);
         const accounts = accountSnapshot.docs.map((documentSnapshot) =>
           serializeFirestoreDocument(documentSnapshot),
         );
-        const expenses = expenseSnapshot.docs.map((documentSnapshot) =>
+        const remoteEvents = eventSnapshot.docs.map((documentSnapshot) =>
           serializeFirestoreDocument(documentSnapshot),
         );
 
-        emitLedgerPayload(
-          app,
-          cacheLedgerPayload(auth.currentUser?.uid, {
-            status: "loaded",
-            ledgerId: selectedLedgerId,
-            lastAccountId: loadLastAccountId(selectedLedgerId),
-            ledgers,
-            accounts,
-            expenses,
-          }),
-        );
+        const cachedEvents = cachedPayload?.events || [];
+        const cachedIds = new Set(cachedEvents.map((e) => e.id));
+        const remoteIds = new Set(remoteEvents.map((e) => e.id));
+
+        // Push cached events missing from Firestore
+        const pushBatch = writeBatch(db);
+        let pushCount = 0;
+        for (const event of cachedEvents) {
+          if (event.id && !remoteIds.has(event.id)) {
+            pushBatch.set(doc(db, "ledgers", selectedLedgerId, "events", event.id), event, { merge: true });
+            pushCount += 1;
+            if (pushCount >= 450) {
+              await pushBatch.commit();
+              pushCount = 0;
+            }
+          }
+        }
+        if (pushCount > 0) {
+          await pushBatch.commit();
+        }
+
+        // Merge: start with all cached events, then add remote events not in cache
+        const mergedEvents = [...cachedEvents];
+        for (const event of remoteEvents) {
+          if (event.id && !cachedIds.has(event.id)) {
+            mergedEvents.push(event);
+          }
+        }
+        mergedEvents.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+        const ledgerData = {
+          status: "loaded",
+          ledgerId: selectedLedgerId,
+          lastAccountId: loadLastAccountId(selectedLedgerId),
+          ledgers,
+          accounts,
+          expenses: [],
+          events: mergedEvents,
+        };
+
+        emitLedgerPayload(app, cacheLedgerPayload(auth.currentUser?.uid, ledgerData));
       }
 
       async function ensureLedger(auth, db, ledgerId) {
@@ -586,10 +660,23 @@
         return `contabilizar:ledger:${uid}:${ledgerId}`;
       }
 
+      function computeLastEventSequence(events) {
+        let maxSeq = 0;
+        for (const event of events) {
+          if (event.sequence > maxSeq) {
+            maxSeq = event.sequence;
+          }
+        }
+        return maxSeq;
+      }
+
       function cacheLedgerPayload(uid, payload) {
         if (!uid || !payload?.ledgerId) {
           return payload;
         }
+
+        const events = Array.isArray(payload.events) ? payload.events : [];
+        const lastEventSequence = computeLastEventSequence(events);
 
         const cachedPayload = {
           status: "loaded",
@@ -598,6 +685,8 @@
           ledgers: Array.isArray(payload.ledgers) ? payload.ledgers : [],
           accounts: Array.isArray(payload.accounts) ? payload.accounts : [],
           expenses: Array.isArray(payload.expenses) ? payload.expenses : [],
+          events,
+          lastEventSequence,
         };
 
         try {
@@ -605,7 +694,7 @@
             ledgerCacheKey(uid, payload.ledgerId),
             JSON.stringify({
               schemaVersion: LEDGER_CACHE_SCHEMA_VERSION,
-              cachedAt: new Date().toISOString(),
+              syncedAt: new Date().toISOString(),
               payload: cachedPayload,
             }),
           );
@@ -689,17 +778,6 @@
         }
 
         return cacheLedgerPayload(uid, updatePayload(payload));
-      }
-
-      function upsertCachedExpense(uid, ledgerId, expense) {
-        return updateLedgerCache(uid, ledgerId, (payload) => ({
-          ...payload,
-          lastAccountId: expense.accountId || payload.lastAccountId,
-          expenses: upsertById(payload.expenses, {
-            ...expense,
-            updatedAt: new Date().toISOString(),
-          }),
-        }));
       }
 
       function upsertCachedAccount(uid, ledgerId, account) {

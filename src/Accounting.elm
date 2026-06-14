@@ -30,6 +30,7 @@ module Accounting exposing
     , setDate
     , setDescription
     , setMovementType
+    , expenseToForm
     , sortExpenses
     , summarizeMoney
     )
@@ -105,6 +106,7 @@ type alias Form =
     , currency : Currency
     , date : String
     , movementType : MovementType
+    , editingId : Maybe String
     }
 
 
@@ -122,6 +124,7 @@ emptyForm =
     , currency = ARS
     , date = ""
     , movementType = ExpenseMovement
+    , editingId = Nothing
     }
 
 
@@ -152,6 +155,18 @@ setDate date form =
 setMovementType : MovementType -> Form -> Form
 setMovementType movementType form =
     { form | movementType = movementType }
+
+
+expenseToForm : Expense -> Form -> Form
+expenseToForm expense form =
+    { description = expense.description |> Maybe.withDefault ""
+    , amount = String.fromFloat expense.inputAmount
+    , accountId = expense.accountId
+    , currency = expense.inputCurrency
+    , date = expense.date
+    , movementType = expense.movementType
+    , editingId = Just expense.id
+    }
 
 
 buildExpense : Float -> String -> List Account -> Form -> Result String Expense

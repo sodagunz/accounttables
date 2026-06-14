@@ -6,14 +6,14 @@ module Ledger exposing
     , decodeLedger
     , encodeAccountCreate
     , encodeAccountDelete
-    , encodeExpense
     , encodeGuestInvite
     , encodeGuestRemove
     , encodeLedgerName
     , encodeLedgerRequest
     )
 
-import Accounting exposing (Account, Expense, currencyFromString, currencyToString, movementTypeFromString, movementTypeToString)
+import Accounting exposing (Account, Expense, currencyFromString, movementTypeFromString)
+import Events exposing (Event)
 import Json.Decode as Decode
 import Json.Encode as Encode
 
@@ -41,7 +41,8 @@ type alias Member =
 
 
 type alias LedgerData =
-    { expenses : List Expense
+    { events : List Event
+    , expenses : List Expense
     , accounts : List Account
     , ledgers : List LedgerSummary
     , currentLedgerId : String
@@ -53,14 +54,6 @@ encodeLedgerRequest : String -> Encode.Value
 encodeLedgerRequest ledgerId =
     Encode.object
         [ ( "ledgerId", Encode.string ledgerId ) ]
-
-
-encodeExpense : String -> Expense -> Encode.Value
-encodeExpense ledgerId expense =
-    Encode.object
-        [ ( "ledgerId", Encode.string ledgerId )
-        , ( "expense", encodeExpenseRecord expense )
-        ]
 
 
 encodeAccountCreate : String -> String -> Encode.Value
@@ -103,23 +96,6 @@ encodeLedgerName ledgerId name =
         ]
 
 
-encodeExpenseRecord : Expense -> Encode.Value
-encodeExpenseRecord expense =
-    Encode.object
-        [ ( "id", Encode.string expense.id )
-        , ( "movementType", Encode.string (movementTypeToString expense.movementType) )
-        , ( "description", encodeMaybeString expense.description )
-        , ( "accountId", Encode.string expense.accountId )
-        , ( "accountName", Encode.string expense.accountName )
-        , ( "inputAmount", Encode.float expense.inputAmount )
-        , ( "inputCurrency", Encode.string (currencyToString expense.inputCurrency) )
-        , ( "exchangeRate", Encode.float expense.exchangeRate )
-        , ( "ars", Encode.float expense.ars )
-        , ( "usd", Encode.float expense.usd )
-        , ( "date", Encode.string expense.date )
-        ]
-
-
 encodeMaybeString : Maybe String -> Encode.Value
 encodeMaybeString maybeString =
     case maybeString of
@@ -143,13 +119,14 @@ ledgerPayloadDecoder =
             (\status ->
                 case status of
                     "loaded" ->
-                        Decode.map5
-                            (\ledgers currentLedgerId accounts expenses lastAccountId ->
+                        Decode.map6
+                            (\ledgers currentLedgerId accounts expenses lastAccountId events ->
                                 { ledgers = ledgers
                                 , currentLedgerId = currentLedgerId
                                 , accounts = accounts
                                 , expenses = expenses
                                 , lastAccountId = lastAccountId
+                                , events = events
                                 }
                             )
                             (Decode.field "ledgers" (Decode.list ledgerSummaryDecoder))
@@ -157,6 +134,7 @@ ledgerPayloadDecoder =
                             (Decode.field "accounts" (Decode.list accountDecoder))
                             (Decode.field "expenses" (Decode.list expenseDecoder))
                             (Decode.maybe (Decode.field "lastAccountId" Decode.string))
+                            (Decode.field "events" (Decode.list Events.eventDecoder))
 
                     "error" ->
                         Decode.field "message" Decode.string

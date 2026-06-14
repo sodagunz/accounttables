@@ -2,7 +2,7 @@ module View.ExpenseTable exposing (Config, view)
 
 import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, expensesFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
-import Html.Attributes exposing (attribute, checked, class, classList, name, type_, value)
+import Html.Attributes exposing (attribute, checked, class, classList, for, id, name, type_, value)
 import Html.Events exposing (onClick)
 import Util.Date exposing (DateDisplay(..), formatDate)
 import Util.Format exposing (formatMoney, formatNumber)
@@ -24,6 +24,8 @@ type alias Config msg =
     , onSelectSort : SortField -> msg
     , onExportCsv : msg
     , onExportXlsx : msg
+    ,             onDelete : String -> msg
+            , onEdit : String -> msg
     }
 
 
@@ -32,7 +34,24 @@ view config =
     section [ class "panel" ]
         [ Html.h2 [ class "section-title" ] [ text "Gastos" ]
         , div [ class "expense-table-layout" ]
-            [ filterControls config
+            [ div [ class "filters-toggle" ]
+                [ input
+                    [ type_ "checkbox"
+                    , id "filters-toggle-input"
+                    , class "filters-toggle__input"
+                    ]
+                    []
+                , label
+                    [ class "filters-toggle__button"
+                    , for "filters-toggle-input"
+                    ]
+                    [ span [] [ text "Filtros" ]
+                    , span [ class "filters-toggle__arrow" ] [ text "▼" ]
+                    ]
+                , div [ class "filters-toggle__content" ]
+                    [ filterControls config
+                    ]
+                ]
             , expenseTableBody config
             ]
         ]
@@ -74,9 +93,10 @@ expenseTableBody config =
                                     USD ->
                                         "Total (USD)"
                                 )
+                            , th [ class "actions-header" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Acciones" ] ]
                             ]
                         ]
-                    , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
+                    , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
                     ]
                 ]
             ]
@@ -217,8 +237,8 @@ exportControls config =
         ]
 
 
-expenseRow : DateDisplay -> Currency -> Expense -> Html msg
-expenseRow dateDisplay displayCurrency expense =
+expenseRow : DateDisplay -> Currency -> (String -> msg) -> (String -> msg) -> Expense -> Html msg
+expenseRow dateDisplay displayCurrency onEdit onDelete expense =
     tr []
         [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay expense.date) ]
         , td [ attribute "data-label" "Caja" ] [ text expense.accountName ]
@@ -235,6 +255,22 @@ expenseRow dateDisplay displayCurrency expense =
           td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney expense.inputCurrency displayAmount) ]
         , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber expense.exchangeRate) ]
         , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency expense)) ]
+        , td [ class "action-cell", attribute "data-label" "" ]
+            [ div [ class "action-buttons" ]
+                [ button
+                    [ type_ "button"
+                    , class "edit-button"
+                    , onClick (onEdit expense.id)
+                    ]
+                    [ text "✎" ]
+                , button
+                    [ type_ "button"
+                    , class "delete-button"
+                    , onClick (onDelete expense.id)
+                    ]
+                    [ text "×" ]
+                ]
+            ]
         ]
 
 
@@ -313,4 +349,5 @@ totalRow displayCurrency labelText rowClass total =
     tr [ class rowClass ]
         [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ text labelText ]
         , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatTotal (valueForCurrency displayCurrency total) displayCurrency) ]
+        , td [ attribute "data-label" "" ] []
         ]

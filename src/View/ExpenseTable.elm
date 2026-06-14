@@ -31,29 +31,36 @@ view : Config msg -> Html msg
 view config =
     section [ class "panel" ]
         [ Html.h2 [ class "section-title" ] [ text "Gastos" ]
-        , tableControls config
-        , if List.isEmpty config.expenses then
-            p [ class "empty" ] [ text "Todavía no hay gastos." ]
-
-          else
-            div [ class "table-wrap" ]
-                [ table [ class "expense-table" ]
-                    [ thead []
-                        [ tr []
-                            [ sortableHeader config SortByDate "" "Fecha"
-                            , sortableHeader config SortByAccount "" "Caja"
-                            , sortableHeader config SortByDescription "" "Descripción"
-                            , th [ class "numeric" ] [ text "Ingresado" ]
-                            , sortableHeader config SortByExchangeRate "numeric" "Cotización"
-                            , sortableHeader config SortByPesos "numeric" "Pesos"
-                            , th [ class "equivalence" ] [ text "=" ]
-                            , sortableHeader config SortByDollars "numeric" "Dólar"
-                            ]
-                        ]
-                    , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.accounts config.expenses)
-                    ]
-                ]
+        , div [ class "expense-table-layout" ]
+            [ tableControls config
+            , expenseTableBody config
+            ]
         ]
+
+
+expenseTableBody : Config msg -> Html msg
+expenseTableBody config =
+    if List.isEmpty config.expenses then
+        p [ class "empty" ] [ text "Todavía no hay gastos." ]
+
+    else
+        div [ class "table-wrap" ]
+            [ table [ class "expense-table" ]
+                [ thead []
+                    [ tr []
+                        [ sortableHeader config SortByDate "" "Fecha"
+                        , sortableHeader config SortByAccount "" "Caja"
+                        , sortableHeader config SortByDescription "" "Descripción"
+                        , th [ class "numeric" ] [ text "Ingresado" ]
+                        , sortableHeader config SortByExchangeRate "numeric" "Cotización"
+                        , sortableHeader config SortByPesos "numeric" "Pesos"
+                        , th [ class "equivalence" ] [ text "=" ]
+                        , sortableHeader config SortByDollars "numeric" "Dólar"
+                        ]
+                    ]
+                , tbody [] (List.map (expenseRow config.dateDisplay) config.expenses ++ subtotalRows config.accounts config.expenses)
+                ]
+            ]
 
 
 tableControls : Config msg -> Html msg

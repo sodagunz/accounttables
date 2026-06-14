@@ -94,9 +94,11 @@
 
     Verified in the current flow. `GotToday` initializes the form date from the user's current date, the visible date input remains available in the movement form, and `Update.Expenses.add` preserves `model.form.date` after submit while clearing only the transient amount and description fields. No localStorage persistence was added; this behavior is session-local as intended.
 
-17. [ ] Mobile expense table placement
+17. [x] Mobile expense table placement
 
     On mobile, recent expenses should appear immediately below the entry form. This gives quick confirmation that the movement was recorded and supports fast correction if the user notices a wrong caja, currency, date, or missing description. Filters and exports should not push the latest rows too far down.
+
+    Implemented by keeping the expenses section immediately after the movement form and reordering the table internals on small screens so the latest rows appear before filters, date display controls, and exports. Desktop keeps the original control-first table layout; this item only changes the mobile confirmation path.
 
 18. [ ] Large-screen form and table layout
 

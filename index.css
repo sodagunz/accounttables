@@ -397,6 +397,11 @@ select:focus {
   margin-bottom: 14px;
 }
 
+.expense-table-layout {
+  display: flex;
+  flex-direction: column;
+}
+
 .filter-buttons {
   display: flex;
   flex-wrap: wrap;
@@ -633,6 +638,8 @@ th:first-child {
   .table-controls {
     display: grid;
     gap: 12px;
+    margin: 12px 0 0;
+    order: 2;
   }
 
   .filter-buttons {
@@ -652,6 +659,11 @@ th:first-child {
 
   .table-wrap {
     overflow: visible;
+    order: 1;
+  }
+
+  .empty {
+    order: 1;
   }
 
   .expense-table {

@@ -204,29 +204,6 @@
           }
         });
 
-        app.ports.saveExpense.subscribe(async ({ ledgerId, expense }) => {
-          try {
-            await ensureLedger(auth, db, ledgerId);
-            upsertCachedExpense(auth.currentUser?.uid, ledgerId, expense);
-            await setDoc(
-              doc(db, "ledgers", ledgerId, "expenses", String(expense.id)),
-              {
-                ...expense,
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true },
-            );
-            saveLastAccountId(ledgerId, expense.accountId);
-          } catch (error) {
-            console.error("Firestore expense save failed", error);
-            app.ports.ledgerLoaded.send({
-              status: "error",
-              ledgerId,
-              message: firestoreErrorMessage(error),
-            });
-          }
-        });
-
         app.ports.appendEvent.subscribe(async (payload) => {
           try {
             const ledgerId = payload.ledgerId;
@@ -743,17 +720,6 @@
         }
 
         return cacheLedgerPayload(uid, updatePayload(payload));
-      }
-
-      function upsertCachedExpense(uid, ledgerId, expense) {
-        return updateLedgerCache(uid, ledgerId, (payload) => ({
-          ...payload,
-          lastAccountId: expense.accountId || payload.lastAccountId,
-          expenses: upsertById(payload.expenses, {
-            ...expense,
-            updatedAt: new Date().toISOString(),
-          }),
-        }));
       }
 
       function upsertCachedAccount(uid, ledgerId, account) {

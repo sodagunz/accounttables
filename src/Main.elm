@@ -17,7 +17,6 @@ import Projector
 import Task
 import Time
 import Update.Accounts as Accounts
-import Update.Expenses as Expenses
 import Update.Ledgers as Ledgers
 import Util.Date exposing (DateDisplay(..), dateToIso)
 import View.AuthStatus as AuthStatus
@@ -58,6 +57,7 @@ type Msg
     | InviteGuest
     | RemoveGuest String
     | ToggleAccountFilter String
+    | DeleteExpense String
     | EventsLoaded Decode.Value
 
 
@@ -74,9 +74,6 @@ port authStateChanged : (Decode.Value -> msg) -> Sub msg
 
 
 port loadLedgerData : Encode.Value -> Cmd msg
-
-
-port saveExpense : Encode.Value -> Cmd msg
 
 
 port generateExpenseId : () -> Cmd msg
@@ -235,42 +232,44 @@ update msg model =
                     case Accounting.buildExpense readyModel.exchangeRate expenseId (Model.activeAccounts readyModel) readyModel.form of
                         Ok expense ->
                             let
-                                ( updatedModel, savePayload ) =
-                                    Expenses.add expense readyModel
+                                event =
+                                    Events.MovementCreatedEvent 0
+                                        { id = expense.id
+                                        , movementType = expense.movementType
+                                        , description = expense.description
+                                        , accountId = expense.accountId
+                                        , accountName = expense.accountName
+                                        , inputAmount = expense.inputAmount
+                                        , inputCurrency = expense.inputCurrency
+                                        , exchangeRate = expense.exchangeRate
+                                        , ars = expense.ars
+                                        , usd = expense.usd
+                                        , date = expense.date
+                                        }
 
-                                eventCmd =
-                                    case savePayload of
-                                        Just _ ->
-                                            let
-                                                event =
-                                                    Events.MovementCreatedEvent 0
-                                                        { id = expense.id
-                                                        , movementType = expense.movementType
-                                                        , description = expense.description
-                                                        , accountId = expense.accountId
-                                                        , accountName = expense.accountName
-                                                        , inputAmount = expense.inputAmount
-                                                        , inputCurrency = expense.inputCurrency
-                                                        , exchangeRate = expense.exchangeRate
-                                                        , ars = expense.ars
-                                                        , usd = expense.usd
-                                                        , date = expense.date
-                                                        }
-                                            in
-                                            appendEvent
-                                                (Encode.object
-                                                    [ ( "ledgerId", Encode.string readyModel.currentLedgerId )
-                                                    , ( "event", Events.eventEncoder event )
-                                                    ]
-                                                )
-
-                                        Nothing ->
-                                            Cmd.none
+                                updatedModel =
+                                    { readyModel
+                                        | events = event :: readyModel.events
+                                        , expenses = expense :: Model.activeExpenses readyModel.expenses
+                                        , form =
+                                            { description = ""
+                                            , amount = ""
+                                            , accountId = readyModel.form.accountId
+                                            , currency = readyModel.form.currency
+                                            , date = readyModel.form.date
+                                            , movementType = readyModel.form.movementType
+                                            }
+                                        , error = ""
+                                    }
                             in
                             ( updatedModel
                             , Cmd.batch
-                                [ payloadCmd saveExpense savePayload
-                                , eventCmd
+                                [ appendEvent
+                                    (Encode.object
+                                        [ ( "ledgerId", Encode.string readyModel.currentLedgerId )
+                                        , ( "event", Events.eventEncoder event )
+                                        ]
+                                    )
                                 , saveLastAccount readyModel.currentLedgerId readyModel.form.accountId
                                 ]
                             )
@@ -343,6 +342,34 @@ update msg model =
                         accountId :: hidden
             in
             ( { model | hiddenAccountIds = updatedHidden }, Cmd.none )
+
+        DeleteExpense movementId ->
+            let
+                event =
+                    Events.MovementDeletedEvent 0 { movementId = movementId }
+
+                updatedExpenses =
+                    List.map
+                        (\e ->
+                            if e.id == movementId then
+                                { e | deletedAt = Just "deleted" }
+
+                            else
+                                e
+                        )
+                        model.expenses
+            in
+            ( { model
+                | events = event :: model.events
+                , expenses = Model.activeExpenses updatedExpenses
+              }
+            , appendEvent
+                (Encode.object
+                    [ ( "ledgerId", Encode.string model.currentLedgerId )
+                    , ( "event", Events.eventEncoder event )
+                    ]
+                )
+            )
 
         EventsLoaded value ->
             case Decode.decodeValue (Decode.list Events.eventDecoder) value of
@@ -429,6 +456,7 @@ view model =
                         , onSelectSort = SelectSort
                         , onExportCsv = ExportCsv
                         , onExportXlsx = ExportXlsx
+                        , onDelete = DeleteExpense
                         }
                     ]
                 ]
@@ -592,10 +620,17 @@ applyLedgerData ledger model =
 
         form =
             formWithLoadedAccount ledger.lastAccountId accounts model.form
+
+        expenses =
+            if List.isEmpty ledger.events then
+                Model.activeExpenses ledger.expenses
+
+            else
+                Model.activeExpenses (Projector.projectEvents ledger.events)
     in
     { model
         | events = ledger.events
-        , expenses = Model.activeExpenses ledger.expenses
+        , expenses = expenses
         , accounts = accounts
         , ledgers = ledger.ledgers
         , currentLedgerId = ledger.currentLedgerId

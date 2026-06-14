@@ -6,14 +6,13 @@ module Ledger exposing
     , decodeLedger
     , encodeAccountCreate
     , encodeAccountDelete
-    , encodeExpense
     , encodeGuestInvite
     , encodeGuestRemove
     , encodeLedgerName
     , encodeLedgerRequest
     )
 
-import Accounting exposing (Account, Expense, currencyFromString, currencyToString, movementTypeFromString, movementTypeToString)
+import Accounting exposing (Account, Expense, currencyFromString, movementTypeFromString)
 import Events exposing (Event)
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -57,14 +56,6 @@ encodeLedgerRequest ledgerId =
         [ ( "ledgerId", Encode.string ledgerId ) ]
 
 
-encodeExpense : String -> Expense -> Encode.Value
-encodeExpense ledgerId expense =
-    Encode.object
-        [ ( "ledgerId", Encode.string ledgerId )
-        , ( "expense", encodeExpenseRecord expense )
-        ]
-
-
 encodeAccountCreate : String -> String -> Encode.Value
 encodeAccountCreate ledgerId name =
     Encode.object
@@ -102,23 +93,6 @@ encodeLedgerName ledgerId name =
     Encode.object
         [ ( "ledgerId", Encode.string ledgerId )
         , ( "name", Encode.string name )
-        ]
-
-
-encodeExpenseRecord : Expense -> Encode.Value
-encodeExpenseRecord expense =
-    Encode.object
-        [ ( "id", Encode.string expense.id )
-        , ( "movementType", Encode.string (movementTypeToString expense.movementType) )
-        , ( "description", encodeMaybeString expense.description )
-        , ( "accountId", Encode.string expense.accountId )
-        , ( "accountName", Encode.string expense.accountName )
-        , ( "inputAmount", Encode.float expense.inputAmount )
-        , ( "inputCurrency", Encode.string (currencyToString expense.inputCurrency) )
-        , ( "exchangeRate", Encode.float expense.exchangeRate )
-        , ( "ars", Encode.float expense.ars )
-        , ( "usd", Encode.float expense.usd )
-        , ( "date", Encode.string expense.date )
         ]
 
 

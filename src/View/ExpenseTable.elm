@@ -24,6 +24,7 @@ type alias Config msg =
     , onSelectSort : SortField -> msg
     , onExportCsv : msg
     , onExportXlsx : msg
+    , onDelete : String -> msg
     }
 
 
@@ -93,7 +94,7 @@ expenseTableBody config =
                                 )
                             ]
                         ]
-                    , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
+                    , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency config.onDelete) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
                     ]
                 ]
             ]
@@ -234,8 +235,8 @@ exportControls config =
         ]
 
 
-expenseRow : DateDisplay -> Currency -> Expense -> Html msg
-expenseRow dateDisplay displayCurrency expense =
+expenseRow : DateDisplay -> Currency -> (String -> msg) -> Expense -> Html msg
+expenseRow dateDisplay displayCurrency onDelete expense =
     tr []
         [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay expense.date) ]
         , td [ attribute "data-label" "Caja" ] [ text expense.accountName ]
@@ -252,6 +253,14 @@ expenseRow dateDisplay displayCurrency expense =
           td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney expense.inputCurrency displayAmount) ]
         , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber expense.exchangeRate) ]
         , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency expense)) ]
+        , td [ class "action-cell" ]
+            [ button
+                [ type_ "button"
+                , class "delete-button"
+                , onClick (onDelete expense.id)
+                ]
+                [ text "×" ]
+            ]
         ]
 
 

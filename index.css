@@ -728,6 +728,25 @@ th {
     text-underline-offset: 3px;
 }
 
+.action-cell {
+    text-align: center;
+    width: 40px;
+}
+
+.delete-button {
+    background: none;
+    border: none;
+    color: #b91c1c;
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+    padding: 4px 8px;
+}
+
+.delete-button:hover {
+    color: #991b1b;
+}
+
 td.numeric,
 th.numeric {
     font-variant-numeric: tabular-nums;

@@ -270,6 +270,45 @@ select:focus {
   min-width: 0;
 }
 
+.admin-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.admin-disclosure__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 14px 18px;
+  color: #33413c;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.admin-disclosure__summary strong {
+  color: #17352c;
+  font-size: 0.95rem;
+}
+
+.admin-disclosure__content {
+  display: grid;
+  gap: 18px;
+  border-top: 1px solid #d7e4df;
+  padding: 18px;
+}
+
+.admin-section {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-section + .admin-section {
+  border-top: 1px solid #e4ebe7;
+  padding-top: 18px;
+}
+
 .ledger-panel {
   display: grid;
   gap: 12px;
@@ -615,6 +654,18 @@ th:first-child {
     border-right: 0;
     border-radius: 0;
     box-shadow: none;
+    padding: 16px;
+  }
+
+  .admin-panel {
+    padding: 0;
+  }
+
+  .admin-disclosure__summary {
+    padding: 14px 16px;
+  }
+
+  .admin-disclosure__content {
     padding: 16px;
   }
 

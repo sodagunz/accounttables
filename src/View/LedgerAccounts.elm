@@ -18,7 +18,7 @@ type alias Config msg =
 
 view : Config msg -> Html msg
 view config =
-    section [ class "panel accounts-panel" ]
+    section [ class "admin-section accounts-panel" ]
         [ Html.details [ class "accounts-disclosure" ]
             [ Html.summary [ class "accounts-disclosure__summary" ]
                 [ span [] [ text "Crear o eliminar" ]

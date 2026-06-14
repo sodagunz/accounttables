@@ -106,9 +106,11 @@
 
     Implemented by tightening the large-screen grid into a fixed narrow movement column and a flexible table column. The movement form stays visible with desktop sticky positioning, while the table keeps the wider scan/comparison area on the right. The existing mobile order and stacked mobile table behavior are unchanged.
 
-19. [ ] Secondary settings/admin area
+19. [x] Secondary settings/admin area
 
     Ledger management, caja management, and invitations should be grouped in one explicit secondary area. The trigger can be a top-bar control such as `Administrar` or a settings icon with a clear label. Inside, use sections or tabs for `Libro contable`, `Cajas`, and `Miembros`, rather than scattering admin controls across the main expense screen.
+
+    Implemented with a single closed-by-default `Administrar` disclosure after the expenses section. It groups the existing `Libro contable`, `Cajas`, and `Miembros` controls into one secondary admin area while preserving their current behavior. The movement form and recent expenses remain the default visible workflow.
 
 20. [ ] Default screen priority
 

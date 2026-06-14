@@ -5,7 +5,7 @@ import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
 import Auth exposing (AuthState(..))
 import Browser
 import Export
-import Html exposing (Html, div, h1, header, main_, p, text)
+import Html exposing (Html, div, h1, header, main_, p, section, span, strong, text)
 import Html.Attributes exposing (class)
 import Http
 import Json.Decode as Decode
@@ -336,29 +336,44 @@ view model =
                         , onExportCsv = ExportCsv
                         , onExportXlsx = ExportXlsx
                         }
-                    , LedgerAccess.view
-                        { authState = model.authState
-                        , ledgers = model.ledgers
-                        , currentLedgerId = model.currentLedgerId
-                        , ledgerName = model.ledgerName
-                        , inviteEmail = model.inviteEmail
-                        , error = model.ledgerError
-                        , onSelectLedger = SelectLedger
-                        , onLedgerName = UpdateLedgerName
-                        , onSaveLedgerName = SaveLedgerName
-                        , onInviteEmail = UpdateInviteEmail
-                        , onInvite = InviteGuest
-                        , onRemoveGuest = RemoveGuest
-                        }
-                    , LedgerAccounts.view
-                        { accounts = Model.activeAccounts model
-                        , newAccountName = model.newAccountName
-                        , error = model.accountError
-                        , onName = UpdateNewAccountName
-                        , onAdd = AddAccount
-                        , onDelete = DeleteAccount
-                        }
+                    , adminArea model
                     ]
+                ]
+            ]
+        ]
+
+
+adminArea : Model -> Html Msg
+adminArea model =
+    section [ class "panel admin-panel" ]
+        [ Html.details [ class "admin-disclosure" ]
+            [ Html.summary [ class "admin-disclosure__summary" ]
+                [ span [] [ text "Configuracion del libro" ]
+                , strong [] [ text "Administrar" ]
+                ]
+            , div [ class "admin-disclosure__content" ]
+                [ LedgerAccess.view
+                    { authState = model.authState
+                    , ledgers = model.ledgers
+                    , currentLedgerId = model.currentLedgerId
+                    , ledgerName = model.ledgerName
+                    , inviteEmail = model.inviteEmail
+                    , error = model.ledgerError
+                    , onSelectLedger = SelectLedger
+                    , onLedgerName = UpdateLedgerName
+                    , onSaveLedgerName = SaveLedgerName
+                    , onInviteEmail = UpdateInviteEmail
+                    , onInvite = InviteGuest
+                    , onRemoveGuest = RemoveGuest
+                    }
+                , LedgerAccounts.view
+                    { accounts = Model.activeAccounts model
+                    , newAccountName = model.newAccountName
+                    , error = model.accountError
+                    , onName = UpdateNewAccountName
+                    , onAdd = AddAccount
+                    , onDelete = DeleteAccount
+                    }
                 ]
             ]
         ]

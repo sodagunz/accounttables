@@ -25,7 +25,7 @@ type alias Config msg =
 
 view : Config msg -> Html msg
 view config =
-    section [ class "panel ledger-panel" ]
+    section [ class "admin-section ledger-panel" ]
         [ div [ class "ledger-context" ]
             [ div []
                 [ Html.h2 [ class "section-title ledger-context__title" ] [ text "Libro contable" ]

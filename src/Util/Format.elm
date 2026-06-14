@@ -14,8 +14,15 @@ formatMoney currency amount =
 
                 USD ->
                     "U$D "
+
+        formatted =
+            prefix ++ formatFloat (abs amount)
     in
-    prefix ++ formatFloat amount
+    if amount < 0 then
+        "(" ++ formatted ++ ")"
+
+    else
+        formatted
 
 
 formatFloat : Float -> String
@@ -29,15 +36,8 @@ formatFloat amount =
 
         decimal =
             modBy 100 cents
-
-        sign =
-            if amount < 0 then
-                "-"
-
-            else
-                ""
     in
-    sign ++ formatThousands whole ++ "," ++ pad2 decimal
+    formatThousands whole ++ "," ++ pad2 decimal
 
 
 formatThousands : Int -> String

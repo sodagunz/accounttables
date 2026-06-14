@@ -153,7 +153,7 @@ update msg model =
             ( { model | form = Accounting.setDescription description model.form }, Cmd.none )
 
         UpdateAmount amount ->
-            ( { model | form = Accounting.setAmount amount model.form }, Cmd.none )
+            ( { model | form = Accounting.setAmount (String.trim amount) model.form }, Cmd.none )
 
         UpdateAccount accountId ->
             ( { model | form = Accounting.setAccount accountId model.form }

@@ -553,6 +553,10 @@ th {
     font-weight: 700;
 }
 
+.expense-table tbody tr:nth-child(even) {
+    background: #f3f6f5;
+}
+
 .sort-button {
     border: 0;
     background: transparent;

@@ -88,9 +88,11 @@
 
     Verified in the submit path. `Update.Expenses.add` clears the transient amount and description after a movement is registered, but it preserves `model.form.currency`, so the next entry keeps the last selected currency. The initial empty form can still default to ARS; this item is about repeated-entry behavior after the user chooses a currency.
 
-16. [ ] Default date behavior
+16. [x] Default date behavior
 
     The initial date should be today. During a session, retaining the currently selected date is useful for entering multiple movements from the same day or from a backlog. The UI should make the date visible and easy to change without making it part of the critical path for today’s expenses.
+
+    Verified in the current flow. `GotToday` initializes the form date from the user's current date, the visible date input remains available in the movement form, and `Update.Expenses.add` preserves `model.form.date` after submit while clearing only the transient amount and description fields. No localStorage persistence was added; this behavior is session-local as intended.
 
 17. [ ] Mobile expense table placement
 

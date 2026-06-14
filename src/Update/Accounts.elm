@@ -28,7 +28,7 @@ add model =
                     )
 
             _ ->
-                ( { model | accountError = "Ingresa con Google para guardar cajas en el libro contable." }, Nothing )
+                ( { model | accountError = "Ingresa con Google para guardar cuentas en el libro contable." }, Nothing )
 
 
 delete : String -> Model -> ( Model, Maybe Encode.Value )
@@ -44,4 +44,4 @@ delete accountId model =
                 )
 
         _ ->
-            ( { model | accountError = "Ingresa con Google para modificar cajas del libro contable." }, Nothing )
+            ( { model | accountError = "Ingresa con Google para modificar cuentas del libro contable." }, Nothing )

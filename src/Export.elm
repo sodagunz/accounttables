@@ -54,7 +54,7 @@ filename format today =
 headers : List String
 headers =
     [ "Fecha"
-    , "Caja"
+    , "Cuenta"
     , "Descripción"
     , "Ingresado"
     , "Cotización (USD/ARS)"

@@ -1,7 +1,7 @@
 module View.ExpenseTable exposing (Config, view)
 
 import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, SortDirection(..), SortField(..), descriptionDisplay, expensesFor, summarizeMoney)
-import Html exposing (Html, button, div, input, label, p, section, table, tbody, td, text, th, thead, tr)
+import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Util.Date exposing (DateDisplay(..), formatDate)
@@ -51,10 +51,10 @@ expenseTableBody config =
                         [ sortableHeader config SortByDate "" "Fecha"
                         , sortableHeader config SortByAccount "" "Caja"
                         , sortableHeader config SortByDescription "" "Descripción"
-                        , th [ class "numeric" ] [ text "Ingresado" ]
+                        , th [ class "numeric" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Ingresado" ] ]
                         , sortableHeader config SortByExchangeRate "numeric" "Cotización"
                         , sortableHeader config SortByPesos "numeric" "Pesos"
-                        , th [ class "equivalence" ] [ text "=" ]
+                        , th [ class "equivalence" ] [ button [ type_ "button", class "non-sort-button" ] [ text "=" ] ]
                         , sortableHeader config SortByDollars "numeric" "Dólar"
                         ]
                     ]

@@ -74,15 +74,18 @@ tableControls config =
 filterControls : Config msg -> Html msg
 filterControls config =
     div [ class "filters" ]
-        [ div [ class "filter-buttons" ]
-            [ filterButton config AllTime "Completo"
-            , filterButton config ThisYear "Año"
-            , filterButton config ThisMonth "Mes"
-            , filterButton config ThisWeek "Semana"
-            , filterButton config Today "Día"
-            , filterButton config Custom "Personalizado"
+        [ div [ class "report-options" ]
+            [ p [] [ text "Filtros" ]
+            , div [ class "filter-buttons" ]
+                [ filterButton config AllTime "Completo"
+                , filterButton config ThisYear "Año"
+                , filterButton config ThisMonth "Mes"
+                , filterButton config ThisWeek "Semana"
+                , filterButton config Today "Día"
+                , filterButton config Custom "Personalizado"
+                ]
             ]
-        , div [ class "date-mode" ]
+        , div [ class "report-options" ]
             [ p [] [ text "Fecha" ]
             , div [ class "filter-buttons" ]
                 [ dateDisplayButton config NumericDate "DD/MM/AAAA"

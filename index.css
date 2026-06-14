@@ -336,7 +336,7 @@ select:focus {
 .primary {
     border: 0;
     border-radius: 6px;
-    background: #2f806c;
+    background: #17352c;
     color: #ffffff;
     padding: 11px 14px;
     cursor: pointer;
@@ -344,7 +344,7 @@ select:focus {
 }
 
 .primary:hover {
-    background: #276d5c;
+    background: #0e2b23;
 }
 
 .primary--movement {
@@ -696,18 +696,20 @@ th {
     font-weight: 700;
 }
 
-.expense-table tbody tr:nth-child(even) {
-    background: #f3f6f5;
-}
-
-@media (min-width: 821px) {
-    .expense-table td:nth-child(5) {
-        border-right: 2px solid #dce4e0;
-        padding-right: 18px;
+@media (min-width: 521px) {
+    .table-wrap {
+        border: 1px solid #d4ddd9;
+        border-radius: 6px;
     }
 
-    .expense-table td:nth-child(6) {
-        padding-left: 18px;
+    .expense-table th,
+    .expense-table td {
+        border-right: 1px dotted #d4ddd9;
+    }
+
+    .expense-table th:last-child,
+    .expense-table td:last-child {
+        border-right: none;
     }
 }
 
@@ -812,6 +814,10 @@ th:first-child {
     border-top: 2px solid #2f806c;
     color: #17352c;
     font-weight: 800;
+}
+
+.is-negative {
+    color: #b91c1c;
 }
 
 .empty {
@@ -979,6 +985,8 @@ th:first-child {
     .table-wrap {
         overflow: visible;
         order: 1;
+        border: none;
+        border-radius: 0;
     }
 
     .empty {

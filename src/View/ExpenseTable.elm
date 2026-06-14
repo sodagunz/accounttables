@@ -346,8 +346,19 @@ subtotalRows accounts expenses displayCurrency =
 
 totalRow : Currency -> String -> String -> MoneyTotal -> Html msg
 totalRow displayCurrency labelText rowClass total =
+    let
+        totalValue =
+            valueForCurrency displayCurrency total
+    in
     tr [ class rowClass ]
         [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ text labelText ]
-        , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatTotal (valueForCurrency displayCurrency total) displayCurrency) ]
+        , td
+            [ attribute "data-label" "Total"
+            , classList
+                [ ( "numeric", True )
+                , ( "is-negative", totalValue < 0 )
+                ]
+            ]
+            [ text (formatTotal totalValue displayCurrency) ]
         , td [ attribute "data-label" "" ] []
         ]

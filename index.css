@@ -43,7 +43,7 @@ select {
 }
 
 .topbar__inner {
-    max-width: 1320px;
+    max-width: 1600px;
     margin: 0 auto;
 }
 
@@ -153,9 +153,9 @@ h1 {
 }
 
 main {
-    max-width: 1320px;
-    margin: 0 auto;
-    padding: 24px clamp(16px, 4vw, 40px) 48px;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px clamp(16px, 4vw, 40px) 48px;
 }
 
 .layout {

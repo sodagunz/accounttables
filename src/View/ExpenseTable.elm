@@ -2,7 +2,7 @@ module View.ExpenseTable exposing (Config, view)
 
 import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, expensesFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
-import Html.Attributes exposing (attribute, class, type_, value)
+import Html.Attributes exposing (attribute, checked, class, classList, name, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Util.Date exposing (DateDisplay(..), formatDate)
 import Util.Format exposing (formatMoney, formatNumber)
@@ -62,7 +62,22 @@ expenseTableBody config =
                             , sortableHeader config SortByDescription "" "Descripción"
                             , th [ class "numeric" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Ingresado" ] ]
                             , sortableHeader config SortByExchangeRate "numeric" "Cotización (USD/ARS)"
-                            , toggleHeader config
+                            , sortableHeader config
+                                (case config.displayCurrency of
+                                    ARS ->
+                                        SortByPesos
+
+                                    USD ->
+                                        SortByDollars
+                                )
+                                "numeric"
+                                (case config.displayCurrency of
+                                    ARS ->
+                                        "Total (ARS)"
+
+                                    USD ->
+                                        "Total (USD)"
+                                )
                             ]
                         ]
                     , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
@@ -77,25 +92,26 @@ filterControls config =
     div [ class "filters" ]
         [ div [ class "report-options" ]
             [ p [] [ text "Filtros" ]
-            , div [ class "filter-buttons" ]
-                [ filterButton config AllTime "Completo"
-                , filterButton config ThisYear "Año"
-                , filterButton config ThisMonth "Mes"
-                , filterButton config ThisWeek "Semana"
-                , filterButton config Today "Día"
-                , filterButton config Custom "Personalizado"
-                ]
+            , div [ class "segmented-control" ]
+                (List.map (filterSegment config) allFilterWindows)
             ]
         , div [ class "report-options" ]
             [ p [] [ text "Caja" ]
-            , div [ class "filter-buttons" ]
-                (List.map (accountFilterButton config) config.accounts)
+            , div [ class "segmented-control" ]
+                (List.map (accountSegment config) config.accounts)
             ]
         , div [ class "report-options" ]
             [ p [] [ text "Fecha" ]
-            , div [ class "filter-buttons" ]
-                [ dateDisplayButton config NumericDate "DD/MM/AAAA"
-                , dateDisplayButton config LongDate "Texto"
+            , div [ class "segmented-control" ]
+                [ dateSegment config NumericDate "DD/MM/AAAA"
+                , dateSegment config LongDate "Texto"
+                ]
+            ]
+        , div [ class "report-options" ]
+            [ p [] [ text "Divisa" ]
+            , div [ class "segmented-control" ]
+                [ radioSegment config.onSelectDisplayCurrency ARS (config.displayCurrency == ARS) "ARS"
+                , radioSegment config.onSelectDisplayCurrency USD (config.displayCurrency == USD) "USD"
                 ]
             ]
         , if config.filterWindow == Custom then
@@ -115,6 +131,111 @@ filterControls config =
         ]
 
 
+allFilterWindows : List FilterWindow
+allFilterWindows =
+    [ AllTime, ThisYear, ThisMonth, ThisWeek, Today, Custom ]
+
+
+filterSegment : Config msg -> FilterWindow -> Html msg
+filterSegment config filterWindow =
+    let
+        labelText =
+            case filterWindow of
+                AllTime ->
+                    "Completo"
+
+                ThisYear ->
+                    "Año"
+
+                ThisMonth ->
+                    "Mes"
+
+                ThisWeek ->
+                    "Semana"
+
+                Today ->
+                    "Día"
+
+                Custom ->
+                    "Personalizado"
+    in
+    label
+        [ classList
+            [ ( "segmented-control__option", True )
+            , ( "segmented-control__option--active", config.filterWindow == filterWindow )
+            ]
+        ]
+        [ input
+            [ type_ "radio"
+            , name "filter-window"
+            , checked (config.filterWindow == filterWindow)
+            , onClick (config.onSelectFilter filterWindow)
+            ]
+            []
+        , span [] [ text labelText ]
+        ]
+
+
+dateSegment : Config msg -> DateDisplay -> String -> Html msg
+dateSegment config dateDisplay labelText =
+    label
+        [ classList
+            [ ( "segmented-control__option", True )
+            , ( "segmented-control__option--active", config.dateDisplay == dateDisplay )
+            ]
+        ]
+        [ input
+            [ type_ "radio"
+            , name "date-display"
+            , checked (config.dateDisplay == dateDisplay)
+            , onClick (config.onSelectDateDisplay dateDisplay)
+            ]
+            []
+        , span [] [ text labelText ]
+        ]
+
+
+radioSegment : (a -> msg) -> a -> Bool -> String -> Html msg
+radioSegment onChange value isActive labelText =
+    label
+        [ classList
+            [ ( "segmented-control__option", True )
+            , ( "segmented-control__option--active", isActive )
+            ]
+        ]
+        [ input
+            [ type_ "radio"
+            , name "segmented-radio"
+            , checked isActive
+            , onClick (onChange value)
+            ]
+            []
+        , span [] [ text labelText ]
+        ]
+
+
+accountSegment : Config msg -> Account -> Html msg
+accountSegment config account =
+    let
+        hidden =
+            List.member account.id config.hiddenAccountIds
+    in
+    label
+        [ classList
+            [ ( "segmented-control__option", True )
+            , ( "segmented-control__option--active", not hidden )
+            ]
+        ]
+        [ input
+            [ type_ "checkbox"
+            , checked (not hidden)
+            , onClick (config.onToggleAccount account.id)
+            ]
+            []
+        , span [] [ text account.name ]
+        ]
+
+
 exportControls : Config msg -> Html msg
 exportControls config =
     div [ class "report-options report-options--export" ]
@@ -124,58 +245,6 @@ exportControls config =
             , button [ type_ "button", class "filter-button", onClick config.onExportXlsx ] [ text "XLSX" ]
             ]
         ]
-
-
-filterButton : Config msg -> FilterWindow -> String -> Html msg
-filterButton config filterWindow labelText =
-    button
-        [ type_ "button"
-        , class
-            (if config.filterWindow == filterWindow then
-                "filter-button filter-button--active"
-
-             else
-                "filter-button"
-            )
-        , onClick (config.onSelectFilter filterWindow)
-        ]
-        [ text labelText ]
-
-
-dateDisplayButton : Config msg -> DateDisplay -> String -> Html msg
-dateDisplayButton config dateDisplay labelText =
-    button
-        [ type_ "button"
-        , class
-            (if config.dateDisplay == dateDisplay then
-                "filter-button filter-button--active"
-
-             else
-                "filter-button"
-            )
-        , onClick (config.onSelectDateDisplay dateDisplay)
-        ]
-        [ text labelText ]
-
-
-accountFilterButton : Config msg -> Account -> Html msg
-accountFilterButton config account =
-    let
-        hidden =
-            List.member account.id config.hiddenAccountIds
-    in
-    button
-        [ type_ "button"
-        , class
-            (if hidden then
-                "filter-button"
-
-             else
-                "filter-button filter-button--active"
-            )
-        , onClick (config.onToggleAccount account.id)
-        ]
-        [ text account.name ]
 
 
 expenseRow : DateDisplay -> Currency -> Expense -> Html msg
@@ -195,16 +264,7 @@ expenseRow dateDisplay displayCurrency expense =
           in
           td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney expense.inputCurrency displayAmount) ]
         , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber expense.exchangeRate) ]
-        , let
-            label =
-                case displayCurrency of
-                    ARS ->
-                        "Pesos"
-
-                    USD ->
-                        "Dólar"
-          in
-          td [ attribute "data-label" label, class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency expense)) ]
+        , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency expense)) ]
         ]
 
 
@@ -218,33 +278,20 @@ valueForCurrency currency record =
             record.usd
 
 
-toggleHeader : Config msg -> Html msg
-toggleHeader config =
+formatTotal : Float -> Currency -> String
+formatTotal value currency =
     let
-        labelText =
-            case config.displayCurrency of
-                ARS ->
-                    "Pesos (ARS) ↑"
+        number =
+            formatNumber value
 
-                USD ->
-                    "Dólar (USD) ↑"
-
-        otherCurrency =
-            case config.displayCurrency of
-                ARS ->
-                    USD
-
-                USD ->
-                    ARS
+        prefix =
+            currencyToString currency ++ " "
     in
-    th [ class "numeric" ]
-        [ button
-            [ type_ "button"
-            , class "sort-button"
-            , onClick (config.onSelectDisplayCurrency otherCurrency)
-            ]
-            [ text labelText ]
-        ]
+    if String.startsWith "(" number then
+        "(" ++ prefix ++ String.dropLeft 1 number
+
+    else
+        prefix ++ number
 
 
 sortableHeader : Config msg -> SortField -> String -> String -> Html msg
@@ -295,14 +342,5 @@ totalRow : Currency -> String -> String -> MoneyTotal -> Html msg
 totalRow displayCurrency labelText rowClass total =
     tr [ class rowClass ]
         [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ text labelText ]
-        , let
-            label =
-                case displayCurrency of
-                    ARS ->
-                        "Pesos"
-
-                    USD ->
-                        "Dólar"
-          in
-          td [ attribute "data-label" label, class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency total)) ]
+        , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatTotal (valueForCurrency displayCurrency total) displayCurrency) ]
         ]

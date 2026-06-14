@@ -530,30 +530,43 @@ select:focus {
     flex-direction: column;
 }
 
-.filter-buttons {
+.segmented-control {
     display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
-
-.filter-button {
     border: 1px solid #c8d4cf;
     border-radius: 6px;
-    background: #ffffff;
-    color: #33413c;
-    padding: 8px 10px;
+    overflow: hidden;
+}
+
+.segmented-control__option {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 6px 10px;
     cursor: pointer;
+    color: #46524e;
+    font-size: 0.9rem;
+    transition: background 0.15s;
+    border-right: 1px solid #c8d4cf;
 }
 
-.filter-button:hover {
-    border-color: #2f806c;
+.segmented-control__option:last-child {
+    border-right: 0;
 }
 
-.filter-button--active {
-    border-color: #2f806c;
+.segmented-control__option input {
+    display: none;
+}
+
+.segmented-control__option--active {
     background: #e7f2ee;
-    color: #17352c;
     font-weight: 700;
+    color: #17352c;
+}
+
+.segmented-control__option:not(.segmented-control__option--active):hover {
+    background: #f3f8f6;
 }
 
 .report-options {
@@ -828,13 +841,13 @@ th:first-child {
         order: 2;
     }
 
-    .filter-buttons {
+    .segmented-control {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
-    .filter-button {
-        min-height: 40px;
+    .segmented-control__option {
+        justify-content: center;
         padding: 8px 6px;
     }
 

@@ -194,7 +194,7 @@ buildExpense exchangeRate id accounts form =
             else
                 case selectedAccount of
                     Nothing ->
-                        Err "Selecciona una caja."
+                        Err "Selecciona una cuenta."
 
                     Just account ->
                         let

@@ -73,7 +73,7 @@ expenseTableBody config =
                     [ thead []
                         [ tr []
                             [ sortableHeader config SortByDate "" "Fecha"
-                            , sortableHeader config SortByAccount "" "Caja"
+                            , sortableHeader config SortByAccount "" "Cuenta"
                             , sortableHeader config SortByDescription "" "Descripción"
                             , th [ class "numeric" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Ingresado" ] ]
                             , sortableHeader config SortByExchangeRate "numeric" "Cotización (USD/ARS)"
@@ -117,7 +117,7 @@ filterControls config =
             ]
         , div [ class "report-options" ]
             [ div [ class "segmented-control" ]
-                ([ span [ class "segmented-control__label" ] [ text "Caja" ] ]
+                ([ span [ class "segmented-control__label" ] [ text "Cuenta" ] ]
                     ++ List.map (accountSegment config) config.accounts
                 )
             ]
@@ -241,7 +241,7 @@ expenseRow : DateDisplay -> Currency -> (String -> msg) -> (String -> msg) -> Ex
 expenseRow dateDisplay displayCurrency onEdit onDelete expense =
     tr []
         [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay expense.date) ]
-        , td [ attribute "data-label" "Caja" ] [ text expense.accountName ]
+        , td [ attribute "data-label" "Cuenta" ] [ text expense.accountName ]
         , td [ attribute "data-label" "Descripción" ] [ text (descriptionDisplay expense) ]
         , let
             displayAmount =
@@ -346,8 +346,19 @@ subtotalRows accounts expenses displayCurrency =
 
 totalRow : Currency -> String -> String -> MoneyTotal -> Html msg
 totalRow displayCurrency labelText rowClass total =
+    let
+        totalValue =
+            valueForCurrency displayCurrency total
+    in
     tr [ class rowClass ]
         [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ text labelText ]
-        , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatTotal (valueForCurrency displayCurrency total) displayCurrency) ]
+        , td
+            [ attribute "data-label" "Total"
+            , classList
+                [ ( "numeric", True )
+                , ( "is-negative", totalValue < 0 )
+                ]
+            ]
+            [ text (formatTotal totalValue displayCurrency) ]
         , td [ attribute "data-label" "" ] []
         ]

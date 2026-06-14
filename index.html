@@ -1,960 +1,988 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ContabilizAR</title>
-    <link rel="stylesheet" href="index.css" />
-  </head>
-  <body>
-    <div id="app"></div>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-    <script src="elm.js"></script>
-    <script type="module">
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
-      import {
-        getAuth,
-        GoogleAuthProvider,
-        onAuthStateChanged,
-        signInWithPopup,
-        signOut,
-      } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
-      import {
-        arrayRemove,
-        arrayUnion,
-        collection,
-        deleteDoc,
-        doc,
-        getDoc,
-        getDocs,
-        getFirestore,
-        orderBy,
-        query,
-        runTransaction,
-        serverTimestamp,
-        setDoc,
-        updateDoc,
-        writeBatch,
-      } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
-      import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>ContabilizAR</title>
+        <link rel="stylesheet" href="index.css" />
+    </head>
+    <body>
+        <div id="app"></div>
+        <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+        <script src="elm.js"></script>
+        <script type="module">
+            import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+            import {
+                getAuth,
+                GoogleAuthProvider,
+                onAuthStateChanged,
+                signInWithPopup,
+                signOut,
+            } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-auth.js";
+            import {
+                arrayRemove,
+                arrayUnion,
+                collection,
+                deleteDoc,
+                doc,
+                getDoc,
+                getDocs,
+                getFirestore,
+                orderBy,
+                query,
+                runTransaction,
+                serverTimestamp,
+                setDoc,
+                updateDoc,
+                writeBatch,
+            } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+            import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
 
-      const LEDGER_CACHE_SCHEMA_VERSION = 3;
-      const LAST_SESSION_KEY = "contabilizar:lastSession";
+            const LEDGER_CACHE_SCHEMA_VERSION = 3;
+            const LAST_SESSION_KEY = "contabilizar:lastSession";
 
-      const app = Elm.Main.init({
-        node: document.getElementById("app"),
-        flags: loadStartupLedgerCache(),
-      });
-
-      setupFirebaseAuth(app);
-      setupLastAccountStorage(app);
-
-      app.ports.generateExpenseId.subscribe(() => {
-        app.ports.expenseIdGenerated.send(uuidv7());
-      });
-
-      app.ports.exportTable.subscribe((payload) => {
-        if (payload.format === "xlsx" && window.XLSX) {
-          downloadXlsx(payload);
-        } else {
-          downloadCsv({
-            ...payload,
-            filename: payload.filename.replace(/\.xlsx$/i, ".csv"),
-          });
-        }
-      });
-
-      function downloadCsv(payload) {
-        const lines = [payload.headers, ...payload.rows.map((row) => row.cells)];
-        const csv = lines.map((row) => row.map(escapeCsv).join(",")).join("\r\n");
-        downloadBlob(payload.filename, "text/csv;charset=utf-8", "\uFEFF" + csv);
-      }
-
-      function downloadXlsx(payload) {
-        const rows = [payload.headers, ...payload.rows.map((row) => row.cells)];
-        const worksheet = XLSX.utils.aoa_to_sheet(rows);
-        const range = XLSX.utils.decode_range(worksheet["!ref"]);
-
-        worksheet["!cols"] = [
-          { wch: 18 },
-          { wch: 14 },
-          { wch: 28 },
-          { wch: 16 },
-          { wch: 16 },
-          { wch: 18 },
-          { wch: 4 },
-          { wch: 18 },
-        ];
-
-        worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
-        worksheet["!autofilter"] = { ref: worksheet["!ref"] };
-
-        for (let column = range.s.c; column <= range.e.c; column += 1) {
-          const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c: column })];
-          if (cell) {
-            cell.s = { font: { bold: true }, fill: { fgColor: { rgb: "EEF5F2" } } };
-          }
-        }
-
-        payload.rows.forEach((row, index) => {
-          if (row.type === "subtotal" || row.type === "total") {
-            for (let column = range.s.c; column <= range.e.c; column += 1) {
-              const cell = worksheet[XLSX.utils.encode_cell({ r: index + 1, c: column })];
-              if (cell) {
-                cell.s = {
-                  font: { bold: true },
-                  fill: { fgColor: { rgb: row.type === "total" ? "E7F2EE" : "F8FAF9" } },
-                };
-              }
-            }
-          }
-        });
-
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, payload.sheetName || "Gastos");
-        XLSX.writeFile(workbook, payload.filename);
-      }
-
-      function escapeCsv(value) {
-        const text = String(value ?? "");
-        if (/[",\r\n]/.test(text)) {
-          return `"${text.replace(/"/g, '""')}"`;
-        }
-
-        return text;
-      }
-
-      function downloadBlob(filename, mimeType, content) {
-        const blob = new Blob([content], { type: mimeType });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        URL.revokeObjectURL(url);
-      }
-
-      function setupFirebaseAuth(app) {
-        if (!hasFirebaseConfig(firebaseConfig)) {
-          app.ports.authStateChanged.send({ status: "unconfigured" });
-          return;
-        }
-
-        const firebaseApp = initializeApp(firebaseConfig);
-        const auth = getAuth(firebaseApp);
-        const db = getFirestore(firebaseApp);
-        const provider = new GoogleAuthProvider();
-
-        setupFirestore(app, auth, db);
-
-        onAuthStateChanged(auth, (user) => {
-          if (user) {
-            app.ports.authStateChanged.send({
-              status: "signed-in",
-              user: serializeUser(user),
+            const app = Elm.Main.init({
+                node: document.getElementById("app"),
+                flags: loadStartupLedgerCache(),
             });
-          } else {
-            clearLastSession();
-            app.ports.authStateChanged.send({ status: "signed-out" });
-          }
-        });
 
-        app.ports.signInWithGoogle.subscribe(() => {
-          signInWithPopup(auth, provider).catch((error) => {
-            console.error("Firebase Google sign-in failed", error);
-            app.ports.authStateChanged.send({
-              status: "error",
-              message: firebaseAuthErrorMessage(error),
+            setupFirebaseAuth(app);
+            setupLastAccountStorage(app);
+
+            app.ports.generateExpenseId.subscribe(() => {
+                app.ports.expenseIdGenerated.send(uuidv7());
             });
-          });
-        });
 
-        app.ports.signOutUser.subscribe(() => {
-          clearLastSession();
-          signOut(auth).catch((error) => {
-            console.error("Firebase sign-out failed", error);
-            app.ports.authStateChanged.send({
-              status: "error",
-              message: firebaseAuthErrorMessage(error),
+            app.ports.exportTable.subscribe((payload) => {
+                if (payload.format === "xlsx" && window.XLSX) {
+                    downloadXlsx(payload);
+                } else {
+                    downloadCsv({
+                        ...payload,
+                        filename: payload.filename.replace(/\.xlsx$/i, ".csv"),
+                    });
+                }
             });
-          });
-        });
-      }
 
-      function setupLastAccountStorage(app) {
-        app.ports.saveLastAccountSelection.subscribe(({ ledgerId, accountId }) => {
-          saveLastAccountId(ledgerId, accountId);
-        });
-      }
-
-      function setupFirestore(app, auth, db) {
-        app.ports.loadLedgerData.subscribe(async ({ ledgerId }) => {
-          try {
-            emitCachedLedger(app, auth, ledgerId);
-            await loadLedger(app, auth, db, ledgerId);
-          } catch (error) {
-            console.error("Firestore ledger load failed", error);
-            app.ports.ledgerLoaded.send({
-              status: "error",
-              ledgerId,
-              message: firestoreErrorMessage(error),
-            });
-          }
-        });
-
-        app.ports.appendEvent.subscribe(async (payload) => {
-          const ledgerId = payload.ledgerId;
-          const event = payload.event;
-          if (!ledgerId) {
-            console.error("No ledgerId provided for appendEvent");
-            return;
-          }
-          if (!event) {
-            console.error("No event provided for appendEvent");
-            return;
-          }
-
-          const eventId = uuidv7();
-          const uid = auth.currentUser?.uid;
-          const cachedPayload = uid && loadLedgerCache(uid, ledgerId);
-          const estimatedSeq = (cachedPayload?.lastEventSequence || 0) + 1;
-          const newEvent = { ...event, sequence: estimatedSeq, id: eventId };
-
-          // Update cache immediately (sync, no network)
-          if (cachedPayload) {
-            cacheLedgerPayload(uid, {
-              ...cachedPayload,
-              events: [...cachedPayload.events, newEvent],
-            });
-          }
-
-          // Firestore transaction (slow — don't block cache on this)
-          try {
-            const ledgerRef = doc(db, "ledgers", ledgerId);
-            const eventRef = doc(db, "ledgers", ledgerId, "events", eventId);
-
-            await runTransaction(db, async (transaction) => {
-              const ledgerSnapshot = await transaction.get(ledgerRef);
-              if (!ledgerSnapshot.exists()) {
-                throw new Error("Ledger does not exist");
-              }
-
-              const actualSeq = (ledgerSnapshot.data().nextEventSequence || 0) + 1;
-
-              transaction.set(eventRef, {
-                ...event,
-                sequence: actualSeq,
-                id: eventId,
-                createdAt: serverTimestamp(),
-              }, { merge: true });
-
-              transaction.update(ledgerRef, {
-                nextEventSequence: actualSeq,
-                updatedAt: serverTimestamp(),
-              });
-            });
-          } catch (error) {
-            console.error("Firestore event append failed", error);
-          }
-        });
-
-        app.ports.saveAccount.subscribe(async ({ ledgerId, name }) => {
-          try {
-            await ensureLedger(auth, db, ledgerId);
-            const trimmedName = String(name || "").trim();
-
-            if (!trimmedName) {
-              throw new Error("El nombre de la caja no puede estar vacío.");
+            function downloadCsv(payload) {
+                const lines = [payload.headers, ...payload.rows.map((row) => row.cells)];
+                const csv = lines.map((row) => row.map(escapeCsv).join(",")).join("\r\n");
+                downloadBlob(payload.filename, "text/csv;charset=utf-8", "\uFEFF" + csv);
             }
 
-            const accountId = uuidv7();
-            const account = {
-              id: accountId,
-              name: trimmedName,
-              createdAt: new Date().toISOString(),
-            };
-            const cachedLedger = upsertCachedAccount(auth.currentUser?.uid, ledgerId, account);
-            emitLedgerPayload(app, cachedLedger);
-            await setDoc(
-              doc(db, "ledgers", ledgerId, "accounts", accountId),
-              {
-                ...account,
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true },
-            );
-            await loadLedger(app, auth, db, ledgerId);
-          } catch (error) {
-            console.error("Firestore account save failed", error);
-            app.ports.ledgerLoaded.send({
-              status: "error",
-              ledgerId,
-              message: firestoreErrorMessage(error),
-            });
-          }
-        });
+            function downloadXlsx(payload) {
+                const rows = [payload.headers, ...payload.rows.map((row) => row.cells)];
+                const worksheet = XLSX.utils.aoa_to_sheet(rows);
+                const range = XLSX.utils.decode_range(worksheet["!ref"]);
 
-        app.ports.deleteAccount.subscribe(async ({ ledgerId, accountId }) => {
-          try {
-            await ensureLedger(auth, db, ledgerId);
-            const deletedAt = new Date().toISOString();
-            const cachedLedger = softDeleteCachedAccount(
-              auth.currentUser?.uid,
-              ledgerId,
-              accountId,
-              deletedAt,
-            );
-            emitLedgerPayload(app, cachedLedger);
-            let batch = writeBatch(db);
-            let writeCount = 0;
+                worksheet["!cols"] = [
+                    { wch: 18 },
+                    { wch: 14 },
+                    { wch: 28 },
+                    { wch: 16 },
+                    { wch: 16 },
+                    { wch: 18 },
+                    { wch: 4 },
+                    { wch: 18 },
+                ];
 
-            async function setInBatch(ref, data) {
-              batch.set(ref, data, { merge: true });
-              writeCount += 1;
+                worksheet["!freeze"] = { xSplit: 0, ySplit: 1 };
+                worksheet["!autofilter"] = { ref: worksheet["!ref"] };
 
-              if (writeCount >= 450) {
-                await batch.commit();
-                batch = writeBatch(db);
-                writeCount = 0;
-              }
-            }
+                for (let column = range.s.c; column <= range.e.c; column += 1) {
+                    const cell = worksheet[XLSX.utils.encode_cell({ r: 0, c: column })];
+                    if (cell) {
+                        cell.s = { font: { bold: true }, fill: { fgColor: { rgb: "EEF5F2" } } };
+                    }
+                }
 
-            await setInBatch(doc(db, "ledgers", ledgerId, "accounts", accountId), {
-              deletedAt,
-              updatedAt: serverTimestamp(),
-            });
-
-            const expenseSnapshot = await getDocs(collection(db, "ledgers", ledgerId, "expenses"));
-            for (const documentSnapshot of expenseSnapshot.docs) {
-              const expense = documentSnapshot.data();
-              if (expense.accountId === accountId && !expense.deletedAt) {
-                await setInBatch(documentSnapshot.ref, {
-                  deletedAt,
-                  updatedAt: serverTimestamp(),
+                payload.rows.forEach((row, index) => {
+                    if (row.type === "subtotal" || row.type === "total") {
+                        for (let column = range.s.c; column <= range.e.c; column += 1) {
+                            const cell =
+                                worksheet[XLSX.utils.encode_cell({ r: index + 1, c: column })];
+                            if (cell) {
+                                cell.s = {
+                                    font: { bold: true },
+                                    fill: {
+                                        fgColor: {
+                                            rgb: row.type === "total" ? "E7F2EE" : "F8FAF9",
+                                        },
+                                    },
+                                };
+                            }
+                        }
+                    }
                 });
-              }
+
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, payload.sheetName || "Gastos");
+                XLSX.writeFile(workbook, payload.filename);
             }
 
-            if (writeCount > 0) {
-              await batch.commit();
-            }
-            await loadLedger(app, auth, db, ledgerId);
-          } catch (error) {
-            console.error("Firestore account delete failed", error);
-            app.ports.ledgerLoaded.send({
-              status: "error",
-              ledgerId,
-              message: firestoreErrorMessage(error),
-            });
-          }
-        });
+            function escapeCsv(value) {
+                const text = String(value ?? "");
+                if (/[",\r\n]/.test(text)) {
+                    return `"${text.replace(/"/g, '""')}"`;
+                }
 
-        app.ports.inviteLedgerGuest.subscribe(async ({ ledgerId, email }) => {
-          try {
-            await ensureLedger(auth, db, ledgerId);
-            const normalizedEmail = normalizeEmail(email);
-            if (!normalizedEmail) {
-              throw new Error("El email no puede estar vacío.");
+                return text;
             }
 
-            const ledgerSnapshot = await getDoc(doc(db, "ledgers", ledgerId));
-            const ledger = ledgerSnapshot.data();
-            if (ledger?.ownerUid !== auth.currentUser?.uid) {
-              throw new Error("Solo el owner puede invitar usuarios.");
+            function downloadBlob(filename, mimeType, content) {
+                const blob = new Blob([content], { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
             }
 
-            await setDoc(
-              doc(db, "emailInvites", normalizedEmail, "ledgers", ledgerId),
-              {
-                ledgerId,
-                ledgerName: ledger?.name || "Libro contable",
-                ownerUid: auth.currentUser.uid,
-                ownerEmail: normalizeEmail(auth.currentUser.email),
-                invitedEmail: normalizedEmail,
-                createdAt: new Date().toISOString(),
-                updatedAt: serverTimestamp(),
-              },
-              { merge: true },
-            );
-            await updateDoc(doc(db, "ledgers", ledgerId), {
-              invitedEmails: arrayUnion(normalizedEmail),
-              updatedAt: serverTimestamp(),
-            });
-            await loadLedger(app, auth, db, ledgerId);
-          } catch (error) {
-            console.error("Firestore guest invite failed", error);
-            app.ports.ledgerLoaded.send({
-              status: "error",
-              ledgerId,
-              message: firestoreErrorMessage(error),
-            });
-          }
-        });
+            function setupFirebaseAuth(app) {
+                if (!hasFirebaseConfig(firebaseConfig)) {
+                    app.ports.authStateChanged.send({ status: "unconfigured" });
+                    return;
+                }
 
-        app.ports.removeLedgerGuest.subscribe(async ({ ledgerId, uid }) => {
-          try {
-            await ensureLedger(auth, db, ledgerId);
-            const ledgerRef = doc(db, "ledgers", ledgerId);
-            const ledgerSnapshot = await getDoc(ledgerRef);
-            const ledger = ledgerSnapshot.data();
+                const firebaseApp = initializeApp(firebaseConfig);
+                const auth = getAuth(firebaseApp);
+                const db = getFirestore(firebaseApp);
+                const provider = new GoogleAuthProvider();
 
-            if (ledger?.ownerUid !== auth.currentUser?.uid) {
-              throw new Error("Solo el owner puede quitar invitados.");
+                setupFirestore(app, auth, db);
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        app.ports.authStateChanged.send({
+                            status: "signed-in",
+                            user: serializeUser(user),
+                        });
+                    } else {
+                        clearLastSession();
+                        app.ports.authStateChanged.send({ status: "signed-out" });
+                    }
+                });
+
+                app.ports.signInWithGoogle.subscribe(() => {
+                    signInWithPopup(auth, provider).catch((error) => {
+                        console.error("Firebase Google sign-in failed", error);
+                        app.ports.authStateChanged.send({
+                            status: "error",
+                            message: firebaseAuthErrorMessage(error),
+                        });
+                    });
+                });
+
+                app.ports.signOutUser.subscribe(() => {
+                    clearLastSession();
+                    signOut(auth).catch((error) => {
+                        console.error("Firebase sign-out failed", error);
+                        app.ports.authStateChanged.send({
+                            status: "error",
+                            message: firebaseAuthErrorMessage(error),
+                        });
+                    });
+                });
             }
 
-            const member = (ledger.members || []).find((candidate) => candidate.uid === uid);
-            if (!member || uid === ledger.ownerUid) {
-              throw new Error("No se puede quitar este miembro.");
+            function setupLastAccountStorage(app) {
+                app.ports.saveLastAccountSelection.subscribe(({ ledgerId, accountId }) => {
+                    saveLastAccountId(ledgerId, accountId);
+                });
             }
 
-            await updateDoc(ledgerRef, {
-              memberUids: arrayRemove(uid),
-              memberEmails: arrayRemove(normalizeEmail(member.email)),
-              members: arrayRemove(member),
-              updatedAt: serverTimestamp(),
-            });
-            await deleteDoc(doc(db, "userLedgers", uid, "ledgers", ledgerId));
-            await loadLedger(app, auth, db, ledgerId);
-          } catch (error) {
-            console.error("Firestore guest removal failed", error);
-            app.ports.ledgerLoaded.send({
-              status: "error",
-              ledgerId,
-              message: firestoreErrorMessage(error),
-            });
-          }
-        });
+            function setupFirestore(app, auth, db) {
+                app.ports.loadLedgerData.subscribe(async ({ ledgerId }) => {
+                    try {
+                        emitCachedLedger(app, auth, ledgerId);
+                        await loadLedger(app, auth, db, ledgerId);
+                    } catch (error) {
+                        console.error("Firestore ledger load failed", error);
+                        app.ports.ledgerLoaded.send({
+                            status: "error",
+                            ledgerId,
+                            message: firestoreErrorMessage(error),
+                        });
+                    }
+                });
 
-        app.ports.updateLedgerName.subscribe(async ({ ledgerId, name }) => {
-          try {
-            await ensureLedger(auth, db, ledgerId);
-            const trimmedName = String(name || "").trim();
-            if (!trimmedName) {
-              throw new Error("El nombre del libro contable no puede estar vacío.");
+                app.ports.appendEvent.subscribe(async (payload) => {
+                    const ledgerId = payload.ledgerId;
+                    const event = payload.event;
+                    if (!ledgerId) {
+                        console.error("No ledgerId provided for appendEvent");
+                        return;
+                    }
+                    if (!event) {
+                        console.error("No event provided for appendEvent");
+                        return;
+                    }
+
+                    const eventId = uuidv7();
+                    const uid = auth.currentUser?.uid;
+                    const cachedPayload = uid && loadLedgerCache(uid, ledgerId);
+                    const estimatedSeq = (cachedPayload?.lastEventSequence || 0) + 1;
+                    const newEvent = { ...event, sequence: estimatedSeq, id: eventId };
+
+                    // Update cache immediately (sync, no network)
+                    if (cachedPayload) {
+                        cacheLedgerPayload(uid, {
+                            ...cachedPayload,
+                            events: [...cachedPayload.events, newEvent],
+                        });
+                    }
+
+                    // Firestore transaction (slow — don't block cache on this)
+                    try {
+                        const ledgerRef = doc(db, "ledgers", ledgerId);
+                        const eventRef = doc(db, "ledgers", ledgerId, "events", eventId);
+
+                        await runTransaction(db, async (transaction) => {
+                            const ledgerSnapshot = await transaction.get(ledgerRef);
+                            if (!ledgerSnapshot.exists()) {
+                                throw new Error("Ledger does not exist");
+                            }
+
+                            const actualSeq = (ledgerSnapshot.data().nextEventSequence || 0) + 1;
+
+                            transaction.set(
+                                eventRef,
+                                {
+                                    ...event,
+                                    sequence: actualSeq,
+                                    id: eventId,
+                                    createdAt: serverTimestamp(),
+                                },
+                                { merge: true },
+                            );
+
+                            transaction.update(ledgerRef, {
+                                nextEventSequence: actualSeq,
+                                updatedAt: serverTimestamp(),
+                            });
+                        });
+                    } catch (error) {
+                        console.error("Firestore event append failed", error);
+                    }
+                });
+
+                app.ports.saveAccount.subscribe(async ({ ledgerId, name }) => {
+                    try {
+                        await ensureLedger(auth, db, ledgerId);
+                        const trimmedName = String(name || "").trim();
+
+                        if (!trimmedName) {
+                            throw new Error("El nombre de la cuenta no puede estar vacío.");
+                        }
+
+                        const accountId = uuidv7();
+                        const account = {
+                            id: accountId,
+                            name: trimmedName,
+                            createdAt: new Date().toISOString(),
+                        };
+                        const cachedLedger = upsertCachedAccount(
+                            auth.currentUser?.uid,
+                            ledgerId,
+                            account,
+                        );
+                        emitLedgerPayload(app, cachedLedger);
+                        await setDoc(
+                            doc(db, "ledgers", ledgerId, "accounts", accountId),
+                            {
+                                ...account,
+                                updatedAt: serverTimestamp(),
+                            },
+                            { merge: true },
+                        );
+                        await loadLedger(app, auth, db, ledgerId);
+                    } catch (error) {
+                        console.error("Firestore account save failed", error);
+                        app.ports.ledgerLoaded.send({
+                            status: "error",
+                            ledgerId,
+                            message: firestoreErrorMessage(error),
+                        });
+                    }
+                });
+
+                app.ports.deleteAccount.subscribe(async ({ ledgerId, accountId }) => {
+                    try {
+                        await ensureLedger(auth, db, ledgerId);
+                        const deletedAt = new Date().toISOString();
+                        const cachedLedger = softDeleteCachedAccount(
+                            auth.currentUser?.uid,
+                            ledgerId,
+                            accountId,
+                            deletedAt,
+                        );
+                        emitLedgerPayload(app, cachedLedger);
+                        let batch = writeBatch(db);
+                        let writeCount = 0;
+
+                        async function setInBatch(ref, data) {
+                            batch.set(ref, data, { merge: true });
+                            writeCount += 1;
+
+                            if (writeCount >= 450) {
+                                await batch.commit();
+                                batch = writeBatch(db);
+                                writeCount = 0;
+                            }
+                        }
+
+                        await setInBatch(doc(db, "ledgers", ledgerId, "accounts", accountId), {
+                            deletedAt,
+                            updatedAt: serverTimestamp(),
+                        });
+
+                        const expenseSnapshot = await getDocs(
+                            collection(db, "ledgers", ledgerId, "expenses"),
+                        );
+                        for (const documentSnapshot of expenseSnapshot.docs) {
+                            const expense = documentSnapshot.data();
+                            if (expense.accountId === accountId && !expense.deletedAt) {
+                                await setInBatch(documentSnapshot.ref, {
+                                    deletedAt,
+                                    updatedAt: serverTimestamp(),
+                                });
+                            }
+                        }
+
+                        if (writeCount > 0) {
+                            await batch.commit();
+                        }
+                        await loadLedger(app, auth, db, ledgerId);
+                    } catch (error) {
+                        console.error("Firestore account delete failed", error);
+                        app.ports.ledgerLoaded.send({
+                            status: "error",
+                            ledgerId,
+                            message: firestoreErrorMessage(error),
+                        });
+                    }
+                });
+
+                app.ports.inviteLedgerGuest.subscribe(async ({ ledgerId, email }) => {
+                    try {
+                        await ensureLedger(auth, db, ledgerId);
+                        const normalizedEmail = normalizeEmail(email);
+                        if (!normalizedEmail) {
+                            throw new Error("El email no puede estar vacío.");
+                        }
+
+                        const ledgerSnapshot = await getDoc(doc(db, "ledgers", ledgerId));
+                        const ledger = ledgerSnapshot.data();
+                        if (ledger?.ownerUid !== auth.currentUser?.uid) {
+                            throw new Error("Solo el owner puede invitar usuarios.");
+                        }
+
+                        await setDoc(
+                            doc(db, "emailInvites", normalizedEmail, "ledgers", ledgerId),
+                            {
+                                ledgerId,
+                                ledgerName: ledger?.name || "Libro contable",
+                                ownerUid: auth.currentUser.uid,
+                                ownerEmail: normalizeEmail(auth.currentUser.email),
+                                invitedEmail: normalizedEmail,
+                                createdAt: new Date().toISOString(),
+                                updatedAt: serverTimestamp(),
+                            },
+                            { merge: true },
+                        );
+                        await updateDoc(doc(db, "ledgers", ledgerId), {
+                            invitedEmails: arrayUnion(normalizedEmail),
+                            updatedAt: serverTimestamp(),
+                        });
+                        await loadLedger(app, auth, db, ledgerId);
+                    } catch (error) {
+                        console.error("Firestore guest invite failed", error);
+                        app.ports.ledgerLoaded.send({
+                            status: "error",
+                            ledgerId,
+                            message: firestoreErrorMessage(error),
+                        });
+                    }
+                });
+
+                app.ports.removeLedgerGuest.subscribe(async ({ ledgerId, uid }) => {
+                    try {
+                        await ensureLedger(auth, db, ledgerId);
+                        const ledgerRef = doc(db, "ledgers", ledgerId);
+                        const ledgerSnapshot = await getDoc(ledgerRef);
+                        const ledger = ledgerSnapshot.data();
+
+                        if (ledger?.ownerUid !== auth.currentUser?.uid) {
+                            throw new Error("Solo el owner puede quitar invitados.");
+                        }
+
+                        const member = (ledger.members || []).find(
+                            (candidate) => candidate.uid === uid,
+                        );
+                        if (!member || uid === ledger.ownerUid) {
+                            throw new Error("No se puede quitar este miembro.");
+                        }
+
+                        await updateDoc(ledgerRef, {
+                            memberUids: arrayRemove(uid),
+                            memberEmails: arrayRemove(normalizeEmail(member.email)),
+                            members: arrayRemove(member),
+                            updatedAt: serverTimestamp(),
+                        });
+                        await deleteDoc(doc(db, "userLedgers", uid, "ledgers", ledgerId));
+                        await loadLedger(app, auth, db, ledgerId);
+                    } catch (error) {
+                        console.error("Firestore guest removal failed", error);
+                        app.ports.ledgerLoaded.send({
+                            status: "error",
+                            ledgerId,
+                            message: firestoreErrorMessage(error),
+                        });
+                    }
+                });
+
+                app.ports.updateLedgerName.subscribe(async ({ ledgerId, name }) => {
+                    try {
+                        await ensureLedger(auth, db, ledgerId);
+                        const trimmedName = String(name || "").trim();
+                        if (!trimmedName) {
+                            throw new Error("El nombre del libro contable no puede estar vacío.");
+                        }
+
+                        const ledgerRef = doc(db, "ledgers", ledgerId);
+                        const ledgerSnapshot = await getDoc(ledgerRef);
+                        const ledger = ledgerSnapshot.data();
+                        if (ledger?.ownerUid !== auth.currentUser?.uid) {
+                            throw new Error("Solo el owner puede renombrar el libro contable.");
+                        }
+
+                        await updateDoc(ledgerRef, {
+                            name: trimmedName,
+                            updatedAt: serverTimestamp(),
+                        });
+                        await loadLedger(app, auth, db, ledgerId);
+                    } catch (error) {
+                        console.error("Firestore ledger rename failed", error);
+                        app.ports.ledgerLoaded.send({
+                            status: "error",
+                            ledgerId,
+                            message: firestoreErrorMessage(error),
+                        });
+                    }
+                });
             }
 
-            const ledgerRef = doc(db, "ledgers", ledgerId);
-            const ledgerSnapshot = await getDoc(ledgerRef);
-            const ledger = ledgerSnapshot.data();
-            if (ledger?.ownerUid !== auth.currentUser?.uid) {
-              throw new Error("Solo el owner puede renombrar el libro contable.");
+            async function loadLedger(app, auth, db, ledgerId) {
+                await ensurePersonalLedger(auth, db);
+                await acceptPendingInvites(auth, db);
+
+                const ledgers = await loadLedgerSummaries(auth, db);
+                const selectedLedgerId = ledgers.some((ledger) => ledger.id === ledgerId)
+                    ? ledgerId
+                    : ledgers[0]?.id || auth.currentUser?.uid || "";
+
+                const cachedPayload = loadLedgerCache(auth.currentUser?.uid, selectedLedgerId);
+                const lastEventSequence = cachedPayload?.lastEventSequence || 0;
+
+                const [accountSnapshot, eventSnapshot] = await Promise.all([
+                    getDocs(collection(db, "ledgers", selectedLedgerId, "accounts")),
+                    getDocs(
+                        query(
+                            collection(db, "ledgers", selectedLedgerId, "events"),
+                            orderBy("sequence"),
+                        ),
+                    ),
+                ]);
+                const accounts = accountSnapshot.docs.map((documentSnapshot) =>
+                    serializeFirestoreDocument(documentSnapshot),
+                );
+                const remoteEvents = eventSnapshot.docs.map((documentSnapshot) =>
+                    serializeFirestoreDocument(documentSnapshot),
+                );
+
+                const cachedEvents = cachedPayload?.events || [];
+                const cachedIds = new Set(cachedEvents.map((e) => e.id));
+                const remoteIds = new Set(remoteEvents.map((e) => e.id));
+
+                // Push cached events missing from Firestore
+                const pushBatch = writeBatch(db);
+                let pushCount = 0;
+                for (const event of cachedEvents) {
+                    if (event.id && !remoteIds.has(event.id)) {
+                        pushBatch.set(
+                            doc(db, "ledgers", selectedLedgerId, "events", event.id),
+                            event,
+                            { merge: true },
+                        );
+                        pushCount += 1;
+                        if (pushCount >= 450) {
+                            await pushBatch.commit();
+                            pushCount = 0;
+                        }
+                    }
+                }
+                if (pushCount > 0) {
+                    await pushBatch.commit();
+                }
+
+                // Merge: start with all cached events, then add remote events not in cache
+                const mergedEvents = [...cachedEvents];
+                for (const event of remoteEvents) {
+                    if (event.id && !cachedIds.has(event.id)) {
+                        mergedEvents.push(event);
+                    }
+                }
+                mergedEvents.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+
+                const ledgerData = {
+                    status: "loaded",
+                    ledgerId: selectedLedgerId,
+                    lastAccountId: loadLastAccountId(selectedLedgerId),
+                    ledgers,
+                    accounts,
+                    expenses: [],
+                    events: mergedEvents,
+                };
+
+                emitLedgerPayload(app, cacheLedgerPayload(auth.currentUser?.uid, ledgerData));
             }
 
-            await updateDoc(ledgerRef, {
-              name: trimmedName,
-              updatedAt: serverTimestamp(),
-            });
-            await loadLedger(app, auth, db, ledgerId);
-          } catch (error) {
-            console.error("Firestore ledger rename failed", error);
-            app.ports.ledgerLoaded.send({
-              status: "error",
-              ledgerId,
-              message: firestoreErrorMessage(error),
-            });
-          }
-        });
-      }
+            async function ensureLedger(auth, db, ledgerId) {
+                if (!auth.currentUser?.uid) {
+                    throw new Error("No hay una sesión activa.");
+                }
 
-      async function loadLedger(app, auth, db, ledgerId) {
-        await ensurePersonalLedger(auth, db);
-        await acceptPendingInvites(auth, db);
-
-        const ledgers = await loadLedgerSummaries(auth, db);
-        const selectedLedgerId = ledgers.some((ledger) => ledger.id === ledgerId)
-          ? ledgerId
-          : ledgers[0]?.id || auth.currentUser?.uid || "";
-
-        const cachedPayload = loadLedgerCache(auth.currentUser?.uid, selectedLedgerId);
-        const lastEventSequence = cachedPayload?.lastEventSequence || 0;
-
-        const [accountSnapshot, eventSnapshot] = await Promise.all([
-          getDocs(collection(db, "ledgers", selectedLedgerId, "accounts")),
-          getDocs(
-            query(
-              collection(db, "ledgers", selectedLedgerId, "events"),
-              orderBy("sequence"),
-            ),
-          ),
-        ]);
-        const accounts = accountSnapshot.docs.map((documentSnapshot) =>
-          serializeFirestoreDocument(documentSnapshot),
-        );
-        const remoteEvents = eventSnapshot.docs.map((documentSnapshot) =>
-          serializeFirestoreDocument(documentSnapshot),
-        );
-
-        const cachedEvents = cachedPayload?.events || [];
-        const cachedIds = new Set(cachedEvents.map((e) => e.id));
-        const remoteIds = new Set(remoteEvents.map((e) => e.id));
-
-        // Push cached events missing from Firestore
-        const pushBatch = writeBatch(db);
-        let pushCount = 0;
-        for (const event of cachedEvents) {
-          if (event.id && !remoteIds.has(event.id)) {
-            pushBatch.set(doc(db, "ledgers", selectedLedgerId, "events", event.id), event, { merge: true });
-            pushCount += 1;
-            if (pushCount >= 450) {
-              await pushBatch.commit();
-              pushCount = 0;
+                if (ledgerId === auth.currentUser.uid) {
+                    await ensurePersonalLedger(auth, db);
+                }
             }
-          }
-        }
-        if (pushCount > 0) {
-          await pushBatch.commit();
-        }
-
-        // Merge: start with all cached events, then add remote events not in cache
-        const mergedEvents = [...cachedEvents];
-        for (const event of remoteEvents) {
-          if (event.id && !cachedIds.has(event.id)) {
-            mergedEvents.push(event);
-          }
-        }
-        mergedEvents.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
-
-        const ledgerData = {
-          status: "loaded",
-          ledgerId: selectedLedgerId,
-          lastAccountId: loadLastAccountId(selectedLedgerId),
-          ledgers,
-          accounts,
-          expenses: [],
-          events: mergedEvents,
-        };
-
-        emitLedgerPayload(app, cacheLedgerPayload(auth.currentUser?.uid, ledgerData));
-      }
-
-      async function ensureLedger(auth, db, ledgerId) {
-        if (!auth.currentUser?.uid) {
-          throw new Error("No hay una sesión activa.");
-        }
-
-        if (ledgerId === auth.currentUser.uid) {
-          await ensurePersonalLedger(auth, db);
-        }
-      }
-
-      async function ensurePersonalLedger(auth, db) {
-        const uid = auth.currentUser?.uid;
-
-        if (!uid) {
-          throw new Error("No hay una sesión activa.");
-        }
-
-        const email = normalizeEmail(auth.currentUser.email);
-        const member = {
-          uid,
-          email,
-          displayName: auth.currentUser.displayName || email,
-        };
-        const ledgerRef = doc(db, "ledgers", uid);
-        const ledgerSnapshot = await getDoc(ledgerRef);
-
-        if (ledgerSnapshot.exists()) {
-          await setDoc(
-            ledgerRef,
-            {
-              id: uid,
-              name: ledgerSnapshot.data().name || "Mi libro contable",
-              ownerUid: uid,
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true },
-          );
-        } else {
-          await setDoc(ledgerRef, {
-            id: uid,
-            name: "Mi libro contable",
-            ownerUid: uid,
-            memberUids: [uid],
-            memberEmails: [email],
-            members: [member],
-            updatedAt: serverTimestamp(),
-          });
-        }
-        await setDoc(
-          doc(db, "userLedgers", uid, "ledgers", uid),
-          {
-            ledgerId: uid,
-            role: "owner",
-            updatedAt: serverTimestamp(),
-          },
-          { merge: true },
-        );
-      }
-
-      async function acceptPendingInvites(auth, db) {
-        const uid = auth.currentUser?.uid;
-        const email = normalizeEmail(auth.currentUser?.email);
-        if (!uid || !email) {
-          return;
-        }
-
-        const inviteSnapshot = await getDocs(collection(db, "emailInvites", email, "ledgers"));
-        for (const inviteDocument of inviteSnapshot.docs) {
-          const invite = inviteDocument.data();
-          const ledgerId = invite.ledgerId || inviteDocument.id;
-          const member = {
-            uid,
-            email,
-            displayName: auth.currentUser.displayName || email,
-          };
-
-          await updateDoc(doc(db, "ledgers", ledgerId), {
-            memberUids: arrayUnion(uid),
-            memberEmails: arrayUnion(email),
-            members: arrayUnion(member),
-            invitedEmails: arrayRemove(email),
-            updatedAt: serverTimestamp(),
-          });
-          await setDoc(
-            doc(db, "userLedgers", uid, "ledgers", ledgerId),
-            {
-              ledgerId,
-              role: "member",
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true },
-          );
-          await deleteDoc(inviteDocument.ref);
-        }
-      }
-
-      async function loadLedgerSummaries(auth, db) {
-        const uid = auth.currentUser?.uid;
-        if (!uid) {
-          return [];
-        }
-
-        const membershipSnapshot = await getDocs(collection(db, "userLedgers", uid, "ledgers"));
-        const summaries = [];
-        for (const membershipDocument of membershipSnapshot.docs) {
-          const ledgerId = membershipDocument.data().ledgerId || membershipDocument.id;
-          const ledgerSnapshot = await getDoc(doc(db, "ledgers", ledgerId));
-          if (ledgerSnapshot.exists()) {
-            summaries.push(serializeLedgerSummary(ledgerSnapshot));
-          } else {
-            await deleteDoc(membershipDocument.ref);
-          }
-        }
-
-        return summaries.sort((left, right) => left.name.localeCompare(right.name));
-      }
-
-      function emitCachedLedger(app, auth, ledgerId) {
-        emitLedgerPayload(app, loadLedgerCache(auth.currentUser?.uid, ledgerId));
-      }
-
-      function emitLedgerPayload(app, payload) {
-        if (payload) {
-          app.ports.ledgerLoaded.send(payload);
-        }
-      }
-
-      function ledgerCacheKey(uid, ledgerId) {
-        return `contabilizar:ledger:${uid}:${ledgerId}`;
-      }
-
-      function computeLastEventSequence(events) {
-        let maxSeq = 0;
-        for (const event of events) {
-          if (event.sequence > maxSeq) {
-            maxSeq = event.sequence;
-          }
-        }
-        return maxSeq;
-      }
-
-      function cacheLedgerPayload(uid, payload) {
-        if (!uid || !payload?.ledgerId) {
-          return payload;
-        }
-
-        const events = Array.isArray(payload.events) ? payload.events : [];
-        const lastEventSequence = computeLastEventSequence(events);
-
-        const cachedPayload = {
-          status: "loaded",
-          ledgerId: payload.ledgerId,
-          lastAccountId: payload.lastAccountId || loadLastAccountId(payload.ledgerId),
-          ledgers: Array.isArray(payload.ledgers) ? payload.ledgers : [],
-          accounts: Array.isArray(payload.accounts) ? payload.accounts : [],
-          expenses: Array.isArray(payload.expenses) ? payload.expenses : [],
-          events,
-          lastEventSequence,
-        };
-
-        try {
-          localStorage.setItem(
-            ledgerCacheKey(uid, payload.ledgerId),
-            JSON.stringify({
-              schemaVersion: LEDGER_CACHE_SCHEMA_VERSION,
-              syncedAt: new Date().toISOString(),
-              payload: cachedPayload,
-            }),
-          );
-          saveLastSession(uid, payload.ledgerId);
-        } catch (error) {
-          console.warn("Could not cache ledger data", error);
-        }
-
-        return cachedPayload;
-      }
-
-      function loadLedgerCache(uid, ledgerId) {
-        if (!uid || !ledgerId) {
-          return null;
-        }
-
-        try {
-          const rawCache = localStorage.getItem(ledgerCacheKey(uid, ledgerId));
-          if (!rawCache) {
-            return null;
-          }
-
-          const cache = JSON.parse(rawCache);
-          if (
-            cache?.schemaVersion !== LEDGER_CACHE_SCHEMA_VERSION ||
-            cache?.payload?.ledgerId !== ledgerId
-          ) {
-            localStorage.removeItem(ledgerCacheKey(uid, ledgerId));
-            return null;
-          }
-
-          return {
-            ...cache.payload,
-            lastAccountId: loadLastAccountId(ledgerId) || cache.payload.lastAccountId || null,
-          };
-        } catch (error) {
-          console.warn("Could not load cached ledger data", error);
-          return null;
-        }
-      }
-
-      function loadStartupLedgerCache() {
-        try {
-          const rawSession = localStorage.getItem(LAST_SESSION_KEY);
-          if (!rawSession) {
-            return null;
-          }
-
-          const session = JSON.parse(rawSession);
-          return loadLedgerCache(session?.uid, session?.ledgerId);
-        } catch (error) {
-          console.warn("Could not load startup ledger cache", error);
-          return null;
-        }
-      }
-
-      function saveLastSession(uid, ledgerId) {
-        if (!uid || !ledgerId) {
-          return;
-        }
-
-        try {
-          localStorage.setItem(LAST_SESSION_KEY, JSON.stringify({ uid, ledgerId }));
-        } catch (error) {
-          console.warn("Could not save last session", error);
-        }
-      }
-
-      function clearLastSession() {
-        try {
-          localStorage.removeItem(LAST_SESSION_KEY);
-        } catch (error) {
-          console.warn("Could not clear last session", error);
-        }
-      }
-
-      function updateLedgerCache(uid, ledgerId, updatePayload) {
-        const payload = loadLedgerCache(uid, ledgerId);
-        if (!payload) {
-          return null;
-        }
-
-        return cacheLedgerPayload(uid, updatePayload(payload));
-      }
-
-      function upsertCachedAccount(uid, ledgerId, account) {
-        return updateLedgerCache(uid, ledgerId, (payload) => ({
-          ...payload,
-          accounts: upsertById(payload.accounts, account),
-        }));
-      }
-
-      function softDeleteCachedAccount(uid, ledgerId, accountId, deletedAt) {
-        return updateLedgerCache(uid, ledgerId, (payload) => ({
-          ...payload,
-          accounts: payload.accounts.map((account) =>
-            account.id === accountId ? { ...account, deletedAt } : account,
-          ),
-          expenses: payload.expenses.map((expense) =>
-            expense.accountId === accountId && !expense.deletedAt
-              ? { ...expense, deletedAt }
-              : expense,
-          ),
-        }));
-      }
-
-      function upsertById(items, item) {
-        const id = String(item.id || "");
-        const index = items.findIndex((candidate) => String(candidate.id || "") === id);
-
-        if (index === -1) {
-          return [item, ...items];
-        }
-
-        return items.map((candidate, candidateIndex) =>
-          candidateIndex === index ? item : candidate,
-        );
-      }
-
-      function lastAccountStorageKey(ledgerId) {
-        return `contabilizar:lastAccount:${ledgerId}`;
-      }
-
-      function saveLastAccountId(ledgerId, accountId) {
-        if (!ledgerId || !accountId) {
-          return;
-        }
-
-        try {
-          localStorage.setItem(lastAccountStorageKey(ledgerId), accountId);
-        } catch (error) {
-          console.warn("Could not save last account selection", error);
-        }
-      }
-
-      function loadLastAccountId(ledgerId) {
-        if (!ledgerId) {
-          return null;
-        }
-
-        try {
-          return localStorage.getItem(lastAccountStorageKey(ledgerId));
-        } catch (error) {
-          console.warn("Could not load last account selection", error);
-          return null;
-        }
-      }
-
-      function serializeLedgerSummary(documentSnapshot) {
-        const data = documentSnapshot.data();
-        return {
-          id: String(data.id || documentSnapshot.id),
-          name: data.name || "Libro contable",
-          ownerUid: data.ownerUid || "",
-          members: Array.isArray(data.members) ? data.members.map(serializeMember) : [],
-        };
-      }
-
-      function serializeMember(member) {
-        return {
-          uid: member.uid || "",
-          email: normalizeEmail(member.email),
-          displayName: member.displayName || "",
-        };
-      }
-
-      function serializeFirestoreDocument(documentSnapshot) {
-        const data = documentSnapshot.data();
-        return {
-          ...data,
-          id: String(data.id || documentSnapshot.id),
-          deletedAt: serializeMaybeTimestamp(data.deletedAt),
-        };
-      }
-
-      function serializeMaybeTimestamp(value) {
-        if (!value) {
-          return null;
-        }
-
-        if (typeof value === "string") {
-          return value;
-        }
-
-        if (typeof value.toDate === "function") {
-          return value.toDate().toISOString();
-        }
-
-        return String(value);
-      }
-
-      function normalizeEmail(email) {
-        return String(email || "")
-          .trim()
-          .toLowerCase();
-      }
-
-      function uuidv7() {
-        const bytes = new Uint8Array(16);
-        crypto.getRandomValues(bytes);
-
-        let timestamp = BigInt(Date.now());
-        for (let index = 5; index >= 0; index -= 1) {
-          bytes[index] = Number(timestamp & 0xffn);
-          timestamp >>= 8n;
-        }
-
-        bytes[6] = (bytes[6] & 0x0f) | 0x70;
-        bytes[8] = (bytes[8] & 0x3f) | 0x80;
-
-        const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
-        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-      }
-
-      function serializeUser(user) {
-        return {
-          uid: user.uid || "",
-          displayName: user.displayName || "",
-          email: user.email || "",
-          photoUrl: user.photoURL || "",
-        };
-      }
-
-      function firebaseAuthErrorMessage(error) {
-        const code = error?.code || "auth/unknown";
-        const message = error?.message || "Sin detalle técnico.";
-
-        if (code === "auth/popup-closed-by-user") {
-          return "Se cerró la ventana de ingreso.";
-        }
-
-        if (code === "auth/unauthorized-domain") {
-          return "Dominio no autorizado en Firebase Auth: " + window.location.hostname;
-        }
-
-        if (code === "auth/operation-not-allowed") {
-          return "Google no está habilitado en Firebase Auth.";
-        }
-
-        if (code === "auth/popup-blocked") {
-          return "El navegador bloqueó la ventana de ingreso.";
-        }
-
-        return `No se pudo iniciar sesión con Google (${code}): ${message}`;
-      }
-
-      function firestoreErrorMessage(error) {
-        const code = error?.code || "firestore/unknown";
-        const message = error?.message || "Sin detalle técnico.";
-
-        if (code === "permission-denied") {
-          return "Firestore rechazó el acceso a este libro contable.";
-        }
-
-        if (code === "unavailable") {
-          return "Firestore no está disponible en este momento.";
-        }
-
-        return `No se pudieron sincronizar los datos (${code}): ${message}`;
-      }
-    </script>
-  </body>
+
+            async function ensurePersonalLedger(auth, db) {
+                const uid = auth.currentUser?.uid;
+
+                if (!uid) {
+                    throw new Error("No hay una sesión activa.");
+                }
+
+                const email = normalizeEmail(auth.currentUser.email);
+                const member = {
+                    uid,
+                    email,
+                    displayName: auth.currentUser.displayName || email,
+                };
+                const ledgerRef = doc(db, "ledgers", uid);
+                const ledgerSnapshot = await getDoc(ledgerRef);
+
+                if (ledgerSnapshot.exists()) {
+                    await setDoc(
+                        ledgerRef,
+                        {
+                            id: uid,
+                            name: ledgerSnapshot.data().name || "Mi libro contable",
+                            ownerUid: uid,
+                            updatedAt: serverTimestamp(),
+                        },
+                        { merge: true },
+                    );
+                } else {
+                    await setDoc(ledgerRef, {
+                        id: uid,
+                        name: "Mi libro contable",
+                        ownerUid: uid,
+                        memberUids: [uid],
+                        memberEmails: [email],
+                        members: [member],
+                        updatedAt: serverTimestamp(),
+                    });
+                }
+                await setDoc(
+                    doc(db, "userLedgers", uid, "ledgers", uid),
+                    {
+                        ledgerId: uid,
+                        role: "owner",
+                        updatedAt: serverTimestamp(),
+                    },
+                    { merge: true },
+                );
+            }
+
+            async function acceptPendingInvites(auth, db) {
+                const uid = auth.currentUser?.uid;
+                const email = normalizeEmail(auth.currentUser?.email);
+                if (!uid || !email) {
+                    return;
+                }
+
+                const inviteSnapshot = await getDocs(
+                    collection(db, "emailInvites", email, "ledgers"),
+                );
+                for (const inviteDocument of inviteSnapshot.docs) {
+                    const invite = inviteDocument.data();
+                    const ledgerId = invite.ledgerId || inviteDocument.id;
+                    const member = {
+                        uid,
+                        email,
+                        displayName: auth.currentUser.displayName || email,
+                    };
+
+                    await updateDoc(doc(db, "ledgers", ledgerId), {
+                        memberUids: arrayUnion(uid),
+                        memberEmails: arrayUnion(email),
+                        members: arrayUnion(member),
+                        invitedEmails: arrayRemove(email),
+                        updatedAt: serverTimestamp(),
+                    });
+                    await setDoc(
+                        doc(db, "userLedgers", uid, "ledgers", ledgerId),
+                        {
+                            ledgerId,
+                            role: "member",
+                            updatedAt: serverTimestamp(),
+                        },
+                        { merge: true },
+                    );
+                    await deleteDoc(inviteDocument.ref);
+                }
+            }
+
+            async function loadLedgerSummaries(auth, db) {
+                const uid = auth.currentUser?.uid;
+                if (!uid) {
+                    return [];
+                }
+
+                const membershipSnapshot = await getDocs(
+                    collection(db, "userLedgers", uid, "ledgers"),
+                );
+                const summaries = [];
+                for (const membershipDocument of membershipSnapshot.docs) {
+                    const ledgerId = membershipDocument.data().ledgerId || membershipDocument.id;
+                    const ledgerSnapshot = await getDoc(doc(db, "ledgers", ledgerId));
+                    if (ledgerSnapshot.exists()) {
+                        summaries.push(serializeLedgerSummary(ledgerSnapshot));
+                    } else {
+                        await deleteDoc(membershipDocument.ref);
+                    }
+                }
+
+                return summaries.sort((left, right) => left.name.localeCompare(right.name));
+            }
+
+            function emitCachedLedger(app, auth, ledgerId) {
+                emitLedgerPayload(app, loadLedgerCache(auth.currentUser?.uid, ledgerId));
+            }
+
+            function emitLedgerPayload(app, payload) {
+                if (payload) {
+                    app.ports.ledgerLoaded.send(payload);
+                }
+            }
+
+            function ledgerCacheKey(uid, ledgerId) {
+                return `contabilizar:ledger:${uid}:${ledgerId}`;
+            }
+
+            function computeLastEventSequence(events) {
+                let maxSeq = 0;
+                for (const event of events) {
+                    if (event.sequence > maxSeq) {
+                        maxSeq = event.sequence;
+                    }
+                }
+                return maxSeq;
+            }
+
+            function cacheLedgerPayload(uid, payload) {
+                if (!uid || !payload?.ledgerId) {
+                    return payload;
+                }
+
+                const events = Array.isArray(payload.events) ? payload.events : [];
+                const lastEventSequence = computeLastEventSequence(events);
+
+                const cachedPayload = {
+                    status: "loaded",
+                    ledgerId: payload.ledgerId,
+                    lastAccountId: payload.lastAccountId || loadLastAccountId(payload.ledgerId),
+                    ledgers: Array.isArray(payload.ledgers) ? payload.ledgers : [],
+                    accounts: Array.isArray(payload.accounts) ? payload.accounts : [],
+                    expenses: Array.isArray(payload.expenses) ? payload.expenses : [],
+                    events,
+                    lastEventSequence,
+                };
+
+                try {
+                    localStorage.setItem(
+                        ledgerCacheKey(uid, payload.ledgerId),
+                        JSON.stringify({
+                            schemaVersion: LEDGER_CACHE_SCHEMA_VERSION,
+                            syncedAt: new Date().toISOString(),
+                            payload: cachedPayload,
+                        }),
+                    );
+                    saveLastSession(uid, payload.ledgerId);
+                } catch (error) {
+                    console.warn("Could not cache ledger data", error);
+                }
+
+                return cachedPayload;
+            }
+
+            function loadLedgerCache(uid, ledgerId) {
+                if (!uid || !ledgerId) {
+                    return null;
+                }
+
+                try {
+                    const rawCache = localStorage.getItem(ledgerCacheKey(uid, ledgerId));
+                    if (!rawCache) {
+                        return null;
+                    }
+
+                    const cache = JSON.parse(rawCache);
+                    if (
+                        cache?.schemaVersion !== LEDGER_CACHE_SCHEMA_VERSION ||
+                        cache?.payload?.ledgerId !== ledgerId
+                    ) {
+                        localStorage.removeItem(ledgerCacheKey(uid, ledgerId));
+                        return null;
+                    }
+
+                    return {
+                        ...cache.payload,
+                        lastAccountId:
+                            loadLastAccountId(ledgerId) || cache.payload.lastAccountId || null,
+                    };
+                } catch (error) {
+                    console.warn("Could not load cached ledger data", error);
+                    return null;
+                }
+            }
+
+            function loadStartupLedgerCache() {
+                try {
+                    const rawSession = localStorage.getItem(LAST_SESSION_KEY);
+                    if (!rawSession) {
+                        return null;
+                    }
+
+                    const session = JSON.parse(rawSession);
+                    return loadLedgerCache(session?.uid, session?.ledgerId);
+                } catch (error) {
+                    console.warn("Could not load startup ledger cache", error);
+                    return null;
+                }
+            }
+
+            function saveLastSession(uid, ledgerId) {
+                if (!uid || !ledgerId) {
+                    return;
+                }
+
+                try {
+                    localStorage.setItem(LAST_SESSION_KEY, JSON.stringify({ uid, ledgerId }));
+                } catch (error) {
+                    console.warn("Could not save last session", error);
+                }
+            }
+
+            function clearLastSession() {
+                try {
+                    localStorage.removeItem(LAST_SESSION_KEY);
+                } catch (error) {
+                    console.warn("Could not clear last session", error);
+                }
+            }
+
+            function updateLedgerCache(uid, ledgerId, updatePayload) {
+                const payload = loadLedgerCache(uid, ledgerId);
+                if (!payload) {
+                    return null;
+                }
+
+                return cacheLedgerPayload(uid, updatePayload(payload));
+            }
+
+            function upsertCachedAccount(uid, ledgerId, account) {
+                return updateLedgerCache(uid, ledgerId, (payload) => ({
+                    ...payload,
+                    accounts: upsertById(payload.accounts, account),
+                }));
+            }
+
+            function softDeleteCachedAccount(uid, ledgerId, accountId, deletedAt) {
+                return updateLedgerCache(uid, ledgerId, (payload) => ({
+                    ...payload,
+                    accounts: payload.accounts.map((account) =>
+                        account.id === accountId ? { ...account, deletedAt } : account,
+                    ),
+                    expenses: payload.expenses.map((expense) =>
+                        expense.accountId === accountId && !expense.deletedAt
+                            ? { ...expense, deletedAt }
+                            : expense,
+                    ),
+                }));
+            }
+
+            function upsertById(items, item) {
+                const id = String(item.id || "");
+                const index = items.findIndex((candidate) => String(candidate.id || "") === id);
+
+                if (index === -1) {
+                    return [item, ...items];
+                }
+
+                return items.map((candidate, candidateIndex) =>
+                    candidateIndex === index ? item : candidate,
+                );
+            }
+
+            function lastAccountStorageKey(ledgerId) {
+                return `contabilizar:lastAccount:${ledgerId}`;
+            }
+
+            function saveLastAccountId(ledgerId, accountId) {
+                if (!ledgerId || !accountId) {
+                    return;
+                }
+
+                try {
+                    localStorage.setItem(lastAccountStorageKey(ledgerId), accountId);
+                } catch (error) {
+                    console.warn("Could not save last account selection", error);
+                }
+            }
+
+            function loadLastAccountId(ledgerId) {
+                if (!ledgerId) {
+                    return null;
+                }
+
+                try {
+                    return localStorage.getItem(lastAccountStorageKey(ledgerId));
+                } catch (error) {
+                    console.warn("Could not load last account selection", error);
+                    return null;
+                }
+            }
+
+            function serializeLedgerSummary(documentSnapshot) {
+                const data = documentSnapshot.data();
+                return {
+                    id: String(data.id || documentSnapshot.id),
+                    name: data.name || "Libro contable",
+                    ownerUid: data.ownerUid || "",
+                    members: Array.isArray(data.members) ? data.members.map(serializeMember) : [],
+                };
+            }
+
+            function serializeMember(member) {
+                return {
+                    uid: member.uid || "",
+                    email: normalizeEmail(member.email),
+                    displayName: member.displayName || "",
+                };
+            }
+
+            function serializeFirestoreDocument(documentSnapshot) {
+                const data = documentSnapshot.data();
+                return {
+                    ...data,
+                    id: String(data.id || documentSnapshot.id),
+                    deletedAt: serializeMaybeTimestamp(data.deletedAt),
+                };
+            }
+
+            function serializeMaybeTimestamp(value) {
+                if (!value) {
+                    return null;
+                }
+
+                if (typeof value === "string") {
+                    return value;
+                }
+
+                if (typeof value.toDate === "function") {
+                    return value.toDate().toISOString();
+                }
+
+                return String(value);
+            }
+
+            function normalizeEmail(email) {
+                return String(email || "")
+                    .trim()
+                    .toLowerCase();
+            }
+
+            function uuidv7() {
+                const bytes = new Uint8Array(16);
+                crypto.getRandomValues(bytes);
+
+                let timestamp = BigInt(Date.now());
+                for (let index = 5; index >= 0; index -= 1) {
+                    bytes[index] = Number(timestamp & 0xffn);
+                    timestamp >>= 8n;
+                }
+
+                bytes[6] = (bytes[6] & 0x0f) | 0x70;
+                bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+                const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
+                    "",
+                );
+                return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+            }
+
+            function serializeUser(user) {
+                return {
+                    uid: user.uid || "",
+                    displayName: user.displayName || "",
+                    email: user.email || "",
+                    photoUrl: user.photoURL || "",
+                };
+            }
+
+            function firebaseAuthErrorMessage(error) {
+                const code = error?.code || "auth/unknown";
+                const message = error?.message || "Sin detalle técnico.";
+
+                if (code === "auth/popup-closed-by-user") {
+                    return "Se cerró la ventana de ingreso.";
+                }
+
+                if (code === "auth/unauthorized-domain") {
+                    return "Dominio no autorizado en Firebase Auth: " + window.location.hostname;
+                }
+
+                if (code === "auth/operation-not-allowed") {
+                    return "Google no está habilitado en Firebase Auth.";
+                }
+
+                if (code === "auth/popup-blocked") {
+                    return "El navegador bloqueó la ventana de ingreso.";
+                }
+
+                return `No se pudo iniciar sesión con Google (${code}): ${message}`;
+            }
+
+            function firestoreErrorMessage(error) {
+                const code = error?.code || "firestore/unknown";
+                const message = error?.message || "Sin detalle técnico.";
+
+                if (code === "permission-denied") {
+                    return "Firestore rechazó el acceso a este libro contable.";
+                }
+
+                if (code === "unavailable") {
+                    return "Firestore no está disponible en este momento.";
+                }
+
+                return `No se pudieron sincronizar los datos (${code}): ${message}`;
+            }
+        </script>
+    </body>
 </html>

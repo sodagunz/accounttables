@@ -22,14 +22,14 @@ view config =
         [ Html.details [ class "accounts-disclosure" ]
             [ Html.summary [ class "accounts-disclosure__summary" ]
                 [ span [] [ text "Crear o eliminar" ]
-                , strong [] [ text "Cajas" ]
+                , strong [] [ text "Cuentas" ]
                 ]
             , div [ class "accounts-disclosure__content" ]
-                [ Html.h2 [ class "section-title" ] [ text "Cajas" ]
+                [ Html.h2 [ class "section-title" ] [ text "Cuentas" ]
                 , Html.form [ class "inline-form", onSubmit config.onAdd ]
                     [ input
                         [ type_ "text"
-                        , placeholder "Caja"
+                        , placeholder "Cuenta"
                         , value config.newAccountName
                         , onInput config.onName
                         ]
@@ -38,7 +38,7 @@ view config =
                     ]
                 , p [ class "error" ] [ text config.error ]
                 , if List.isEmpty config.accounts then
-                    p [ class "empty empty--compact" ] [ text "No hay cajas activas." ]
+                    p [ class "empty empty--compact" ] [ text "No hay cuentas activas." ]
 
                   else
                     ul [ class "account-list" ] (List.map (accountRow config) config.accounts)

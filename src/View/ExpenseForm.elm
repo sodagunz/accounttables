@@ -89,7 +89,7 @@ view config =
                     ]
                 ]
             , label []
-                [ text "Caja"
+                [ text "Cuenta"
                 , select [ value selectedAccountId, onInput config.onAccount ]
                     (accountOptions config.accounts)
                 ]
@@ -155,7 +155,7 @@ accountOptions : List Account -> List (Html msg)
 accountOptions accounts =
     case accounts of
         [] ->
-            [ option [ value "" ] [ text "Agrega una caja" ] ]
+            [ option [ value "" ] [ text "Agrega una cuenta" ] ]
 
         _ ->
             List.map accountOption accounts

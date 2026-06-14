@@ -201,10 +201,18 @@ accountSegment config account =
 exportControls : Config msg -> Html msg
 exportControls config =
     div [ class "report-options report-options--export" ]
-        [ p [] [ text "Exportar" ]
-        , div [ class "filter-buttons" ]
-            [ button [ type_ "button", class "filter-button", onClick config.onExportCsv ] [ text "CSV" ]
-            , button [ type_ "button", class "filter-button", onClick config.onExportXlsx ] [ text "XLSX" ]
+        [ div [ class "segmented-control" ]
+            [ span [ class "segmented-control__label" ] [ text "Exportar" ]
+            , span
+                [ class "segmented-control__option segmented-control__option--action"
+                , onClick config.onExportCsv
+                ]
+                [ text "CSV" ]
+            , span
+                [ class "segmented-control__option segmented-control__option--action"
+                , onClick config.onExportXlsx
+                ]
+                [ text "XLSX" ]
             ]
         ]
 

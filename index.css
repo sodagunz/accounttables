@@ -747,7 +747,14 @@ th {
 .action-cell {
     text-align: center;
     white-space: nowrap;
-    width: 70px;
+    width: 80px;
+}
+
+.action-cell .edit-button,
+.action-cell .delete-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .edit-button {
@@ -1013,6 +1020,13 @@ th:first-child {
 
     .expense-table td.numeric {
         text-align: left;
+    }
+
+    .expense-table td.action-cell {
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        padding: 4px 0 0;
     }
 
     .expense-table .subtotal,

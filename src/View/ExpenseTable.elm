@@ -254,7 +254,7 @@ expenseRow dateDisplay displayCurrency onEdit onDelete expense =
           td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney expense.inputCurrency displayAmount) ]
         , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber expense.exchangeRate) ]
         , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency expense)) ]
-        , td [ class "action-cell" ]
+        , td [ class "action-cell", attribute "data-label" "" ]
             [ button
                 [ type_ "button"
                 , class "edit-button"

@@ -255,18 +255,20 @@ expenseRow dateDisplay displayCurrency onEdit onDelete expense =
         , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber expense.exchangeRate) ]
         , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency expense)) ]
         , td [ class "action-cell", attribute "data-label" "" ]
-            [ button
-                [ type_ "button"
-                , class "edit-button"
-                , onClick (onEdit expense.id)
+            [ div [ class "action-buttons" ]
+                [ button
+                    [ type_ "button"
+                    , class "edit-button"
+                    , onClick (onEdit expense.id)
+                    ]
+                    [ text "✎" ]
+                , button
+                    [ type_ "button"
+                    , class "delete-button"
+                    , onClick (onDelete expense.id)
+                    ]
+                    [ text "×" ]
                 ]
-                [ text "✎" ]
-            , button
-                [ type_ "button"
-                , class "delete-button"
-                , onClick (onDelete expense.id)
-                ]
-                [ text "×" ]
             ]
         ]
 

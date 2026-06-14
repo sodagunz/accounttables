@@ -96,6 +96,9 @@ port removeLedgerGuest : Encode.Value -> Cmd msg
 port updateLedgerName : Encode.Value -> Cmd msg
 
 
+port saveLastAccountSelection : Encode.Value -> Cmd msg
+
+
 port ledgerLoaded : (Decode.Value -> msg) -> Sub msg
 
 
@@ -144,7 +147,9 @@ update msg model =
             ( { model | form = Accounting.setAmount amount model.form }, Cmd.none )
 
         UpdateAccount accountId ->
-            ( { model | form = Accounting.setAccount accountId model.form }, Cmd.none )
+            ( { model | form = Accounting.setAccount accountId model.form }
+            , saveLastAccount model.currentLedgerId accountId
+            )
 
         UpdateCurrency currency ->
             ( { model | form = Accounting.setCurrency (Accounting.currencyFromString currency) model.form }, Cmd.none )
@@ -214,7 +219,12 @@ update msg model =
                                 ( updatedModel, payload ) =
                                     Expenses.add expense readyModel
                             in
-                            ( updatedModel, payloadCmd saveExpense payload )
+                            ( updatedModel
+                            , Cmd.batch
+                                [ payloadCmd saveExpense payload
+                                , saveLastAccount readyModel.currentLedgerId readyModel.form.accountId
+                                ]
+                            )
 
                         Err error ->
                             ( { readyModel | error = error }, Cmd.none )
@@ -480,12 +490,20 @@ handleLedgerLoaded : Decode.Value -> Model -> ( Model, Cmd Msg )
 handleLedgerLoaded value model =
     case Ledger.decodeLedger value of
         Ok ledger ->
+            let
+                accounts =
+                    Model.activeAccountsFromList ledger.accounts
+
+                form =
+                    formWithLoadedAccount ledger.lastAccountId accounts model.form
+            in
             ( { model
                 | expenses = Model.activeExpenses ledger.expenses
-                , accounts = Model.activeAccountsFromList ledger.accounts
+                , accounts = accounts
                 , ledgers = ledger.ledgers
                 , currentLedgerId = ledger.currentLedgerId
                 , ledgerName = Model.ledgerNameFor ledger.currentLedgerId ledger.ledgers
+                , form = form
                 , ledgerLoadState = Loaded
                 , error = ""
                 , accountError = ""
@@ -497,3 +515,35 @@ handleLedgerLoaded value model =
 
         Err error ->
             ( { model | ledgerLoadState = LoadError error }, Cmd.none )
+
+
+formWithLoadedAccount : Maybe String -> List Accounting.Account -> Accounting.Form -> Accounting.Form
+formWithLoadedAccount lastAccountId accounts form =
+    case lastAccountId of
+        Just accountId ->
+            if List.any (\account -> account.id == accountId) accounts then
+                Accounting.setAccount accountId form
+
+            else
+                Accounting.setAccount "" form
+
+        Nothing ->
+            if List.any (\account -> account.id == form.accountId) accounts then
+                form
+
+            else
+                Accounting.setAccount "" form
+
+
+saveLastAccount : String -> String -> Cmd Msg
+saveLastAccount ledgerId accountId =
+    if ledgerId == "" || accountId == "" then
+        Cmd.none
+
+    else
+        saveLastAccountSelection
+            (Encode.object
+                [ ( "ledgerId", Encode.string ledgerId )
+                , ( "accountId", Encode.string accountId )
+                ]
+            )

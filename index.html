@@ -38,6 +38,7 @@
       const app = Elm.Main.init({ node: document.getElementById("app") });
 
       setupFirebaseAuth(app);
+      setupLastAccountStorage(app);
 
       app.ports.generateExpenseId.subscribe(() => {
         app.ports.expenseIdGenerated.send(uuidv7());
@@ -171,6 +172,12 @@
         });
       }
 
+      function setupLastAccountStorage(app) {
+        app.ports.saveLastAccountSelection.subscribe(({ ledgerId, accountId }) => {
+          saveLastAccountId(ledgerId, accountId);
+        });
+      }
+
       function setupFirestore(app, auth, db) {
         app.ports.loadLedgerData.subscribe(async ({ ledgerId }) => {
           try {
@@ -196,6 +203,7 @@
               },
               { merge: true },
             );
+            saveLastAccountId(ledgerId, expense.accountId);
           } catch (error) {
             console.error("Firestore expense save failed", error);
             app.ports.ledgerLoaded.send({
@@ -415,6 +423,7 @@
         app.ports.ledgerLoaded.send({
           status: "loaded",
           ledgerId: selectedLedgerId,
+          lastAccountId: loadLastAccountId(selectedLedgerId),
           ledgers,
           accounts,
           expenses,
@@ -536,6 +545,35 @@
         }
 
         return summaries.sort((left, right) => left.name.localeCompare(right.name));
+      }
+
+      function lastAccountStorageKey(ledgerId) {
+        return `contabilizar:lastAccount:${ledgerId}`;
+      }
+
+      function saveLastAccountId(ledgerId, accountId) {
+        if (!ledgerId || !accountId) {
+          return;
+        }
+
+        try {
+          localStorage.setItem(lastAccountStorageKey(ledgerId), accountId);
+        } catch (error) {
+          console.warn("Could not save last account selection", error);
+        }
+      }
+
+      function loadLastAccountId(ledgerId) {
+        if (!ledgerId) {
+          return null;
+        }
+
+        try {
+          return localStorage.getItem(lastAccountStorageKey(ledgerId));
+        } catch (error) {
+          console.warn("Could not load last account selection", error);
+          return null;
+        }
       }
 
       function serializeLedgerSummary(documentSnapshot) {

@@ -82,6 +82,8 @@
 
     Implemented by preserving the normalized form caja after each movement and making the selector visibly fall back to the first active caja whenever the form has no valid selected caja. The submit path already normalizes through `Model.ensureSelectedAccount`, so the displayed default and the saved movement use the same caja without requiring a separate selection step.
 
+    Follow-up fix: the last selected/used caja is now persisted in `localStorage` per ledger and restored on ledger load after refresh. The restored value is only applied if the caja still exists; otherwise the selector falls back to the first active caja. The fake empty `Seleccionar` option is not used in the movement form.
+
 15. [x] Default currency to the last used currency
 
     Currency should behave like caja: preserve the last selected value after submitting. This matters because people often enter a batch of receipts in the same currency. Resetting to ARS after every submit creates friction and risks wrong entries for USD-heavy sessions.

@@ -120,31 +120,33 @@ encodeMaybeString maybeString =
             Encode.null
 
 
-decodeLedger : Decode.Value -> Result String { expenses : List Expense, accounts : List Account, ledgers : List LedgerSummary, currentLedgerId : String }
+decodeLedger : Decode.Value -> Result String { expenses : List Expense, accounts : List Account, ledgers : List LedgerSummary, currentLedgerId : String, lastAccountId : Maybe String }
 decodeLedger value =
     Decode.decodeValue ledgerPayloadDecoder value
         |> Result.mapError Decode.errorToString
 
 
-ledgerPayloadDecoder : Decode.Decoder { expenses : List Expense, accounts : List Account, ledgers : List LedgerSummary, currentLedgerId : String }
+ledgerPayloadDecoder : Decode.Decoder { expenses : List Expense, accounts : List Account, ledgers : List LedgerSummary, currentLedgerId : String, lastAccountId : Maybe String }
 ledgerPayloadDecoder =
     Decode.field "status" Decode.string
         |> Decode.andThen
             (\status ->
                 case status of
                     "loaded" ->
-                        Decode.map4
-                            (\ledgers currentLedgerId accounts expenses ->
+                        Decode.map5
+                            (\ledgers currentLedgerId accounts expenses lastAccountId ->
                                 { ledgers = ledgers
                                 , currentLedgerId = currentLedgerId
                                 , accounts = accounts
                                 , expenses = expenses
+                                , lastAccountId = lastAccountId
                                 }
                             )
                             (Decode.field "ledgers" (Decode.list ledgerSummaryDecoder))
                             (Decode.field "ledgerId" Decode.string)
                             (Decode.field "accounts" (Decode.list accountDecoder))
                             (Decode.field "expenses" (Decode.list expenseDecoder))
+                            (Decode.maybe (Decode.field "lastAccountId" Decode.string))
 
                     "error" ->
                         Decode.field "message" Decode.string

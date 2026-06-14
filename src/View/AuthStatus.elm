@@ -20,7 +20,11 @@ view config =
     div [ class "auth-status" ]
         (case config.authState of
             AuthLoading ->
-                [ p [] [ text "Comprobando sesión..." ] ]
+                [ div [ class "auth-user" ]
+                    [ syncDot Loading
+                    , span [ class "auth-user__skeleton", attribute "aria-label" "Comprobando sesión" ] []
+                    ]
+                ]
 
             AuthUnconfigured ->
                 [ p [] [ text "Firebase no configurado." ] ]

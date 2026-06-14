@@ -104,6 +104,13 @@ h1 {
   font-weight: 700;
 }
 
+.auth-user__skeleton {
+  width: 128px;
+  height: 0.9rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.24);
+}
+
 .sync-dot {
   width: 9px;
   height: 9px;

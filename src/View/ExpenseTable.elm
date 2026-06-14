@@ -3,7 +3,7 @@ module View.ExpenseTable exposing (Config, view)
 import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, expensesFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, checked, class, classList, name, type_, value)
-import Html.Events exposing (onClick, onInput)
+import Html.Events exposing (onClick)
 import Util.Date exposing (DateDisplay(..), formatDate)
 import Util.Format exposing (formatMoney, formatNumber)
 
@@ -15,14 +15,10 @@ type alias Config msg =
     , hiddenAccountIds : List String
     , dateDisplay : DateDisplay
     , displayCurrency : Currency
-    , customStart : String
-    , customEnd : String
     , sortField : SortField
     , sortDirection : SortDirection
     , onSelectFilter : FilterWindow -> msg
     , onToggleAccount : String -> msg
-    , onCustomStart : String -> msg
-    , onCustomEnd : String -> msg
     , onSelectDateDisplay : DateDisplay -> msg
     , onSelectDisplayCurrency : Currency -> msg
     , onSelectSort : SortField -> msg
@@ -98,7 +94,6 @@ filterControls config =
                 , filterSegment config ThisMonth "Mes"
                 , filterSegment config ThisWeek "Semana"
                 , filterSegment config Today "Día"
-                , filterSegment config Custom "Personalizado"
                 ]
             ]
         , div [ class "report-options" ]
@@ -121,20 +116,6 @@ filterControls config =
                 , radioSegment config.onSelectDisplayCurrency USD (config.displayCurrency == USD) "USD"
                 ]
             ]
-        , if config.filterWindow == Custom then
-            div [ class "custom-range" ]
-                [ label []
-                    [ text "Desde"
-                    , input [ type_ "date", value config.customStart, onInput config.onCustomStart ] []
-                    ]
-                , label []
-                    [ text "Hasta"
-                    , input [ type_ "date", value config.customEnd, onInput config.onCustomEnd ] []
-                    ]
-                ]
-
-          else
-            text ""
         ]
 
 

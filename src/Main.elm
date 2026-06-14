@@ -34,8 +34,6 @@ type Msg
     | UpdateDate String
     | UpdateMovementType Accounting.MovementType
     | SelectFilter FilterWindow
-    | UpdateCustomStart String
-    | UpdateCustomEnd String
     | SelectDateDisplay DateDisplay
     | SelectDisplayCurrency Accounting.Currency
     | SelectSort SortField
@@ -174,12 +172,6 @@ update msg model =
 
         SelectFilter filterWindow ->
             ( { model | filterWindow = filterWindow }, Cmd.none )
-
-        UpdateCustomStart date ->
-            ( { model | customStart = date, filterWindow = Custom }, Cmd.none )
-
-        UpdateCustomEnd date ->
-            ( { model | customEnd = date, filterWindow = Custom }, Cmd.none )
 
         SelectDateDisplay dateDisplay ->
             ( { model | dateDisplay = dateDisplay }, Cmd.none )
@@ -372,14 +364,10 @@ view model =
                         , hiddenAccountIds = model.hiddenAccountIds
                         , dateDisplay = model.dateDisplay
                         , displayCurrency = model.displayCurrency
-                        , customStart = model.customStart
-                        , customEnd = model.customEnd
                         , sortField = model.sortField
                         , sortDirection = model.sortDirection
                         , onSelectFilter = SelectFilter
                         , onToggleAccount = ToggleAccountFilter
-                        , onCustomStart = UpdateCustomStart
-                        , onCustomEnd = UpdateCustomEnd
                         , onSelectDateDisplay = SelectDateDisplay
                         , onSelectDisplayCurrency = SelectDisplayCurrency
                         , onSelectSort = SelectSort

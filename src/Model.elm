@@ -34,8 +34,6 @@ type alias Model =
     , error : String
     , today : String
     , filterWindow : FilterWindow
-    , customStart : String
-    , customEnd : String
     , dateDisplay : DateDisplay
     , displayCurrency : Currency
     , sortField : SortField
@@ -64,8 +62,6 @@ initial =
     , error = ""
     , today = ""
     , filterWindow = ThisMonth
-    , customStart = ""
-    , customEnd = ""
     , dateDisplay = NumericDate
     , displayCurrency = ARS
     , sortField = SortByDate

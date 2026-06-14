@@ -547,6 +547,7 @@ select:focus {
     cursor: pointer;
     color: #46524e;
     font-size: 0.9rem;
+    white-space: nowrap;
     transition: background 0.15s;
     border-right: 1px solid #c8d4cf;
 }
@@ -597,12 +598,6 @@ select:focus {
 .report-options--export {
     border-top: 1px solid #dce4e0;
     padding-top: 12px;
-}
-
-.custom-range {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(160px, 220px));
-    gap: 12px;
 }
 
 .table-wrap {
@@ -827,10 +822,6 @@ th:first-child {
 
     .movement-title {
         font-size: 1.35rem;
-    }
-
-    .custom-range {
-        grid-template-columns: 1fr;
     }
 
     .inline-form {

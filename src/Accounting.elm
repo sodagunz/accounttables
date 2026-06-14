@@ -54,7 +54,6 @@ type FilterWindow
     | ThisMonth
     | ThisWeek
     | Today
-    | Custom
 
 
 type SortField
@@ -316,8 +315,6 @@ filteredExpenses :
         | expenses : List Expense
         , filterWindow : FilterWindow
         , today : String
-        , customStart : String
-        , customEnd : String
     }
     -> List Expense
 filteredExpenses model =
@@ -328,8 +325,6 @@ expenseMatchesFilter :
     { model
         | filterWindow : FilterWindow
         , today : String
-        , customStart : String
-        , customEnd : String
     }
     -> Expense
     -> Bool
@@ -349,21 +344,6 @@ expenseMatchesFilter model expense =
 
         Today ->
             expense.date == model.today
-
-        Custom ->
-            withinCustomRange model.customStart model.customEnd expense.date
-
-
-withinCustomRange : String -> String -> String -> Bool
-withinCustomRange start end date =
-    let
-        afterStart =
-            start == "" || date >= start
-
-        beforeEnd =
-            end == "" || date <= end
-    in
-    afterStart && beforeEnd
 
 
 sortExpenses : SortField -> SortDirection -> List Expense -> List Expense

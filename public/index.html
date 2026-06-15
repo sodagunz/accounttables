@@ -44,13 +44,13 @@
             const LOCAL_LEDGER_ID = "local";
             const LOCAL_LEDGER_KEY = "contabilizar:localLedger";
             const DEFAULT_LOCAL_LEDGER_NAME = "Libro contable de desconocido";
-            const WIZARD_STATE_KEY = "contabilizar:wizardState";
+            const TUTORIAL_STATE_KEY = "contabilizar:tutorialState";
 
             const app = Elm.Main.init({
                 node: document.getElementById("app"),
                 flags: {
                     ledger: loadStartupLedgerCache(),
-                    wizardState: loadWizardState(),
+                    tutorialState: loadTutorialState(),
                 },
             });
 
@@ -71,8 +71,8 @@
                 });
             });
 
-            app.ports.saveWizardState.subscribe((state) => {
-                saveWizardState(state);
+            app.ports.saveTutorialState.subscribe((state) => {
+                saveTutorialState(state);
             });
 
             app.ports.generateExpenseId.subscribe(() => {
@@ -1279,20 +1279,20 @@
                 }
             }
 
-            function loadWizardState() {
+            function loadTutorialState() {
                 try {
-                    return localStorage.getItem(WIZARD_STATE_KEY) || "";
+                    return localStorage.getItem(TUTORIAL_STATE_KEY) || "";
                 } catch (error) {
-                    console.warn("Could not load wizard state", error);
+                    console.warn("Could not load tutorial state", error);
                     return "";
                 }
             }
 
-            function saveWizardState(state) {
+            function saveTutorialState(state) {
                 try {
-                    localStorage.setItem(WIZARD_STATE_KEY, String(state || ""));
+                    localStorage.setItem(TUTORIAL_STATE_KEY, String(state || ""));
                 } catch (error) {
-                    console.warn("Could not save wizard state", error);
+                    console.warn("Could not save tutorial state", error);
                 }
             }
 

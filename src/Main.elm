@@ -206,7 +206,7 @@ modelFromFlags flags =
 
 decodeTutorialStateFromFlags : Decode.Value -> TutorialState
 decodeTutorialStateFromFlags flags =
-    case Decode.decodeValue (Decode.field "wizardState" Decode.string) flags of
+    case Decode.decodeValue (Decode.field "tutorialState" Decode.string) flags of
         Ok "dismissed" ->
             TutorialDismissed
 

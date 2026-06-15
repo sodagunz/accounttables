@@ -348,13 +348,21 @@ main {
 
 @media (max-width: 520px) {
     .tutorial-tooltip {
-        top: auto;
-        bottom: 0;
-        left: 0;
-        right: 0;
+        top: auto !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
         max-width: none;
         border-radius: 12px 12px 0 0;
         border-bottom: 0;
+    }
+
+    .tutorial-spotlight {
+        display: none;
+    }
+
+    .tutorial-backdrop {
+        display: none;
     }
 }
 

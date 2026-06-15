@@ -2,7 +2,7 @@ module View.LedgerAccounts exposing (Config, view)
 
 import Accounting exposing (Account)
 import Html exposing (Html, button, div, input, li, p, section, span, strong, text, ul)
-import Html.Attributes exposing (class, id, placeholder, type_, value)
+import Html.Attributes exposing (attribute, class, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 
 
@@ -30,6 +30,7 @@ view config =
                     [ input
                         [ type_ "text"
                         , id "new-account-name"
+                        , attribute "data-tutorial" "account-name"
                         , placeholder "Cuenta"
                         , value config.newAccountName
                         , onInput config.onName

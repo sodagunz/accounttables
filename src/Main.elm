@@ -1041,8 +1041,8 @@ tutorialAdvanceCmd model oldState newState =
 tutorialNavigateCmd : Model -> TutorialStep -> Cmd Msg
 tutorialNavigateCmd model step =
     Cmd.batch
-        [ getElementRect (tutorialTargetSelector model step)
-        , tutorialOpenDisclosureCmd step
+        [ tutorialOpenDisclosureCmd step
+        , getElementRect (tutorialTargetSelector model step)
         ]
 
 

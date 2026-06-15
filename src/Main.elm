@@ -1505,10 +1505,10 @@ applyLedgerData ledger model =
 
 
 adjustTutorialAfterLedgerLoad : LoadState -> Model -> Model
-adjustTutorialAfterLedgerLoad previousLoadState model =
+adjustTutorialAfterLedgerLoad _ model =
     case model.tutorialState of
         TutorialOpen AccountsStep ->
-            if previousLoadState == Loading && not (List.isEmpty (Model.activeAccounts model)) then
+            if not (List.isEmpty (Model.activeAccounts model)) then
                 { model | tutorialState = TutorialOpen CollaboratorsStep, accountError = "" }
 
             else

@@ -1335,16 +1335,31 @@ handleAuthStateChanged authState model =
                 )
 
         SignedOut ->
-            ( { model
-                | authState = authState
-                , inviteEmail = ""
-                , error = ""
-                , accountError = ""
-                , ledgerError = ""
-              }
-                |> ensureLocalLedger
-                |> Model.ensureSelectedAccount
-            , loadLedgerData (Ledger.encodeLedgerRequest localLedgerId)
+            let
+                signedOutModel =
+                    { model
+                        | authState = authState
+                        , inviteEmail = ""
+                        , error = ""
+                        , accountError = ""
+                        , ledgerError = ""
+                      }
+                        |> ensureLocalLedger
+                        |> Model.ensureSelectedAccount
+
+                tutorialCmd =
+                    case signedOutModel.tutorialState of
+                        TutorialOpen SignInStep ->
+                            tutorialNavigateCmd signedOutModel SignInStep
+
+                        _ ->
+                            Cmd.none
+            in
+            ( signedOutModel
+            , Cmd.batch
+                [ loadLedgerData (Ledger.encodeLedgerRequest localLedgerId)
+                , tutorialCmd
+                ]
             )
 
         AuthUnconfigured ->

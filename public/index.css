@@ -255,6 +255,28 @@ main {
     line-height: 1.15;
 }
 
+.setup-shortcut {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 12px;
+}
+
+.setup-shortcut__button {
+    min-height: 34px;
+    border: 0;
+    background: transparent;
+    color: #205c4c;
+    cursor: pointer;
+    font-weight: 700;
+    padding: 0;
+}
+
+.setup-shortcut__button:hover,
+.setup-shortcut__button:focus {
+    text-decoration: underline;
+    outline: none;
+}
+
 .layout {
     display: grid;
     grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);

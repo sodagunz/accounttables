@@ -71,6 +71,11 @@
                 });
             });
 
+            app.ports.openDisclosure.subscribe((id) => {
+                const el = document.getElementById(id);
+                if (el) el.open = true;
+            });
+
             app.ports.saveTutorialState.subscribe((state) => {
                 saveTutorialState(state);
             });

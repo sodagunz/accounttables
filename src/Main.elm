@@ -145,6 +145,9 @@ port getElementRect : String -> Cmd msg
 port openDisclosure : String -> Cmd msg
 
 
+port focusElement : String -> Cmd msg
+
+
 port lockBodyScroll : Bool -> Cmd msg
 
 
@@ -441,9 +444,7 @@ update msg model =
                                     if isNewExpense then
                                         case updatedModel.tutorialState of
                                             TutorialOpen FirstExpenseStep ->
-                                                 ( { updatedModel | tutorialState = TutorialOpen DeleteExpenseStep }
-                                                 , tutorialNavigateCmd updatedModel DeleteExpenseStep
-                                                 )
+                                                tutorialNavigateTo DeleteExpenseStep updatedModel
 
                                             _ ->
                                                 ( updatedModel, Cmd.none )
@@ -497,7 +498,7 @@ update msg model =
                                     nextAccountsStep =
                                         tutorialStepAfterAccounts updatedModel
                                 in
-                                ( { updatedModel | tutorialState = TutorialOpen nextAccountsStep, accountError = "" }
+                                ( { updatedModel | tutorialState = TutorialOpen nextAccountsStep, tutorialTargetRect = Nothing, accountError = "" }
                                 , tutorialNavigateCmd updatedModel nextAccountsStep
                                 )
 
@@ -695,13 +696,7 @@ update msg model =
         TutorialBack ->
             case model.tutorialState of
                 TutorialOpen step ->
-                    let
-                        prev =
-                            previousTutorialStep step
-                    in
-                    ( { model | tutorialState = TutorialOpen prev }
-                    , tutorialNavigateCmd model prev
-                    )
+                    tutorialNavigateTo (previousTutorialStep step) model
 
                 _ ->
                     ( model, Cmd.none )
@@ -727,7 +722,7 @@ update msg model =
                 step =
                     reopenedTutorialStep model
             in
-            ( { model | tutorialState = TutorialOpen step, tutorialCompletionVisible = False }
+            ( { model | tutorialState = TutorialOpen step, tutorialCompletionVisible = False, tutorialTargetRect = Nothing }
             , Cmd.batch
                 [ lockBodyScroll True
                 , saveTutorialState (Encode.string "")
@@ -997,7 +992,7 @@ tutorialTargetSelector model step =
             "[data-tutorial=\"invite-email\"]"
 
         FirstExpenseStep ->
-            "[data-tutorial=\"description\"]"
+            "[data-tutorial=\"movement-submit\"]"
 
         DeleteExpenseStep ->
             case List.head (Model.activeExpenses model.expenses) of
@@ -1005,7 +1000,17 @@ tutorialTargetSelector model step =
                     "[data-tutorial=\"delete-" ++ expense.id ++ "\"]"
 
                 Nothing ->
-                    "[data-tutorial=\"description\"]"
+                    "[data-tutorial=\"movement-submit\"]"
+
+
+tutorialFocusSelector : Model -> TutorialStep -> String
+tutorialFocusSelector model step =
+    case step of
+        FirstExpenseStep ->
+            "[data-tutorial=\"movement-amount\"]"
+
+        _ ->
+            tutorialTargetSelector model step
 
 
 tutorialTargetRectDecoder : Decode.Decoder TargetRect
@@ -1028,16 +1033,12 @@ advanceTutorialFrom step model =
                 next =
                     tutorialStepAfterAccounts model
             in
-            ( { model | tutorialState = TutorialOpen next }
-            , tutorialNavigateCmd model next
-            )
+            tutorialNavigateTo next model
 
         _ ->
             case rawNextStep step of
                 Just nextStep ->
-                    ( { model | tutorialState = TutorialOpen nextStep }
-                    , tutorialNavigateCmd model nextStep
-                    )
+                    tutorialNavigateTo nextStep model
 
                 Nothing ->
                     ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
@@ -1110,7 +1111,15 @@ tutorialNavigateCmd model step =
     Cmd.batch
         [ tutorialOpenDisclosureCmd step
         , getElementRect (tutorialTargetSelector model step)
+        , focusElement (tutorialFocusSelector model step)
         ]
+
+
+tutorialNavigateTo : TutorialStep -> Model -> ( Model, Cmd Msg )
+tutorialNavigateTo step model =
+    ( { model | tutorialState = TutorialOpen step, tutorialTargetRect = Nothing }
+    , tutorialNavigateCmd model step
+    )
 
 
 tutorialOpenDisclosureCmd : TutorialStep -> Cmd Msg
@@ -1334,6 +1343,7 @@ handleAuthStateChanged authState model =
                     , ledgerError = ""
                     , migrationState = PreparingMigration
                     , tutorialState = newTutorialState
+                    , tutorialTargetRect = Nothing
                    }
                 , Cmd.batch
                     [ prepareLocalMigration ()
@@ -1352,6 +1362,7 @@ handleAuthStateChanged authState model =
                     , accountError = ""
                     , ledgerError = ""
                     , tutorialState = newTutorialState
+                    , tutorialTargetRect = Nothing
                   }
                 , Cmd.batch
                     [ loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
@@ -1537,6 +1548,7 @@ adjustTutorialAfterLedgerLoad _ model =
                 { model
                     | tutorialState = TutorialOpen (tutorialStepAfterAccounts model)
                     , accountError = ""
+                    , tutorialTargetRect = Nothing
                 }
 
             else

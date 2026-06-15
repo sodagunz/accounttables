@@ -71,6 +71,7 @@ type Msg
     | WizardBack
     | WizardSkip
     | WizardFinish
+    | ReopenWizard
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -625,6 +626,11 @@ update msg model =
             , saveWizardState (Encode.string "completed")
             )
 
+        ReopenWizard ->
+            ( { model | wizardState = WizardOpen WelcomeStep }
+            , saveWizardState (Encode.string "")
+            )
+
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
 payloadCmd toCmd payload =
@@ -656,6 +662,7 @@ view model =
             ]
         , main_ []
             [ wizardView model
+            , reopenWizardButton model
             , migrationPrompt model
             , localRiskBanner model
             , div [ class "layout" ]
@@ -705,6 +712,19 @@ view model =
                 ]
             ]
         ]
+
+
+reopenWizardButton : Model -> Html Msg
+reopenWizardButton model =
+    case model.wizardState of
+        WizardOpen _ ->
+            text ""
+
+        _ ->
+            section [ class "setup-shortcut" ]
+                [ button [ class "setup-shortcut__button", type_ "button", onClick ReopenWizard ]
+                    [ text "Abrir configuracion inicial" ]
+                ]
 
 
 wizardView : Model -> Html Msg

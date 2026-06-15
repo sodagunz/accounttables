@@ -37,6 +37,23 @@ service cloud.firestore {
       return signedIn() && ledgerId == request.auth.uid;
     }
 
+    function authEmailIs(email) {
+      return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == email;
+    }
+
+    function ownsEmail(email) {
+      return signedIn()
+        && (
+          authEmailIs(email)
+          || (
+            exists(/databases/$(database)/documents/userEmails/$(email))
+            && get(/databases/$(database)/documents/userEmails/$(email)).data.uid == request.auth.uid
+          )
+        );
+    }
+
     match /ledgers/{ledgerId} {
       allow create: if signedIn()
         && ledgerId == request.auth.uid
@@ -66,15 +83,30 @@ service cloud.firestore {
     }
 
     match /userLedgers/{uid}/ledgers/{ledgerId} {
-      allow read, list, create, update: if signedIn() && uid == request.auth.uid;
+      allow read, list: if signedIn() && uid == request.auth.uid;
+      allow create, update: if signedIn()
+        && (
+          uid == request.auth.uid
+          || isLedgerOwner(request.resource.data.ledgerId)
+        );
       allow delete: if signedIn()
         && (uid == request.auth.uid || isLedgerOwner(resource.data.ledgerId));
     }
 
     match /emailInvites/{email}/ledgers/{ledgerId} {
       allow read, list, delete: if signedIn()
-        && (request.auth.token.email == email || isLedgerOwner(ledgerId));
+        && (ownsEmail(email) || isLedgerOwner(ledgerId));
       allow create, update: if isLedgerOwner(ledgerId);
+    }
+
+    match /userEmails/{email} {
+      allow read: if signedIn();
+      allow create, update: if signedIn()
+        && authEmailIs(email)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == email;
+      allow delete: if signedIn()
+        && resource.data.uid == request.auth.uid;
     }
   }
 }

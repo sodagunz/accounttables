@@ -56,7 +56,7 @@ view config =
                 ]
             , label [ class "description-field" ]
                 [ text "Descripción"
-                , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
+                , input [ class "description-field__input", type_ "text", attribute "data-tutorial" "description", value config.form.description, onInput config.onDescription ] []
                 ]
             , div [ class "movement-type" ]
                 [ span [ class "movement-type__label" ] [ text "Tipo" ]

@@ -7,7 +7,7 @@ import Browser
 import Events exposing (Event)
 import Export
 import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
-import Html.Attributes exposing (class, type_, value)
+import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode
@@ -836,6 +836,7 @@ wizardStepContent model step =
                 [ text "Nueva cuenta"
                 , Html.input
                     [ type_ "text"
+                    , attribute "data-tutorial" "account-name"
                     , value model.newAccountName
                     , onInput UpdateNewAccountName
                     ]
@@ -858,6 +859,7 @@ wizardStepContent model step =
                         [ text "Email"
                         , Html.input
                             [ type_ "email"
+                            , attribute "data-tutorial" "invite-email"
                             , value model.inviteEmail
                             , onInput UpdateInviteEmail
                             ]

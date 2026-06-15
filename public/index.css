@@ -337,6 +337,92 @@ main {
     outline: none;
 }
 
+[data-tutorial] {
+    position: relative;
+    z-index: 1000;
+}
+
+.tutorial-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 999;
+}
+
+.tutorial-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.tutorial-spotlight {
+    position: fixed;
+    z-index: 1000;
+    pointer-events: none;
+    border-radius: 6px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+    transition: all 0.25s ease;
+}
+
+.tutorial-tooltip {
+    position: fixed;
+    z-index: 1001;
+    max-width: 360px;
+    background: #ffffff;
+    border: 1px solid #d4ddd9;
+    border-radius: 8px;
+    padding: 16px 18px;
+    box-shadow: 0 8px 20px rgba(20, 34, 30, 0.15);
+    display: grid;
+    gap: 12px;
+    pointer-events: auto;
+}
+
+.tutorial-tooltip p {
+    color: #2f3d38;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.tutorial-tooltip__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.tutorial-tooltip__actions .primary {
+    width: auto;
+    flex: 0 0 auto;
+}
+
+.tutorial-tooltip__back,
+.tutorial-tooltip__skip {
+    min-height: 36px;
+    border: 0;
+    background: transparent;
+    color: #205c4c;
+    cursor: pointer;
+    font-weight: 700;
+    padding: 0;
+}
+
+.tutorial-tooltip__back:hover,
+.tutorial-tooltip__skip:hover {
+    text-decoration: underline;
+}
+
+@media (max-width: 520px) {
+    .tutorial-tooltip {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-width: none;
+        border-radius: 12px 12px 0 0;
+        border-bottom: 0;
+    }
+}
+
 .layout {
     display: grid;
     grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);

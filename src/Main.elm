@@ -902,9 +902,25 @@ tutorialTooltipPosition : Maybe TargetRect -> List (Html.Attribute Msg)
 tutorialTooltipPosition maybeRect =
     case maybeRect of
         Just rect ->
-            [ style "top" (String.fromFloat (rect.bottom + 8) ++ "px")
-            , style "left" (String.fromFloat rect.left ++ "px")
-            ]
+            let
+                gap =
+                    8
+
+                midline =
+                    rect.viewportHeight / 2
+
+                below =
+                    rect.top < midline
+            in
+            if below then
+                [ style "top" (String.fromFloat (rect.bottom + gap) ++ "px")
+                , style "left" (String.fromFloat rect.left ++ "px")
+                ]
+
+            else
+                [ style "bottom" (String.fromFloat (rect.viewportHeight - rect.top + gap) ++ "px")
+                , style "left" (String.fromFloat rect.left ++ "px")
+                ]
 
         Nothing ->
             [ style "top" "50%"
@@ -957,14 +973,14 @@ tutorialTargetSelector model step =
 
 tutorialTargetRectDecoder : Decode.Decoder TargetRect
 tutorialTargetRectDecoder =
-    Decode.field "rect" <|
-        Decode.map6 TargetRect
-            (Decode.field "top" Decode.float)
-            (Decode.field "right" Decode.float)
-            (Decode.field "bottom" Decode.float)
-            (Decode.field "left" Decode.float)
-            (Decode.field "width" Decode.float)
-            (Decode.field "height" Decode.float)
+    Decode.map7 TargetRect
+        (Decode.at [ "rect", "top" ] Decode.float)
+        (Decode.at [ "rect", "right" ] Decode.float)
+        (Decode.at [ "rect", "bottom" ] Decode.float)
+        (Decode.at [ "rect", "left" ] Decode.float)
+        (Decode.at [ "rect", "width" ] Decode.float)
+        (Decode.at [ "rect", "height" ] Decode.float)
+        (Decode.field "viewportHeight" Decode.float)
 
 
 advanceTutorialFrom : TutorialStep -> Model -> ( Model, Cmd Msg )

@@ -747,14 +747,10 @@ view model =
                     False
 
         mainContent =
-            if isTutorialOpen then
-                [ tutorialView model ]
-
-            else
-                [ reopenTutorialButton model
-                , tutorialCompletionBanner model
-                , migrationPrompt model
-                , localRiskBanner model
+            [ reopenTutorialButton model
+            , tutorialCompletionBanner model
+            , migrationPrompt model
+            , localRiskBanner model
                 , div [ class "layout" ]
                     [ div [ class "input-area" ]
                         [ ExpenseForm.view
@@ -826,6 +822,7 @@ view model =
                 ]
             ]
         , main_ [] mainContent
+        , tutorialView model
         ]
 
 

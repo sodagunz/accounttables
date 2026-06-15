@@ -1,4 +1,5 @@
 elm-stuff/
-elm.js
 .direnv/
 .secrets/
+public/elm.js
+firebase-debug.log

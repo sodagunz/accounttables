@@ -629,7 +629,7 @@ update msg model =
             )
 
         ReopenWizard ->
-            ( { model | wizardState = WizardOpen WelcomeStep, wizardCompletionVisible = False }
+            ( { model | wizardState = WizardOpen (reopenedWizardStep model), wizardCompletionVisible = False }
             , saveWizardState (Encode.string "")
             )
 
@@ -943,6 +943,16 @@ firstSetupStep model =
         CollaboratorsStep
 
 
+reopenedWizardStep : Model -> WizardStep
+reopenedWizardStep model =
+    case model.authState of
+        SignedIn _ ->
+            firstSetupStep model
+
+        _ ->
+            WelcomeStep
+
+
 previousWizardStep : Model -> WizardStep -> WizardStep
 previousWizardStep model step =
     case step of
@@ -950,14 +960,24 @@ previousWizardStep model step =
             WelcomeStep
 
         AccountsStep ->
-            WelcomeStep
+            case model.authState of
+                SignedIn _ ->
+                    AccountsStep
+
+                _ ->
+                    WelcomeStep
 
         CollaboratorsStep ->
             if List.isEmpty (Model.activeAccounts model) then
                 AccountsStep
 
             else
-                WelcomeStep
+                case model.authState of
+                    SignedIn _ ->
+                        CollaboratorsStep
+
+                    _ ->
+                        WelcomeStep
 
 
 wizardAfterAuth : Model -> WizardState

@@ -987,7 +987,7 @@ tutorialTargetSelector model step =
             "[data-tutorial=\"sign-in\"]"
 
         AccountsStep ->
-            "[data-tutorial=\"account-name\"]"
+            "[data-tutorial=\"account-form\"]"
 
         CollaboratorsStep ->
             "[data-tutorial=\"invite-email\"]"
@@ -1383,7 +1383,19 @@ handleLedgerLoaded : Decode.Value -> Model -> ( Model, Cmd Msg )
 handleLedgerLoaded value model =
     case Ledger.decodeLedger value of
         Ok ledger ->
-            ( applyLedgerData ledger model, Cmd.none )
+            let
+                updatedModel =
+                    applyLedgerData ledger model
+
+                advanceCmd =
+                    case ( model.tutorialState, updatedModel.tutorialState ) of
+                        ( TutorialOpen AccountsStep, TutorialOpen CollaboratorsStep ) ->
+                            tutorialNavigateCmd updatedModel CollaboratorsStep
+
+                        _ ->
+                            Cmd.none
+            in
+            ( updatedModel, advanceCmd )
 
         Err error ->
             ( { model | ledgerLoadState = LoadError error, migrationState = NoMigration }, Cmd.none )
@@ -1493,8 +1505,17 @@ applyLedgerData ledger model =
 
 
 adjustTutorialAfterLedgerLoad : LoadState -> Model -> Model
-adjustTutorialAfterLedgerLoad _ model =
-    model
+adjustTutorialAfterLedgerLoad previousLoadState model =
+    case model.tutorialState of
+        TutorialOpen AccountsStep ->
+            if previousLoadState == Loading && not (List.isEmpty (Model.activeAccounts model)) then
+                { model | tutorialState = TutorialOpen CollaboratorsStep, accountError = "" }
+
+            else
+                model
+
+        _ ->
+            model
 
 
 tutorialAfterAuth : Model -> TutorialState

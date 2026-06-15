@@ -832,7 +832,7 @@ view model =
 tutorialCompletionBanner : Model -> Html Msg
 tutorialCompletionBanner model =
     if model.tutorialCompletionVisible then
-        section [ class "wizard-done-banner" ]
+        section [ class "tutorial-done-banner" ]
             [ strong [] [ text "Listo" ]
             , span [] [ text "Ya puedes empezar a registrar movimientos." ]
             , button [ type_ "button", onClick DismissTutorialCompletion ] [ text "Cerrar" ]

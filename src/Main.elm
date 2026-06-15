@@ -73,6 +73,7 @@ type Msg
     | TutorialFinish
     | ReopenTutorial
     | DismissTutorialCompletion
+    | ElementRectReceived Decode.Value
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -136,6 +137,12 @@ port mergeLocalLedgerToFirestore : Encode.Value -> Cmd msg
 
 
 port saveTutorialState : Encode.Value -> Cmd msg
+
+
+port getElementRect : String -> Cmd msg
+
+
+port elementRectReceived : (Decode.Value -> msg) -> Sub msg
 
 
 main : Program Decode.Value Model Msg
@@ -635,6 +642,9 @@ update msg model =
 
         DismissTutorialCompletion ->
             ( { model | tutorialCompletionVisible = False }, Cmd.none )
+
+        ElementRectReceived _ ->
+            ( model, Cmd.none )
 
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
@@ -1170,6 +1180,7 @@ subscriptions _ =
         , expenseIdGenerated ExpenseIdGenerated
         , eventsLoaded EventsLoaded
         , localMigrationPrepared LocalMigrationPrepared
+        , elementRectReceived ElementRectReceived
         ]
 
 

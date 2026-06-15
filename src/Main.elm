@@ -703,12 +703,12 @@ update msg model =
                     ( model, Cmd.none )
 
         TutorialSkip ->
-            ( { model | tutorialState = TutorialDismissed }
-            , Cmd.batch
-                [ lockBodyScroll False
-                , saveTutorialState (Encode.string "dismissed")
-                ]
-            )
+            case model.tutorialState of
+                TutorialOpen step ->
+                    advanceTutorialFrom step model
+
+                _ ->
+                    ( model, Cmd.none )
 
         TutorialFinish ->
             ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
@@ -899,7 +899,7 @@ tutorialView model =
                             button [ class "tutorial-tooltip__back", type_ "button", onClick TutorialBack ] [ text "Atras" ]
                          ]
                             ++ tutorialPrimaryButton step
-                            ++ [ button [ class "tutorial-tooltip__skip", type_ "button", onClick TutorialSkip ] [ text "Saltar" ] ]
+                            ++ tutorialSkipButton step
                         )
                     ]
                 ]
@@ -968,6 +968,16 @@ tutorialPrimaryButton step =
 
         _ ->
             []
+
+
+tutorialSkipButton : TutorialStep -> List (Html Msg)
+tutorialSkipButton step =
+    case step of
+        AccountsStep ->
+            []
+
+        _ ->
+            [ button [ class "tutorial-tooltip__skip", type_ "button", onClick TutorialSkip ] [ text "Saltar" ] ]
 
 
 tutorialTargetSelector : Model -> TutorialStep -> String

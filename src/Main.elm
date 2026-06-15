@@ -13,7 +13,7 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
-import Model exposing (MigrationState(..), Model, StorageMode(..))
+import Model exposing (MigrationState(..), Model, StorageMode(..), WizardState(..), WizardStep(..))
 import Projector
 import Task
 import Time
@@ -67,6 +67,10 @@ type Msg
     | SelectMigrationLedger String
     | ConfirmLocalMigration
     | SkipLocalMigration
+    | WizardNext
+    | WizardBack
+    | WizardSkip
+    | WizardFinish
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -129,6 +133,9 @@ port localMigrationPrepared : (Decode.Value -> msg) -> Sub msg
 port mergeLocalLedgerToFirestore : Encode.Value -> Cmd msg
 
 
+port saveWizardState : Encode.Value -> Cmd msg
+
+
 main : Program Decode.Value Model Msg
 main =
     Browser.element
@@ -151,12 +158,43 @@ init flags =
 
 modelFromFlags : Decode.Value -> Model
 modelFromFlags flags =
-    case Ledger.decodeLedger flags of
+    let
+        wizardState =
+            decodeWizardStateFromFlags flags
+
+        initialModel =
+            Model.initial
+
+        baseModel =
+            { initialModel | wizardState = wizardState }
+
+        ledgerResult =
+            case Decode.decodeValue (Decode.field "ledger" Decode.value) flags of
+                Ok ledgerValue ->
+                    Ledger.decodeLedger ledgerValue
+
+                Err _ ->
+                    Ledger.decodeLedger flags
+    in
+    case ledgerResult of
         Ok ledger ->
-            applyLedgerData ledger Model.initial
+            applyLedgerData ledger baseModel
 
         Err _ ->
-            Model.initial
+            baseModel
+
+
+decodeWizardStateFromFlags : Decode.Value -> WizardState
+decodeWizardStateFromFlags flags =
+    case Decode.decodeValue (Decode.field "wizardState" Decode.string) flags of
+        Ok "dismissed" ->
+            WizardDismissed
+
+        Ok "completed" ->
+            WizardCompleted
+
+        _ ->
+            WizardOpen WelcomeStep
 
 
 localLedgerId : String
@@ -561,6 +599,32 @@ update msg model =
                 NoMigration ->
                     ( model, Cmd.none )
 
+        WizardNext ->
+            case model.wizardState of
+                WizardOpen step ->
+                    ( { model | wizardState = WizardOpen (nextWizardStep step) }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        WizardBack ->
+            case model.wizardState of
+                WizardOpen step ->
+                    ( { model | wizardState = WizardOpen (previousWizardStep step) }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        WizardSkip ->
+            ( { model | wizardState = WizardDismissed }
+            , saveWizardState (Encode.string "dismissed")
+            )
+
+        WizardFinish ->
+            ( { model | wizardState = WizardCompleted }
+            , saveWizardState (Encode.string "completed")
+            )
+
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
 payloadCmd toCmd payload =
@@ -591,7 +655,8 @@ view model =
                 ]
             ]
         , main_ []
-            [ migrationPrompt model
+            [ wizardView model
+            , migrationPrompt model
             , localRiskBanner model
             , div [ class "layout" ]
                 [ div [ class "input-area" ]
@@ -640,6 +705,174 @@ view model =
                 ]
             ]
         ]
+
+
+wizardView : Model -> Html Msg
+wizardView model =
+    case model.wizardState of
+        WizardOpen step ->
+            section [ class "wizard-panel" ]
+                [ div [ class "wizard-panel__header" ]
+                    [ span [ class "wizard-panel__step" ] [ text (wizardStepLabel step) ]
+                    , button [ class "wizard-panel__skip", type_ "button", onClick WizardSkip ] [ text "Saltar" ]
+                    ]
+                , div [ class "wizard-panel__body" ] (wizardStepContent model step)
+                , div [ class "wizard-panel__actions" ]
+                    ([ if step == WelcomeStep then
+                        text ""
+
+                       else
+                        button [ class "cancel-button", type_ "button", onClick WizardBack ] [ text "Atras" ]
+                     ]
+                        ++ [ wizardPrimaryAction step ]
+                    )
+                ]
+
+        _ ->
+            text ""
+
+
+wizardPrimaryAction : WizardStep -> Html Msg
+wizardPrimaryAction step =
+    case step of
+        DoneStep ->
+            button [ class "primary", type_ "button", onClick WizardFinish ] [ text "Empezar" ]
+
+        _ ->
+            button [ class "primary", type_ "button", onClick WizardNext ] [ text "Continuar" ]
+
+
+wizardStepContent : Model -> WizardStep -> List (Html Msg)
+wizardStepContent model step =
+    case step of
+        WelcomeStep ->
+            [ h1 [] [ text "Configura tu libro" ]
+            , p [] [ text "Puedes iniciar sesion con Google para sincronizar o trabajar solo en este navegador bajo tu propio riesgo." ]
+            , div [ class "wizard-panel__inline-actions" ]
+                [ button [ class "primary", type_ "button", onClick SignInWithGoogle ] [ text "Ingresar con Google" ]
+                , button [ class "cancel-button", type_ "button", onClick WizardNext ] [ text "Usar solo en este dispositivo" ]
+                ]
+            ]
+
+        LedgerNameStep ->
+            [ h1 [] [ text "Nombra el libro" ]
+            , p [] [ text "Este nombre aparece en la cabecera y luego se puede cambiar desde Administrar." ]
+            , label []
+                [ text "Nombre"
+                , Html.input
+                    [ type_ "text"
+                    , value model.ledgerName
+                    , onInput UpdateLedgerName
+                    ]
+                    []
+                ]
+            , button [ class "primary", type_ "button", onClick SaveLedgerName ] [ text "Guardar nombre" ]
+            ]
+
+        AccountsStep ->
+            [ h1 [] [ text "Crea tus cuentas" ]
+            , p [] [ text "Necesitas al menos una cuenta para registrar movimientos. Puedes agregar mas desde Administrar." ]
+            , label []
+                [ text "Nueva cuenta"
+                , Html.input
+                    [ type_ "text"
+                    , value model.newAccountName
+                    , onInput UpdateNewAccountName
+                    ]
+                    []
+                ]
+            , div [ class "wizard-panel__inline-actions" ]
+                [ button [ class "primary", type_ "button", onClick AddAccount ] [ text "Agregar cuenta" ]
+                , button [ class "cancel-button", type_ "button", onClick OpenAccountTool ] [ text "Abrir cuentas" ]
+                ]
+            , p [ class "error" ] [ text model.accountError ]
+            ]
+
+        CollaboratorsStep ->
+            case model.authState of
+                SignedIn _ ->
+                    [ h1 [] [ text "Invita colaboradores" ]
+                    , p [] [ text "Si trabajas con alguien mas, puedes invitarlo por email. Tambien puedes hacerlo despues desde Miembros." ]
+                    , label []
+                        [ text "Email"
+                        , Html.input
+                            [ type_ "email"
+                            , value model.inviteEmail
+                            , onInput UpdateInviteEmail
+                            ]
+                            []
+                        ]
+                    , button [ class "primary", type_ "button", onClick InviteGuest ] [ text "Invitar" ]
+                    , p [ class "error" ] [ text model.ledgerError ]
+                    ]
+
+                _ ->
+                    [ h1 [] [ text "Colaboradores" ]
+                    , p [] [ text "Las invitaciones necesitan Google y Firestore. Puedes seguir en modo local y activar sincronizacion despues." ]
+                    , button [ class "primary", type_ "button", onClick SignInWithGoogle ] [ text "Ingresar con Google" ]
+                    ]
+
+        DoneStep ->
+            [ h1 [] [ text "Listo" ]
+            , p [] [ text "Ya puedes registrar movimientos. El formulario queda preparado para que cargues el primer importe." ]
+            ]
+
+
+wizardStepLabel : WizardStep -> String
+wizardStepLabel step =
+    case step of
+        WelcomeStep ->
+            "1 de 5"
+
+        LedgerNameStep ->
+            "2 de 5"
+
+        AccountsStep ->
+            "3 de 5"
+
+        CollaboratorsStep ->
+            "4 de 5"
+
+        DoneStep ->
+            "5 de 5"
+
+
+nextWizardStep : WizardStep -> WizardStep
+nextWizardStep step =
+    case step of
+        WelcomeStep ->
+            LedgerNameStep
+
+        LedgerNameStep ->
+            AccountsStep
+
+        AccountsStep ->
+            CollaboratorsStep
+
+        CollaboratorsStep ->
+            DoneStep
+
+        DoneStep ->
+            DoneStep
+
+
+previousWizardStep : WizardStep -> WizardStep
+previousWizardStep step =
+    case step of
+        WelcomeStep ->
+            WelcomeStep
+
+        LedgerNameStep ->
+            WelcomeStep
+
+        AccountsStep ->
+            LedgerNameStep
+
+        CollaboratorsStep ->
+            AccountsStep
+
+        DoneStep ->
+            CollaboratorsStep
 
 
 migrationPrompt : Model -> Html Msg

@@ -579,6 +579,7 @@
                                             name: trimmedName,
                                             ownerUid: "",
                                             members: [],
+                                            invitedEmails: [],
                                         },
                                     ],
                                 }),
@@ -1035,6 +1036,7 @@
                             name: DEFAULT_LOCAL_LEDGER_NAME,
                             ownerUid: "",
                             members: [],
+                            invitedEmails: [],
                         },
                     ],
                     accounts: [],
@@ -1061,6 +1063,7 @@
                             name: ledgerName,
                             ownerUid: "",
                             members: [],
+                            invitedEmails: [],
                         },
                     ],
                     accounts,
@@ -1362,6 +1365,9 @@
                     name: data.name || "Libro contable",
                     ownerUid: data.ownerUid || "",
                     members: Array.isArray(data.members) ? data.members.map(serializeMember) : [],
+                    invitedEmails: Array.isArray(data.invitedEmails)
+                        ? data.invitedEmails.map(normalizeEmail).filter(Boolean)
+                        : [],
                 };
             }
 

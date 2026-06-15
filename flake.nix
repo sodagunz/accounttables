@@ -21,6 +21,12 @@
         (pkgs.writeShellScriptBin "build" ''
           exec elm make src/Main.elm --output=public/elm.js
         '')
+        (pkgs.writeShellScriptBin "build-release" ''
+          exec elm make src/Main.elm --output=public/elm.js --optimize
+        '')
+        (pkgs.writeShellScriptBin "deploy" ''
+          exec firebase deploy
+        '')
         (pkgs.writeShellScriptBin "update-rules" ''
           exec env GOOGLE_APPLICATION_CREDENTIALS=.secrets/contabilizar-admin-api.json \
             node scripts/deploy-firestore-rules.cjs contabilizar-78c2d firestore.rules
@@ -35,6 +41,14 @@
         build = {
           type = "app";
           program = "${pkgs.writeShellScriptBin "build" "exec elm make src/Main.elm --output=public/elm.js"}/bin/build";
+        };
+        build-release = {
+          type = "app";
+          program = "${pkgs.writeShellScriptBin "build-release" "exec elm make src/Main.elm --output=public/elm.js --optimize"}/bin/build";
+        };
+        deploy = {
+          type = "app";
+          program = "${pkgs.writeShellScriptBin "deploy" "exec firebase deploy"}/bin/deploy";
         };
         update-rules = {
           type = "app";

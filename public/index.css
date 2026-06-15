@@ -230,12 +230,13 @@ main {
 .wizard-panel {
     display: grid;
     gap: 14px;
-    margin-bottom: 16px;
+    max-width: 520px;
+    margin: 48px auto;
     border: 1px solid #9fc1b6;
     border-radius: 8px;
     background: #ffffff;
     color: #24302c;
-    padding: 16px;
+    padding: 24px;
     box-shadow: 0 8px 20px rgba(20, 34, 30, 0.08);
 }
 
@@ -270,7 +271,6 @@ main {
 .wizard-panel__body {
     display: grid;
     gap: 12px;
-    max-width: 680px;
 }
 
 .wizard-panel__body h1 {
@@ -1158,6 +1158,16 @@ td.is-negative,
     .primary {
         width: 100%;
         min-height: 48px;
+    }
+
+    .wizard-panel {
+        max-width: none;
+        margin: 0;
+        border-left: 0;
+        border-right: 0;
+        border-radius: 0;
+        box-shadow: none;
+        padding: 20px 16px;
     }
 
     .table-controls {

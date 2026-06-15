@@ -2,6 +2,7 @@ module Model exposing
     ( MigrationState(..)
     , Model
     , StorageMode(..)
+    , TargetRect
     , TutorialState(..)
     , TutorialStep(..)
     , activeAccounts
@@ -54,6 +55,7 @@ type alias Model =
     , migrationState : MigrationState
     , tutorialState : TutorialState
     , tutorialCompletionVisible : Bool
+    , tutorialTargetRect : Maybe TargetRect
     }
 
 
@@ -70,15 +72,27 @@ type MigrationState
 
 
 type TutorialStep
-    = WelcomeStep
+    = SignInStep
     | AccountsStep
     | CollaboratorsStep
+    | FirstExpenseStep
+    | DeleteExpenseStep
 
 
 type TutorialState
     = TutorialOpen TutorialStep
     | TutorialDismissed
     | TutorialCompleted
+
+
+type alias TargetRect =
+    { top : Float
+    , right : Float
+    , bottom : Float
+    , left : Float
+    , width : Float
+    , height : Float
+    }
 
 
 initial : Model
@@ -109,8 +123,9 @@ initial =
     , ledgerLoadState = NotLoaded
     , hiddenAccountIds = []
     , migrationState = NoMigration
-    , tutorialState = TutorialOpen WelcomeStep
+    , tutorialState = TutorialOpen SignInStep
     , tutorialCompletionVisible = False
+    , tutorialTargetRect = Nothing
     }
 
 

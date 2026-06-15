@@ -7,13 +7,13 @@ import Browser
 import Events exposing (Event)
 import Export
 import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
-import Html.Attributes exposing (attribute, class, type_, value)
+import Html.Attributes exposing (attribute, class, style, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
-import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), TutorialStep(..))
+import Model exposing (MigrationState(..), Model, StorageMode(..), TargetRect, TutorialState(..), TutorialStep(..))
 import Projector
 import Task
 import Time
@@ -157,11 +157,22 @@ main =
 
 init : Decode.Value -> ( Model, Cmd Msg )
 init flags =
-    ( modelFromFlags flags
-    , Cmd.batch
-        [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
-        , Dolar.fetchOfficialDollar GotExchangeRate
-        ]
+    let
+        model =
+            modelFromFlags flags
+
+        baseCmds =
+            [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
+            , Dolar.fetchOfficialDollar GotExchangeRate
+            ]
+    in
+    ( model
+    , case model.tutorialState of
+        TutorialOpen step ->
+            Cmd.batch (getElementRect (tutorialTargetSelector model step) :: baseCmds)
+
+        _ ->
+            Cmd.batch baseCmds
     )
 
 
@@ -203,7 +214,7 @@ decodeTutorialStateFromFlags flags =
             TutorialCompleted
 
         _ ->
-            TutorialOpen WelcomeStep
+            TutorialOpen SignInStep
 
 
 localLedgerId : String
@@ -612,7 +623,7 @@ update msg model =
         TutorialNext ->
             case model.tutorialState of
                 TutorialOpen step ->
-                    ( advanceTutorialFrom step model, Cmd.none )
+                    advanceTutorialFrom step model
 
                 _ ->
                     ( model, Cmd.none )
@@ -620,7 +631,13 @@ update msg model =
         TutorialBack ->
             case model.tutorialState of
                 TutorialOpen step ->
-                    ( { model | tutorialState = TutorialOpen (previousTutorialStep model step) }, Cmd.none )
+                    let
+                        prev =
+                            previousTutorialStep step
+                    in
+                    ( { model | tutorialState = TutorialOpen prev }
+                    , getElementRect (tutorialTargetSelector model prev)
+                    )
 
                 _ ->
                     ( model, Cmd.none )
@@ -636,15 +653,27 @@ update msg model =
             )
 
         ReopenTutorial ->
-            ( { model | tutorialState = TutorialOpen (reopenedTutorialStep model), tutorialCompletionVisible = False }
-            , saveTutorialState (Encode.string "")
+            let
+                step =
+                    reopenedTutorialStep model
+            in
+            ( { model | tutorialState = TutorialOpen step, tutorialCompletionVisible = False }
+            , Cmd.batch
+                [ saveTutorialState (Encode.string "")
+                , getElementRect (tutorialTargetSelector model step)
+                ]
             )
 
         DismissTutorialCompletion ->
             ( { model | tutorialCompletionVisible = False }, Cmd.none )
 
-        ElementRectReceived _ ->
-            ( model, Cmd.none )
+        ElementRectReceived value ->
+            case Decode.decodeValue tutorialTargetRectDecoder value of
+                Ok rect ->
+                    ( { model | tutorialTargetRect = Just rect }, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
 
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
@@ -781,242 +810,173 @@ tutorialView : Model -> Html Msg
 tutorialView model =
     case model.tutorialState of
         TutorialOpen step ->
-            section [ class "wizard-panel" ]
-                [ div [ class "wizard-panel__header" ]
-                    [ span [ class "wizard-panel__step" ] [ text (tutorialStepLabel step) ]
-                    , button [ class "wizard-panel__skip", type_ "button", onClick TutorialSkip ] [ text "Saltar" ]
-                    ]
-                , div [ class "wizard-panel__body" ] (tutorialStepContent model step)
-                , div [ class "wizard-panel__actions" ]
-                    ([ if step == WelcomeStep then
-                        text ""
+            div [ class "tutorial-overlay" ]
+                [ case model.tutorialTargetRect of
+                    Just rect ->
+                        div
+                            [ class "tutorial-spotlight"
+                            , style "top" (String.fromFloat rect.top ++ "px")
+                            , style "left" (String.fromFloat rect.left ++ "px")
+                            , style "width" (String.fromFloat rect.width ++ "px")
+                            , style "height" (String.fromFloat rect.height ++ "px")
+                            ]
+                            []
 
-                       else
-                        button [ class "cancel-button", type_ "button", onClick TutorialBack ] [ text "Atras" ]
-                     ]
-                        ++ tutorialPrimaryAction model step
-                    )
+                    Nothing ->
+                        div [ class "tutorial-backdrop" ] []
+                , div
+                    (class "tutorial-tooltip" :: tutorialTooltipPosition model.tutorialTargetRect)
+                    [ p [] [ text (tutorialStepText step) ]
+                    , div [ class "tutorial-tooltip__actions" ]
+                        ([ if step == SignInStep then
+                            text ""
+
+                           else
+                            button [ class "tutorial-tooltip__back", type_ "button", onClick TutorialBack ] [ text "Atras" ]
+                         ]
+                            ++ (if step == DeleteExpenseStep then
+                                    [ button [ class "primary", type_ "button", onClick TutorialFinish ] [ text "Finalizar" ] ]
+
+                                else
+                                    [ button [ class "primary", type_ "button", onClick TutorialNext ] [ text "Siguiente" ] ]
+                               )
+                            ++ [ button [ class "tutorial-tooltip__skip", type_ "button", onClick TutorialSkip ] [ text "Saltar" ] ]
+                        )
+                    ]
                 ]
 
         _ ->
             text ""
 
 
-tutorialPrimaryAction : Model -> TutorialStep -> List (Html Msg)
-tutorialPrimaryAction model step =
-    case step of
-        WelcomeStep ->
-            []
-
-        AccountsStep ->
-            if List.isEmpty (Model.activeAccounts model) then
-                []
-
-            else
-                [ button [ class "primary", type_ "button", onClick TutorialNext ] [ text "Continuar" ] ]
-
-        CollaboratorsStep ->
-            [ button [ class "primary", type_ "button", onClick TutorialFinish ] [ text "Finalizar" ] ]
-
-
-tutorialStepContent : Model -> TutorialStep -> List (Html Msg)
-tutorialStepContent model step =
-    case step of
-        WelcomeStep ->
-            [ h1 [] [ text "Configura tu libro" ]
-            , p [] [ text "Puedes iniciar sesion con Google para sincronizar o trabajar solo en este navegador bajo tu propio riesgo." ]
-            , div [ class "wizard-panel__inline-actions" ]
-                [ button [ class "primary", type_ "button", onClick SignInWithGoogle ] [ text "Ingresar con Google" ]
-                , button [ class "cancel-button", type_ "button", onClick TutorialNext ] [ text "Usar solo en este dispositivo" ]
-                ]
+tutorialTooltipPosition : Maybe TargetRect -> List (Html.Attribute Msg)
+tutorialTooltipPosition maybeRect =
+    case maybeRect of
+        Just rect ->
+            [ style "top" (String.fromFloat (rect.bottom + 8) ++ "px")
+            , style "left" (String.fromFloat rect.left ++ "px")
             ]
 
-        AccountsStep ->
-            [ h1 [] [ text "Crea tus cuentas" ]
-            , p []
-                [ text
-                    (if List.isEmpty (Model.activeAccounts model) then
-                        "Necesitas al menos una cuenta para registrar movimientos."
-
-                     else
-                        "Estas son las cuentas que ya creaste. Puedes continuar o agregar otra."
-                    )
-                ]
-            , label []
-                [ text "Nueva cuenta"
-                , Html.input
-                    [ type_ "text"
-                    , attribute "data-tutorial" "account-name"
-                    , value model.newAccountName
-                    , onInput UpdateNewAccountName
-                    ]
-                    []
-                ]
-            , div [ class "wizard-panel__inline-actions" ]
-                [ button [ class "primary", type_ "button", onClick AddAccount ] [ text "Agregar cuenta" ]
-                , button [ class "cancel-button", type_ "button", onClick OpenAccountTool ] [ text "Abrir cuentas" ]
-                ]
-            , tutorialAccountList model
-            , p [ class "error" ] [ text model.accountError ]
-            ]
-
-        CollaboratorsStep ->
-            case model.authState of
-                SignedIn _ ->
-                    [ h1 [] [ text "Invita colaboradores" ]
-                    , p [] [ text "Si trabajas con alguien mas, puedes invitarlo por email. Tambien puedes hacerlo despues desde Miembros." ]
-                    , label []
-                        [ text "Email"
-                        , Html.input
-                            [ type_ "email"
-                            , attribute "data-tutorial" "invite-email"
-                            , value model.inviteEmail
-                            , onInput UpdateInviteEmail
-                            ]
-                            []
-                        ]
-                    , button [ class "primary", type_ "button", onClick InviteGuest ] [ text "Invitar" ]
-                    , tutorialCollaboratorList model
-                    , p [ class "error" ] [ text model.ledgerError ]
-                    ]
-
-                _ ->
-                    [ h1 [] [ text "Colaboradores" ]
-                    , p [] [ text "Las invitaciones necesitan Google y Firestore. Puedes seguir en modo local y activar sincronizacion despues." ]
-                    , button [ class "primary", type_ "button", onClick SignInWithGoogle ] [ text "Ingresar con Google" ]
-                    ]
-
-
-tutorialAccountList : Model -> Html Msg
-tutorialAccountList model =
-    case Model.activeAccounts model of
-        [] ->
-            p [ class "empty empty--compact" ] [ text "Todavia no hay cuentas." ]
-
-        accounts ->
-            Html.ul [ class "wizard-list" ]
-                (List.map (\account -> Html.li [] [ text account.name ]) accounts)
-
-
-tutorialCollaboratorList : Model -> Html Msg
-tutorialCollaboratorList model =
-    case currentLedger model of
         Nothing ->
-            p [ class "empty empty--compact" ] [ text "Todavia no hay colaboradores invitados." ]
-
-        Just ledger ->
-            let
-                collaborators =
-                    List.filter (\member -> member.uid /= ledger.ownerUid) ledger.members
-
-                collaboratorItems =
-                    List.map (\member -> member.displayName ++ " <" ++ member.email ++ ">") collaborators
-
-                inviteItems =
-                    List.map (\email -> email ++ " (invitado)") ledger.invitedEmails
-
-                items =
-                    collaboratorItems ++ inviteItems
-            in
-            if List.isEmpty items then
-                p [ class "empty empty--compact" ] [ text "Todavia no hay colaboradores invitados." ]
-
-            else
-                Html.ul [ class "wizard-list" ]
-                    (List.map (\item -> Html.li [] [ text item ]) items)
+            [ style "top" "50%"
+            , style "left" "50%"
+            ]
 
 
-currentLedger : Model -> Maybe Ledger.LedgerSummary
-currentLedger model =
-    model.ledgers
-        |> List.filter (\ledger -> ledger.id == model.currentLedgerId)
-        |> List.head
-
-
-tutorialStepLabel : TutorialStep -> String
-tutorialStepLabel step =
+tutorialStepText : TutorialStep -> String
+tutorialStepText step =
     case step of
-        WelcomeStep ->
-            "1 de 3"
+        SignInStep ->
+            "Para empezar, inicia sesion con Google. Si no quieres sincronizar, puedes saltar este paso."
 
         AccountsStep ->
-            "2 de 3"
+            "Crea una cuenta para registrar movimientos. Dale un nombre y agregala."
 
         CollaboratorsStep ->
-            "3 de 3"
+            "Invita a alguien por email para trabajar juntos. Tambien puedes hacerlo despues."
+
+        FirstExpenseStep ->
+            "Registra tu primer movimiento. Completa los campos y presiona \"Agregar\"."
+
+        DeleteExpenseStep ->
+            "Puedes eliminar o editar movimientos. Prueba a eliminar este."
 
 
-advanceTutorialFrom : TutorialStep -> Model -> Model
+tutorialTargetSelector : Model -> TutorialStep -> String
+tutorialTargetSelector model step =
+    case step of
+        SignInStep ->
+            "[data-tutorial=\"sign-in\"]"
+
+        AccountsStep ->
+            "[data-tutorial=\"account-name\"]"
+
+        CollaboratorsStep ->
+            "[data-tutorial=\"invite-email\"]"
+
+        FirstExpenseStep ->
+            "[data-tutorial=\"description\"]"
+
+        DeleteExpenseStep ->
+            case List.head (Model.activeExpenses model.expenses) of
+                Just expense ->
+                    "[data-tutorial=\"delete-" ++ expense.id ++ "\"]"
+
+                Nothing ->
+                    "[data-tutorial=\"description\"]"
+
+
+tutorialTargetRectDecoder : Decode.Decoder TargetRect
+tutorialTargetRectDecoder =
+    Decode.field "rect" <|
+        Decode.map6 TargetRect
+            (Decode.field "top" Decode.float)
+            (Decode.field "right" Decode.float)
+            (Decode.field "bottom" Decode.float)
+            (Decode.field "left" Decode.float)
+            (Decode.field "width" Decode.float)
+            (Decode.field "height" Decode.float)
+
+
+advanceTutorialFrom : TutorialStep -> Model -> ( Model, Cmd Msg )
 advanceTutorialFrom step model =
+    case rawNextStep step of
+        Just nextStep ->
+            ( { model | tutorialState = TutorialOpen nextStep }
+            , getElementRect (tutorialTargetSelector model nextStep)
+            )
+
+        Nothing ->
+            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
+            , saveTutorialState (Encode.string "completed")
+            )
+
+
+rawNextStep : TutorialStep -> Maybe TutorialStep
+rawNextStep step =
     case step of
-        WelcomeStep ->
-            { model | tutorialState = TutorialOpen (firstTutorialStep model) }
+        SignInStep ->
+            Just AccountsStep
 
         AccountsStep ->
-            if List.isEmpty (Model.activeAccounts model) then
-                { model | accountError = "Agrega al menos una cuenta para continuar." }
-
-            else
-                { model | tutorialState = TutorialOpen CollaboratorsStep, accountError = "" }
+            Just CollaboratorsStep
 
         CollaboratorsStep ->
-            { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
+            Just FirstExpenseStep
+
+        FirstExpenseStep ->
+            Just DeleteExpenseStep
+
+        DeleteExpenseStep ->
+            Nothing
 
 
-firstTutorialStep : Model -> TutorialStep
-firstTutorialStep model =
+previousTutorialStep : TutorialStep -> TutorialStep
+previousTutorialStep step =
+    case step of
+        SignInStep ->
+            SignInStep
+
+        AccountsStep ->
+            SignInStep
+
+        CollaboratorsStep ->
+            AccountsStep
+
+        FirstExpenseStep ->
+            CollaboratorsStep
+
+        DeleteExpenseStep ->
+            FirstExpenseStep
+
+
+reopenedTutorialStep : Model -> TutorialStep
+reopenedTutorialStep model =
     if List.isEmpty (Model.activeAccounts model) then
         AccountsStep
 
     else
         CollaboratorsStep
-
-
-reopenedTutorialStep : Model -> TutorialStep
-reopenedTutorialStep model =
-    case model.authState of
-        SignedIn _ ->
-            firstTutorialStep model
-
-        _ ->
-            WelcomeStep
-
-
-previousTutorialStep : Model -> TutorialStep -> TutorialStep
-previousTutorialStep model step =
-    case step of
-        WelcomeStep ->
-            WelcomeStep
-
-        AccountsStep ->
-            case model.authState of
-                SignedIn _ ->
-                    AccountsStep
-
-                _ ->
-                    WelcomeStep
-
-        CollaboratorsStep ->
-            if List.isEmpty (Model.activeAccounts model) then
-                AccountsStep
-
-            else
-                case model.authState of
-                    SignedIn _ ->
-                        CollaboratorsStep
-
-                    _ ->
-                        WelcomeStep
-
-
-tutorialAfterAuth : Model -> TutorialState
-tutorialAfterAuth model =
-    case model.tutorialState of
-        TutorialOpen WelcomeStep ->
-            TutorialOpen (firstTutorialStep model)
-
-        _ ->
-            model.tutorialState
 
 
 migrationPrompt : Model -> Html Msg
@@ -1370,17 +1330,18 @@ applyLedgerData ledger model =
 
 
 adjustTutorialAfterLedgerLoad : LoadState -> Model -> Model
-adjustTutorialAfterLedgerLoad previousLoadState model =
-    case model.tutorialState of
-        TutorialOpen AccountsStep ->
-            if previousLoadState == Loading && not (List.isEmpty (Model.activeAccounts model)) then
-                { model | tutorialState = TutorialOpen CollaboratorsStep }
+adjustTutorialAfterLedgerLoad _ model =
+    model
 
-            else
-                model
+
+tutorialAfterAuth : Model -> TutorialState
+tutorialAfterAuth model =
+    case model.tutorialState of
+        TutorialOpen SignInStep ->
+            TutorialOpen (reopenedTutorialStep model)
 
         _ ->
-            model
+            model.tutorialState
 
 
 formWithLoadedAccount : Maybe String -> List Accounting.Account -> Accounting.Form -> Accounting.Form

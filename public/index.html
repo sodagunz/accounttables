@@ -380,23 +380,43 @@
                             throw new Error("Solo el owner puede invitar usuarios.");
                         }
 
-                        await setDoc(
-                            doc(db, "emailInvites", normalizedEmail, "ledgers", ledgerId),
-                            {
-                                ledgerId,
-                                ledgerName: ledger?.name || "Libro contable",
-                                ownerUid: auth.currentUser.uid,
-                                ownerEmail: normalizeEmail(auth.currentUser.email),
-                                invitedEmail: normalizedEmail,
-                                createdAt: new Date().toISOString(),
+                        const existingUser = await loadUserByEmail(db, normalizedEmail);
+                        if (existingUser?.uid) {
+                            if (existingUser.uid === ledger.ownerUid) {
+                                throw new Error("Ese email ya pertenece al owner.");
+                            }
+
+                            await grantLedgerAccess(db, ledgerId, {
+                                uid: existingUser.uid,
+                                email: normalizedEmail,
+                                displayName: existingUser.displayName || normalizedEmail,
+                            });
+                            await deleteDoc(
+                                doc(db, "emailInvites", normalizedEmail, "ledgers", ledgerId),
+                            ).catch((error) => {
+                                if (error?.code !== "not-found") {
+                                    throw error;
+                                }
+                            });
+                        } else {
+                            await setDoc(
+                                doc(db, "emailInvites", normalizedEmail, "ledgers", ledgerId),
+                                {
+                                    ledgerId,
+                                    ledgerName: ledger?.name || "Libro contable",
+                                    ownerUid: auth.currentUser.uid,
+                                    ownerEmail: normalizeEmail(auth.currentUser.email),
+                                    invitedEmail: normalizedEmail,
+                                    createdAt: new Date().toISOString(),
+                                    updatedAt: serverTimestamp(),
+                                },
+                                { merge: true },
+                            );
+                            await updateDoc(doc(db, "ledgers", ledgerId), {
+                                invitedEmails: arrayUnion(normalizedEmail),
                                 updatedAt: serverTimestamp(),
-                            },
-                            { merge: true },
-                        );
-                        await updateDoc(doc(db, "ledgers", ledgerId), {
-                            invitedEmails: arrayUnion(normalizedEmail),
-                            updatedAt: serverTimestamp(),
-                        });
+                            });
+                        }
                         await loadLedger(app, auth, db, ledgerId);
                     } catch (error) {
                         console.error("Firestore guest invite failed", error);
@@ -476,6 +496,7 @@
             }
 
             async function loadLedger(app, auth, db, ledgerId) {
+                await ensureUserEmailIndex(auth, db);
                 await ensurePersonalLedger(auth, db);
                 await acceptPendingInvites(auth, db);
 
@@ -628,24 +649,69 @@
                         displayName: auth.currentUser.displayName || email,
                     };
 
-                    await updateDoc(doc(db, "ledgers", ledgerId), {
-                        memberUids: arrayUnion(uid),
-                        memberEmails: arrayUnion(email),
-                        members: arrayUnion(member),
-                        invitedEmails: arrayRemove(email),
-                        updatedAt: serverTimestamp(),
-                    });
-                    await setDoc(
-                        doc(db, "userLedgers", uid, "ledgers", ledgerId),
-                        {
-                            ledgerId,
-                            role: "member",
-                            updatedAt: serverTimestamp(),
-                        },
-                        { merge: true },
-                    );
+                    await grantLedgerAccess(db, ledgerId, member);
                     await deleteDoc(inviteDocument.ref);
                 }
+            }
+
+            async function ensureUserEmailIndex(auth, db) {
+                const uid = auth.currentUser?.uid;
+                const email = normalizeEmail(auth.currentUser?.email);
+                if (!uid || !email) {
+                    return;
+                }
+
+                await setDoc(
+                    doc(db, "userEmails", email),
+                    {
+                        uid,
+                        email,
+                        displayName: auth.currentUser.displayName || email,
+                        updatedAt: serverTimestamp(),
+                    },
+                    { merge: true },
+                );
+            }
+
+            async function loadUserByEmail(db, email) {
+                if (!email) {
+                    return null;
+                }
+
+                const userSnapshot = await getDoc(doc(db, "userEmails", email));
+                if (!userSnapshot.exists()) {
+                    return null;
+                }
+
+                const user = userSnapshot.data();
+                return {
+                    uid: user.uid || "",
+                    email: normalizeEmail(user.email) || email,
+                    displayName: user.displayName || "",
+                };
+            }
+
+            async function grantLedgerAccess(db, ledgerId, member) {
+                await updateDoc(doc(db, "ledgers", ledgerId), {
+                    memberUids: arrayUnion(member.uid),
+                    memberEmails: arrayUnion(normalizeEmail(member.email)),
+                    members: arrayUnion({
+                        uid: member.uid,
+                        email: normalizeEmail(member.email),
+                        displayName: member.displayName || normalizeEmail(member.email),
+                    }),
+                    invitedEmails: arrayRemove(normalizeEmail(member.email)),
+                    updatedAt: serverTimestamp(),
+                });
+                await setDoc(
+                    doc(db, "userLedgers", member.uid, "ledgers", ledgerId),
+                    {
+                        ledgerId,
+                        role: "member",
+                        updatedAt: serverTimestamp(),
+                    },
+                    { merge: true },
+                );
             }
 
             async function loadLedgerSummaries(auth, db) {

@@ -77,6 +77,10 @@
                 if (el) el.open = true;
             });
 
+            app.ports.lockBodyScroll.subscribe((locked) => {
+                document.body.style.overflow = locked ? "hidden" : "";
+            });
+
             app.ports.saveTutorialState.subscribe((state) => {
                 saveTutorialState(state);
             });

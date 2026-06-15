@@ -145,6 +145,9 @@ port getElementRect : String -> Cmd msg
 port openDisclosure : String -> Cmd msg
 
 
+port lockBodyScroll : Bool -> Cmd msg
+
+
 port elementRectReceived : (Decode.Value -> msg) -> Sub msg
 
 
@@ -172,7 +175,7 @@ init flags =
     ( model
     , case model.tutorialState of
         TutorialOpen step ->
-            Cmd.batch (tutorialNavigateCmd model step :: baseCmds)
+            Cmd.batch (lockBodyScroll True :: tutorialNavigateCmd model step :: baseCmds)
 
         _ ->
             Cmd.batch baseCmds
@@ -584,7 +587,12 @@ update msg model =
                 _ ->
                     baseModel
             , Cmd.batch
-                [ appendEvent
+                [ if baseModel.tutorialState == TutorialOpen DeleteExpenseStep then
+                    lockBodyScroll False
+
+                  else
+                    Cmd.none
+                , appendEvent
                     (Encode.object
                         [ ( "ledgerId", Encode.string model.currentLedgerId )
                         , ( "event", Events.eventEncoder event )
@@ -696,12 +704,18 @@ update msg model =
 
         TutorialSkip ->
             ( { model | tutorialState = TutorialDismissed }
-            , saveTutorialState (Encode.string "dismissed")
+            , Cmd.batch
+                [ lockBodyScroll False
+                , saveTutorialState (Encode.string "dismissed")
+                ]
             )
 
         TutorialFinish ->
             ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
-            , saveTutorialState (Encode.string "completed")
+            , Cmd.batch
+                [ lockBodyScroll False
+                , saveTutorialState (Encode.string "completed")
+                ]
             )
 
         ReopenTutorial ->
@@ -711,7 +725,8 @@ update msg model =
             in
             ( { model | tutorialState = TutorialOpen step, tutorialCompletionVisible = False }
             , Cmd.batch
-                [ saveTutorialState (Encode.string "")
+                [ lockBodyScroll True
+                , saveTutorialState (Encode.string "")
                 , tutorialNavigateCmd model step
                 ]
             )
@@ -993,7 +1008,10 @@ advanceTutorialFrom step model =
 
         Nothing ->
             ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
-            , saveTutorialState (Encode.string "completed")
+            , Cmd.batch
+                [ lockBodyScroll False
+                , saveTutorialState (Encode.string "completed")
+                ]
             )
 
 

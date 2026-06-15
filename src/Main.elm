@@ -1050,10 +1050,16 @@ tutorialOpenDisclosureCmd : TutorialStep -> Cmd Msg
 tutorialOpenDisclosureCmd step =
     case step of
         AccountsStep ->
-            openDisclosure "accounts-tool"
+            Cmd.batch
+                [ openDisclosure "admin-tool"
+                , openDisclosure "accounts-tool"
+                ]
 
         CollaboratorsStep ->
-            openDisclosure "members-tool"
+            Cmd.batch
+                [ openDisclosure "admin-tool"
+                , openDisclosure "members-tool"
+                ]
 
         _ ->
             Cmd.none

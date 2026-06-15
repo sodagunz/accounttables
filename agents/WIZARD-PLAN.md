@@ -214,11 +214,11 @@ Important: never silently discard local data on auth state change.
 
    Implement `loadLocalLedger`, `saveLocalLedger`, and `clearLocalLedger` around `localStorage`. Include schema validation, corruption handling, and `updatedAt`.
 
-3. [ ] Add Elm storage mode and wizard state
+3. [x] Add Elm storage mode and wizard state
 
    Extend `Model`, `init`, and `Main.update` with `StorageMode`, `WizardState`, and messages for opening, skipping, advancing, and completing the wizard.
 
-   Progress: `StorageMode` is implemented. `WizardState` and wizard messages remain pending.
+   Progress: `StorageMode`, `WizardState`, wizard messages, and persisted wizard dismissal/completion are implemented.
 
 4. [x] Replace signed-out sample behavior with local ledger hydration
 
@@ -236,7 +236,7 @@ Important: never silently discard local data on auth state change.
 
    Allow signed-out users to rename their local ledger. Persist the name and local ledger summary.
 
-8. [ ] Add the wizard UI
+8. [x] Add the wizard UI
 
    Build a compact modal or full-screen panel for first-run setup. Steps: welcome, ledger name, accounts, collaborators, done. Every step has skip. The primary Google action should use the existing `signInWithGoogle` port.
 

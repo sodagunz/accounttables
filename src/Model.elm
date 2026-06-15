@@ -2,6 +2,8 @@ module Model exposing
     ( MigrationState(..)
     , Model
     , StorageMode(..)
+    , WizardState(..)
+    , WizardStep(..)
     , activeAccounts
     , activeAccountsFromList
     , activeExpenses
@@ -50,6 +52,7 @@ type alias Model =
     , ledgerLoadState : LoadState
     , hiddenAccountIds : List String
     , migrationState : MigrationState
+    , wizardState : WizardState
     }
 
 
@@ -63,6 +66,20 @@ type MigrationState
     | PreparingMigration
     | ChoosingMigration (List Ledger.LedgerSummary) String
     | UploadingMigration String
+
+
+type WizardStep
+    = WelcomeStep
+    | LedgerNameStep
+    | AccountsStep
+    | CollaboratorsStep
+    | DoneStep
+
+
+type WizardState
+    = WizardOpen WizardStep
+    | WizardDismissed
+    | WizardCompleted
 
 
 initial : Model
@@ -93,6 +110,7 @@ initial =
     , ledgerLoadState = NotLoaded
     , hiddenAccountIds = []
     , migrationState = NoMigration
+    , wizardState = WizardOpen WelcomeStep
     }
 
 

@@ -314,3 +314,32 @@ Started implementation:
 Build this in the release-slice order above.
 
 Do not start with the wizard UI alone. The wizard is only valuable if choosing `Usar solo en este dispositivo` leads to a durable local workflow. The first implementation should make local mode real, then layer the wizard on top.
+
+## Wizard Polish Remarks
+
+User remarks captured after the first wizard draft. They are listed in the user's chronological order, but should be addressed by product priority.
+
+1. White wizard buttons are too wide compared with the green primary buttons. Make secondary white buttons size like the green buttons. Low priority.
+
+2. The first wizard step has inconsistent progression. `Usar solo en este dispositivo` advances to the next step immediately, but `Ingresar con Google` requires a successful auth response and then a manual `Continuar`. Remove the generic `Continuar` button from step 1. The only ways forward should be successful Google auth or choosing local-only mode. After a successful auth response, if the wizard is still open on the first step, advance automatically.
+
+3. Remove the ledger-name step completely. Users can rename from the admin panel, and the default ledger name is acceptable because renaming is non-destructive.
+
+4. The accounts step, currently 3 of 5 and later 2 of 4, should appear only if there are no accounts yet. This applies to both Firestore-loaded accounts after Google auth and localStorage accounts in local-only mode. Users should not be able to continue until they add at least one account. The wizard should display the accounts already created so users do not need to scroll to confirm them.
+
+5. The invite-collaborators step should show which collaborators have been invited. Users must be able to skip this step.
+
+6. The final `Listo, ya puedes empezar a registrar` step should not be part of the wizard. Completing the wizard should close it, then show a pop-up, notification, or small banner with that text, similar in weight to the local-mode sign-in reminder.
+
+### Wizard Polish Progress
+
+Addressed in the current polish pass:
+
+- Step 1 no longer has a generic `Continuar`; users move forward by signing in successfully or choosing local-only mode.
+- Successful Google auth advances the wizard out of the welcome step automatically.
+- The ledger-name step was removed from the wizard.
+- The accounts step is skipped when accounts already exist, and blocks continuation while no account exists.
+- Accounts created during the wizard are listed in the wizard.
+- The collaborator step lists accepted collaborators and pending invited emails.
+- The final `Listo` step was replaced with a dismissible completion banner.
+- Wizard secondary buttons are scoped to content width instead of stretching across the column.

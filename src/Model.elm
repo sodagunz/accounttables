@@ -53,6 +53,7 @@ type alias Model =
     , hiddenAccountIds : List String
     , migrationState : MigrationState
     , wizardState : WizardState
+    , wizardCompletionVisible : Bool
     }
 
 
@@ -70,10 +71,8 @@ type MigrationState
 
 type WizardStep
     = WelcomeStep
-    | LedgerNameStep
     | AccountsStep
     | CollaboratorsStep
-    | DoneStep
 
 
 type WizardState
@@ -111,6 +110,7 @@ initial =
     , hiddenAccountIds = []
     , migrationState = NoMigration
     , wizardState = WizardOpen WelcomeStep
+    , wizardCompletionVisible = False
     }
 
 

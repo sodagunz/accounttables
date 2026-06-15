@@ -72,6 +72,7 @@ type Msg
     | WizardSkip
     | WizardFinish
     | ReopenWizard
+    | DismissWizardCompletion
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -227,6 +228,7 @@ ensureLocalLedger model =
                   , name = localLedgerName
                   , ownerUid = ""
                   , members = []
+                  , invitedEmails = []
                   }
                 ]
         }
@@ -603,7 +605,7 @@ update msg model =
         WizardNext ->
             case model.wizardState of
                 WizardOpen step ->
-                    ( { model | wizardState = WizardOpen (nextWizardStep step) }, Cmd.none )
+                    ( advanceWizardFrom step model, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -611,7 +613,7 @@ update msg model =
         WizardBack ->
             case model.wizardState of
                 WizardOpen step ->
-                    ( { model | wizardState = WizardOpen (previousWizardStep step) }, Cmd.none )
+                    ( { model | wizardState = WizardOpen (previousWizardStep model step) }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
@@ -622,14 +624,17 @@ update msg model =
             )
 
         WizardFinish ->
-            ( { model | wizardState = WizardCompleted }
+            ( { model | wizardState = WizardCompleted, wizardCompletionVisible = True }
             , saveWizardState (Encode.string "completed")
             )
 
         ReopenWizard ->
-            ( { model | wizardState = WizardOpen WelcomeStep }
+            ( { model | wizardState = WizardOpen WelcomeStep, wizardCompletionVisible = False }
             , saveWizardState (Encode.string "")
             )
+
+        DismissWizardCompletion ->
+            ( { model | wizardCompletionVisible = False }, Cmd.none )
 
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
@@ -651,18 +656,23 @@ view model =
                 [ div [ class "topbar__content" ]
                     [ div []
                         [ h1 [] [ text "ContabilizAR" ] ]
-                    , AuthStatus.view
-                        { authState = model.authState
-                        , ledgerLoadState = model.ledgerLoadState
-                        , onSignIn = SignInWithGoogle
-                        , onSignOut = SignOut
-                        }
+                    , div [ class "topbar__actions" ]
+                        [ button [ class "topbar-setup-button", type_ "button", onClick ReopenWizard ]
+                            [ text "Configuracion inicial" ]
+                        , AuthStatus.view
+                            { authState = model.authState
+                            , ledgerLoadState = model.ledgerLoadState
+                            , onSignIn = SignInWithGoogle
+                            , onSignOut = SignOut
+                            }
+                        ]
                     ]
                 ]
             ]
         , main_ []
             [ wizardView model
             , reopenWizardButton model
+            , wizardCompletionBanner model
             , migrationPrompt model
             , localRiskBanner model
             , div [ class "layout" ]
@@ -714,6 +724,19 @@ view model =
         ]
 
 
+wizardCompletionBanner : Model -> Html Msg
+wizardCompletionBanner model =
+    if model.wizardCompletionVisible then
+        section [ class "wizard-done-banner" ]
+            [ strong [] [ text "Listo" ]
+            , span [] [ text "Ya puedes empezar a registrar movimientos." ]
+            , button [ type_ "button", onClick DismissWizardCompletion ] [ text "Cerrar" ]
+            ]
+
+    else
+        text ""
+
+
 reopenWizardButton : Model -> Html Msg
 reopenWizardButton model =
     case model.wizardState of
@@ -744,7 +767,7 @@ wizardView model =
                        else
                         button [ class "cancel-button", type_ "button", onClick WizardBack ] [ text "Atras" ]
                      ]
-                        ++ [ wizardPrimaryAction step ]
+                        ++ wizardPrimaryAction model step
                     )
                 ]
 
@@ -752,14 +775,21 @@ wizardView model =
             text ""
 
 
-wizardPrimaryAction : WizardStep -> Html Msg
-wizardPrimaryAction step =
+wizardPrimaryAction : Model -> WizardStep -> List (Html Msg)
+wizardPrimaryAction model step =
     case step of
-        DoneStep ->
-            button [ class "primary", type_ "button", onClick WizardFinish ] [ text "Empezar" ]
+        WelcomeStep ->
+            []
 
-        _ ->
-            button [ class "primary", type_ "button", onClick WizardNext ] [ text "Continuar" ]
+        AccountsStep ->
+            if List.isEmpty (Model.activeAccounts model) then
+                []
+
+            else
+                [ button [ class "primary", type_ "button", onClick WizardNext ] [ text "Continuar" ] ]
+
+        CollaboratorsStep ->
+            [ button [ class "primary", type_ "button", onClick WizardFinish ] [ text "Finalizar" ] ]
 
 
 wizardStepContent : Model -> WizardStep -> List (Html Msg)
@@ -774,24 +804,17 @@ wizardStepContent model step =
                 ]
             ]
 
-        LedgerNameStep ->
-            [ h1 [] [ text "Nombra el libro" ]
-            , p [] [ text "Este nombre aparece en la cabecera y luego se puede cambiar desde Administrar." ]
-            , label []
-                [ text "Nombre"
-                , Html.input
-                    [ type_ "text"
-                    , value model.ledgerName
-                    , onInput UpdateLedgerName
-                    ]
-                    []
-                ]
-            , button [ class "primary", type_ "button", onClick SaveLedgerName ] [ text "Guardar nombre" ]
-            ]
-
         AccountsStep ->
             [ h1 [] [ text "Crea tus cuentas" ]
-            , p [] [ text "Necesitas al menos una cuenta para registrar movimientos. Puedes agregar mas desde Administrar." ]
+            , p []
+                [ text
+                    (if List.isEmpty (Model.activeAccounts model) then
+                        "Necesitas al menos una cuenta para registrar movimientos."
+
+                     else
+                        "Estas son las cuentas que ya creaste. Puedes continuar o agregar otra."
+                    )
+                ]
             , label []
                 [ text "Nueva cuenta"
                 , Html.input
@@ -805,6 +828,7 @@ wizardStepContent model step =
                 [ button [ class "primary", type_ "button", onClick AddAccount ] [ text "Agregar cuenta" ]
                 , button [ class "cancel-button", type_ "button", onClick OpenAccountTool ] [ text "Abrir cuentas" ]
                 ]
+            , wizardAccountList model
             , p [ class "error" ] [ text model.accountError ]
             ]
 
@@ -823,6 +847,7 @@ wizardStepContent model step =
                             []
                         ]
                     , button [ class "primary", type_ "button", onClick InviteGuest ] [ text "Invitar" ]
+                    , wizardCollaboratorList model
                     , p [ class "error" ] [ text model.ledgerError ]
                     ]
 
@@ -832,67 +857,117 @@ wizardStepContent model step =
                     , button [ class "primary", type_ "button", onClick SignInWithGoogle ] [ text "Ingresar con Google" ]
                     ]
 
-        DoneStep ->
-            [ h1 [] [ text "Listo" ]
-            , p [] [ text "Ya puedes registrar movimientos. El formulario queda preparado para que cargues el primer importe." ]
-            ]
+
+wizardAccountList : Model -> Html Msg
+wizardAccountList model =
+    case Model.activeAccounts model of
+        [] ->
+            p [ class "empty empty--compact" ] [ text "Todavia no hay cuentas." ]
+
+        accounts ->
+            Html.ul [ class "wizard-list" ]
+                (List.map (\account -> Html.li [] [ text account.name ]) accounts)
+
+
+wizardCollaboratorList : Model -> Html Msg
+wizardCollaboratorList model =
+    case currentLedger model of
+        Nothing ->
+            p [ class "empty empty--compact" ] [ text "Todavia no hay colaboradores invitados." ]
+
+        Just ledger ->
+            let
+                collaborators =
+                    List.filter (\member -> member.uid /= ledger.ownerUid) ledger.members
+
+                collaboratorItems =
+                    List.map (\member -> member.displayName ++ " <" ++ member.email ++ ">") collaborators
+
+                inviteItems =
+                    List.map (\email -> email ++ " (invitado)") ledger.invitedEmails
+
+                items =
+                    collaboratorItems ++ inviteItems
+            in
+            if List.isEmpty items then
+                p [ class "empty empty--compact" ] [ text "Todavia no hay colaboradores invitados." ]
+
+            else
+                Html.ul [ class "wizard-list" ]
+                    (List.map (\item -> Html.li [] [ text item ]) items)
+
+
+currentLedger : Model -> Maybe Ledger.LedgerSummary
+currentLedger model =
+    model.ledgers
+        |> List.filter (\ledger -> ledger.id == model.currentLedgerId)
+        |> List.head
 
 
 wizardStepLabel : WizardStep -> String
 wizardStepLabel step =
     case step of
         WelcomeStep ->
-            "1 de 5"
-
-        LedgerNameStep ->
-            "2 de 5"
+            "1 de 3"
 
         AccountsStep ->
-            "3 de 5"
+            "2 de 3"
 
         CollaboratorsStep ->
-            "4 de 5"
-
-        DoneStep ->
-            "5 de 5"
+            "3 de 3"
 
 
-nextWizardStep : WizardStep -> WizardStep
-nextWizardStep step =
+advanceWizardFrom : WizardStep -> Model -> Model
+advanceWizardFrom step model =
     case step of
         WelcomeStep ->
-            LedgerNameStep
-
-        LedgerNameStep ->
-            AccountsStep
+            { model | wizardState = WizardOpen (firstSetupStep model) }
 
         AccountsStep ->
-            CollaboratorsStep
+            if List.isEmpty (Model.activeAccounts model) then
+                { model | accountError = "Agrega al menos una cuenta para continuar." }
+
+            else
+                { model | wizardState = WizardOpen CollaboratorsStep, accountError = "" }
 
         CollaboratorsStep ->
-            DoneStep
-
-        DoneStep ->
-            DoneStep
+            { model | wizardState = WizardCompleted, wizardCompletionVisible = True }
 
 
-previousWizardStep : WizardStep -> WizardStep
-previousWizardStep step =
+firstSetupStep : Model -> WizardStep
+firstSetupStep model =
+    if List.isEmpty (Model.activeAccounts model) then
+        AccountsStep
+
+    else
+        CollaboratorsStep
+
+
+previousWizardStep : Model -> WizardStep -> WizardStep
+previousWizardStep model step =
     case step of
         WelcomeStep ->
             WelcomeStep
 
-        LedgerNameStep ->
+        AccountsStep ->
             WelcomeStep
 
-        AccountsStep ->
-            LedgerNameStep
-
         CollaboratorsStep ->
-            AccountsStep
+            if List.isEmpty (Model.activeAccounts model) then
+                AccountsStep
 
-        DoneStep ->
-            CollaboratorsStep
+            else
+                WelcomeStep
+
+
+wizardAfterAuth : Model -> WizardState
+wizardAfterAuth model =
+    case model.wizardState of
+        WizardOpen WelcomeStep ->
+            WizardOpen (firstSetupStep model)
+
+        _ ->
+            model.wizardState
 
 
 migrationPrompt : Model -> Html Msg
@@ -1081,6 +1156,7 @@ handleAuthStateChanged authState model =
                     , accountError = ""
                     , ledgerError = ""
                     , migrationState = PreparingMigration
+                    , wizardState = wizardAfterAuth model
                   }
                 , prepareLocalMigration ()
                 )
@@ -1095,6 +1171,7 @@ handleAuthStateChanged authState model =
                     , error = ""
                     , accountError = ""
                     , ledgerError = ""
+                    , wizardState = wizardAfterAuth model
                   }
                 , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
                 )
@@ -1238,7 +1315,22 @@ applyLedgerData ledger model =
         , ledgerError = ""
         , migrationState = NoMigration
     }
+        |> adjustWizardAfterLedgerLoad model.ledgerLoadState
         |> Model.ensureSelectedAccount
+
+
+adjustWizardAfterLedgerLoad : LoadState -> Model -> Model
+adjustWizardAfterLedgerLoad previousLoadState model =
+    case model.wizardState of
+        WizardOpen AccountsStep ->
+            if previousLoadState == Loading && not (List.isEmpty (Model.activeAccounts model)) then
+                { model | wizardState = WizardOpen CollaboratorsStep }
+
+            else
+                model
+
+        _ ->
+            model
 
 
 formWithLoadedAccount : Maybe String -> List Accounting.Account -> Accounting.Form -> Accounting.Form

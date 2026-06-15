@@ -13,7 +13,7 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
-import Model exposing (MigrationState(..), Model, StorageMode(..), WizardState(..), WizardStep(..))
+import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), TutorialStep(..))
 import Projector
 import Task
 import Time
@@ -67,12 +67,12 @@ type Msg
     | SelectMigrationLedger String
     | ConfirmLocalMigration
     | SkipLocalMigration
-    | WizardNext
-    | WizardBack
-    | WizardSkip
-    | WizardFinish
-    | ReopenWizard
-    | DismissWizardCompletion
+    | TutorialNext
+    | TutorialBack
+    | TutorialSkip
+    | TutorialFinish
+    | ReopenTutorial
+    | DismissTutorialCompletion
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -135,7 +135,7 @@ port localMigrationPrepared : (Decode.Value -> msg) -> Sub msg
 port mergeLocalLedgerToFirestore : Encode.Value -> Cmd msg
 
 
-port saveWizardState : Encode.Value -> Cmd msg
+port saveTutorialState : Encode.Value -> Cmd msg
 
 
 main : Program Decode.Value Model Msg
@@ -161,14 +161,14 @@ init flags =
 modelFromFlags : Decode.Value -> Model
 modelFromFlags flags =
     let
-        wizardState =
-            decodeWizardStateFromFlags flags
+        tutorialState =
+            decodeTutorialStateFromFlags flags
 
         initialModel =
             Model.initial
 
         baseModel =
-            { initialModel | wizardState = wizardState }
+            { initialModel | tutorialState = tutorialState }
 
         ledgerResult =
             case Decode.decodeValue (Decode.field "ledger" Decode.value) flags of
@@ -186,17 +186,17 @@ modelFromFlags flags =
             baseModel
 
 
-decodeWizardStateFromFlags : Decode.Value -> WizardState
-decodeWizardStateFromFlags flags =
+decodeTutorialStateFromFlags : Decode.Value -> TutorialState
+decodeTutorialStateFromFlags flags =
     case Decode.decodeValue (Decode.field "wizardState" Decode.string) flags of
         Ok "dismissed" ->
-            WizardDismissed
+            TutorialDismissed
 
         Ok "completed" ->
-            WizardCompleted
+            TutorialCompleted
 
         _ ->
-            WizardOpen WelcomeStep
+            TutorialOpen WelcomeStep
 
 
 localLedgerId : String
@@ -602,39 +602,39 @@ update msg model =
                 NoMigration ->
                     ( model, Cmd.none )
 
-        WizardNext ->
-            case model.wizardState of
-                WizardOpen step ->
-                    ( advanceWizardFrom step model, Cmd.none )
+        TutorialNext ->
+            case model.tutorialState of
+                TutorialOpen step ->
+                    ( advanceTutorialFrom step model, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
-        WizardBack ->
-            case model.wizardState of
-                WizardOpen step ->
-                    ( { model | wizardState = WizardOpen (previousWizardStep model step) }, Cmd.none )
+        TutorialBack ->
+            case model.tutorialState of
+                TutorialOpen step ->
+                    ( { model | tutorialState = TutorialOpen (previousTutorialStep model step) }, Cmd.none )
 
                 _ ->
                     ( model, Cmd.none )
 
-        WizardSkip ->
-            ( { model | wizardState = WizardDismissed }
-            , saveWizardState (Encode.string "dismissed")
+        TutorialSkip ->
+            ( { model | tutorialState = TutorialDismissed }
+            , saveTutorialState (Encode.string "dismissed")
             )
 
-        WizardFinish ->
-            ( { model | wizardState = WizardCompleted, wizardCompletionVisible = True }
-            , saveWizardState (Encode.string "completed")
+        TutorialFinish ->
+            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
+            , saveTutorialState (Encode.string "completed")
             )
 
-        ReopenWizard ->
-            ( { model | wizardState = WizardOpen (reopenedWizardStep model), wizardCompletionVisible = False }
-            , saveWizardState (Encode.string "")
+        ReopenTutorial ->
+            ( { model | tutorialState = TutorialOpen (reopenedTutorialStep model), tutorialCompletionVisible = False }
+            , saveTutorialState (Encode.string "")
             )
 
-        DismissWizardCompletion ->
-            ( { model | wizardCompletionVisible = False }, Cmd.none )
+        DismissTutorialCompletion ->
+            ( { model | tutorialCompletionVisible = False }, Cmd.none )
 
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
@@ -650,21 +650,21 @@ view model =
         rows =
             Model.visibleExpenses model
 
-        isWizardOpen =
-            case model.wizardState of
-                WizardOpen _ ->
+        isTutorialOpen =
+            case model.tutorialState of
+                TutorialOpen _ ->
                     True
 
                 _ ->
                     False
 
         mainContent =
-            if isWizardOpen then
-                [ wizardView model ]
+            if isTutorialOpen then
+                [ tutorialView model ]
 
             else
-                [ reopenWizardButton model
-                , wizardCompletionBanner model
+                [ reopenTutorialButton model
+                , tutorialCompletionBanner model
                 , migrationPrompt model
                 , localRiskBanner model
                 , div [ class "layout" ]
@@ -721,11 +721,11 @@ view model =
                     [ div []
                         [ h1 [] [ text "ContabilizAR" ] ]
                     , div [ class "topbar__actions" ]
-                        [ if isWizardOpen then
+                        [ if isTutorialOpen then
                             text ""
 
                           else
-                            button [ class "topbar-setup-button", type_ "button", onClick ReopenWizard ]
+                            button [ class "topbar-setup-button", type_ "button", onClick ReopenTutorial ]
                                 [ text "Configuracion inicial" ]
                         , AuthStatus.view
                             { authState = model.authState
@@ -741,50 +741,50 @@ view model =
         ]
 
 
-wizardCompletionBanner : Model -> Html Msg
-wizardCompletionBanner model =
-    if model.wizardCompletionVisible then
+tutorialCompletionBanner : Model -> Html Msg
+tutorialCompletionBanner model =
+    if model.tutorialCompletionVisible then
         section [ class "wizard-done-banner" ]
             [ strong [] [ text "Listo" ]
             , span [] [ text "Ya puedes empezar a registrar movimientos." ]
-            , button [ type_ "button", onClick DismissWizardCompletion ] [ text "Cerrar" ]
+            , button [ type_ "button", onClick DismissTutorialCompletion ] [ text "Cerrar" ]
             ]
 
     else
         text ""
 
 
-reopenWizardButton : Model -> Html Msg
-reopenWizardButton model =
-    case model.wizardState of
-        WizardOpen _ ->
+reopenTutorialButton : Model -> Html Msg
+reopenTutorialButton model =
+    case model.tutorialState of
+        TutorialOpen _ ->
             text ""
 
         _ ->
             section [ class "setup-shortcut" ]
-                [ button [ class "setup-shortcut__button", type_ "button", onClick ReopenWizard ]
+                [ button [ class "setup-shortcut__button", type_ "button", onClick ReopenTutorial ]
                     [ text "Abrir configuracion inicial" ]
                 ]
 
 
-wizardView : Model -> Html Msg
-wizardView model =
-    case model.wizardState of
-        WizardOpen step ->
+tutorialView : Model -> Html Msg
+tutorialView model =
+    case model.tutorialState of
+        TutorialOpen step ->
             section [ class "wizard-panel" ]
                 [ div [ class "wizard-panel__header" ]
-                    [ span [ class "wizard-panel__step" ] [ text (wizardStepLabel step) ]
-                    , button [ class "wizard-panel__skip", type_ "button", onClick WizardSkip ] [ text "Saltar" ]
+                    [ span [ class "wizard-panel__step" ] [ text (tutorialStepLabel step) ]
+                    , button [ class "wizard-panel__skip", type_ "button", onClick TutorialSkip ] [ text "Saltar" ]
                     ]
-                , div [ class "wizard-panel__body" ] (wizardStepContent model step)
+                , div [ class "wizard-panel__body" ] (tutorialStepContent model step)
                 , div [ class "wizard-panel__actions" ]
                     ([ if step == WelcomeStep then
                         text ""
 
                        else
-                        button [ class "cancel-button", type_ "button", onClick WizardBack ] [ text "Atras" ]
+                        button [ class "cancel-button", type_ "button", onClick TutorialBack ] [ text "Atras" ]
                      ]
-                        ++ wizardPrimaryAction model step
+                        ++ tutorialPrimaryAction model step
                     )
                 ]
 
@@ -792,8 +792,8 @@ wizardView model =
             text ""
 
 
-wizardPrimaryAction : Model -> WizardStep -> List (Html Msg)
-wizardPrimaryAction model step =
+tutorialPrimaryAction : Model -> TutorialStep -> List (Html Msg)
+tutorialPrimaryAction model step =
     case step of
         WelcomeStep ->
             []
@@ -803,21 +803,21 @@ wizardPrimaryAction model step =
                 []
 
             else
-                [ button [ class "primary", type_ "button", onClick WizardNext ] [ text "Continuar" ] ]
+                [ button [ class "primary", type_ "button", onClick TutorialNext ] [ text "Continuar" ] ]
 
         CollaboratorsStep ->
-            [ button [ class "primary", type_ "button", onClick WizardFinish ] [ text "Finalizar" ] ]
+            [ button [ class "primary", type_ "button", onClick TutorialFinish ] [ text "Finalizar" ] ]
 
 
-wizardStepContent : Model -> WizardStep -> List (Html Msg)
-wizardStepContent model step =
+tutorialStepContent : Model -> TutorialStep -> List (Html Msg)
+tutorialStepContent model step =
     case step of
         WelcomeStep ->
             [ h1 [] [ text "Configura tu libro" ]
             , p [] [ text "Puedes iniciar sesion con Google para sincronizar o trabajar solo en este navegador bajo tu propio riesgo." ]
             , div [ class "wizard-panel__inline-actions" ]
                 [ button [ class "primary", type_ "button", onClick SignInWithGoogle ] [ text "Ingresar con Google" ]
-                , button [ class "cancel-button", type_ "button", onClick WizardNext ] [ text "Usar solo en este dispositivo" ]
+                , button [ class "cancel-button", type_ "button", onClick TutorialNext ] [ text "Usar solo en este dispositivo" ]
                 ]
             ]
 
@@ -846,7 +846,7 @@ wizardStepContent model step =
                 [ button [ class "primary", type_ "button", onClick AddAccount ] [ text "Agregar cuenta" ]
                 , button [ class "cancel-button", type_ "button", onClick OpenAccountTool ] [ text "Abrir cuentas" ]
                 ]
-            , wizardAccountList model
+            , tutorialAccountList model
             , p [ class "error" ] [ text model.accountError ]
             ]
 
@@ -866,7 +866,7 @@ wizardStepContent model step =
                             []
                         ]
                     , button [ class "primary", type_ "button", onClick InviteGuest ] [ text "Invitar" ]
-                    , wizardCollaboratorList model
+                    , tutorialCollaboratorList model
                     , p [ class "error" ] [ text model.ledgerError ]
                     ]
 
@@ -877,8 +877,8 @@ wizardStepContent model step =
                     ]
 
 
-wizardAccountList : Model -> Html Msg
-wizardAccountList model =
+tutorialAccountList : Model -> Html Msg
+tutorialAccountList model =
     case Model.activeAccounts model of
         [] ->
             p [ class "empty empty--compact" ] [ text "Todavia no hay cuentas." ]
@@ -888,8 +888,8 @@ wizardAccountList model =
                 (List.map (\account -> Html.li [] [ text account.name ]) accounts)
 
 
-wizardCollaboratorList : Model -> Html Msg
-wizardCollaboratorList model =
+tutorialCollaboratorList : Model -> Html Msg
+tutorialCollaboratorList model =
     case currentLedger model of
         Nothing ->
             p [ class "empty empty--compact" ] [ text "Todavia no hay colaboradores invitados." ]
@@ -923,8 +923,8 @@ currentLedger model =
         |> List.head
 
 
-wizardStepLabel : WizardStep -> String
-wizardStepLabel step =
+tutorialStepLabel : TutorialStep -> String
+tutorialStepLabel step =
     case step of
         WelcomeStep ->
             "1 de 3"
@@ -936,25 +936,25 @@ wizardStepLabel step =
             "3 de 3"
 
 
-advanceWizardFrom : WizardStep -> Model -> Model
-advanceWizardFrom step model =
+advanceTutorialFrom : TutorialStep -> Model -> Model
+advanceTutorialFrom step model =
     case step of
         WelcomeStep ->
-            { model | wizardState = WizardOpen (firstSetupStep model) }
+            { model | tutorialState = TutorialOpen (firstTutorialStep model) }
 
         AccountsStep ->
             if List.isEmpty (Model.activeAccounts model) then
                 { model | accountError = "Agrega al menos una cuenta para continuar." }
 
             else
-                { model | wizardState = WizardOpen CollaboratorsStep, accountError = "" }
+                { model | tutorialState = TutorialOpen CollaboratorsStep, accountError = "" }
 
         CollaboratorsStep ->
-            { model | wizardState = WizardCompleted, wizardCompletionVisible = True }
+            { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
 
 
-firstSetupStep : Model -> WizardStep
-firstSetupStep model =
+firstTutorialStep : Model -> TutorialStep
+firstTutorialStep model =
     if List.isEmpty (Model.activeAccounts model) then
         AccountsStep
 
@@ -962,18 +962,18 @@ firstSetupStep model =
         CollaboratorsStep
 
 
-reopenedWizardStep : Model -> WizardStep
-reopenedWizardStep model =
+reopenedTutorialStep : Model -> TutorialStep
+reopenedTutorialStep model =
     case model.authState of
         SignedIn _ ->
-            firstSetupStep model
+            firstTutorialStep model
 
         _ ->
             WelcomeStep
 
 
-previousWizardStep : Model -> WizardStep -> WizardStep
-previousWizardStep model step =
+previousTutorialStep : Model -> TutorialStep -> TutorialStep
+previousTutorialStep model step =
     case step of
         WelcomeStep ->
             WelcomeStep
@@ -999,14 +999,14 @@ previousWizardStep model step =
                         WelcomeStep
 
 
-wizardAfterAuth : Model -> WizardState
-wizardAfterAuth model =
-    case model.wizardState of
-        WizardOpen WelcomeStep ->
-            WizardOpen (firstSetupStep model)
+tutorialAfterAuth : Model -> TutorialState
+tutorialAfterAuth model =
+    case model.tutorialState of
+        TutorialOpen WelcomeStep ->
+            TutorialOpen (firstTutorialStep model)
 
         _ ->
-            model.wizardState
+            model.tutorialState
 
 
 migrationPrompt : Model -> Html Msg
@@ -1195,8 +1195,8 @@ handleAuthStateChanged authState model =
                     , accountError = ""
                     , ledgerError = ""
                     , migrationState = PreparingMigration
-                    , wizardState = wizardAfterAuth model
-                  }
+                    , tutorialState = tutorialAfterAuth model
+                   }
                 , prepareLocalMigration ()
                 )
 
@@ -1210,7 +1210,7 @@ handleAuthStateChanged authState model =
                     , error = ""
                     , accountError = ""
                     , ledgerError = ""
-                    , wizardState = wizardAfterAuth model
+                    , tutorialState = tutorialAfterAuth model
                   }
                 , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
                 )
@@ -1354,16 +1354,16 @@ applyLedgerData ledger model =
         , ledgerError = ""
         , migrationState = NoMigration
     }
-        |> adjustWizardAfterLedgerLoad model.ledgerLoadState
+        |> adjustTutorialAfterLedgerLoad model.ledgerLoadState
         |> Model.ensureSelectedAccount
 
 
-adjustWizardAfterLedgerLoad : LoadState -> Model -> Model
-adjustWizardAfterLedgerLoad previousLoadState model =
-    case model.wizardState of
-        WizardOpen AccountsStep ->
+adjustTutorialAfterLedgerLoad : LoadState -> Model -> Model
+adjustTutorialAfterLedgerLoad previousLoadState model =
+    case model.tutorialState of
+        TutorialOpen AccountsStep ->
             if previousLoadState == Loading && not (List.isEmpty (Model.activeAccounts model)) then
-                { model | wizardState = WizardOpen CollaboratorsStep }
+                { model | tutorialState = TutorialOpen CollaboratorsStep }
 
             else
                 model

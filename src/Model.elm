@@ -2,8 +2,8 @@ module Model exposing
     ( MigrationState(..)
     , Model
     , StorageMode(..)
-    , WizardState(..)
-    , WizardStep(..)
+    , TutorialState(..)
+    , TutorialStep(..)
     , activeAccounts
     , activeAccountsFromList
     , activeExpenses
@@ -52,8 +52,8 @@ type alias Model =
     , ledgerLoadState : LoadState
     , hiddenAccountIds : List String
     , migrationState : MigrationState
-    , wizardState : WizardState
-    , wizardCompletionVisible : Bool
+    , tutorialState : TutorialState
+    , tutorialCompletionVisible : Bool
     }
 
 
@@ -69,16 +69,16 @@ type MigrationState
     | UploadingMigration String
 
 
-type WizardStep
+type TutorialStep
     = WelcomeStep
     | AccountsStep
     | CollaboratorsStep
 
 
-type WizardState
-    = WizardOpen WizardStep
-    | WizardDismissed
-    | WizardCompleted
+type TutorialState
+    = TutorialOpen TutorialStep
+    | TutorialDismissed
+    | TutorialCompleted
 
 
 initial : Model
@@ -109,8 +109,8 @@ initial =
     , ledgerLoadState = NotLoaded
     , hiddenAccountIds = []
     , migrationState = NoMigration
-    , wizardState = WizardOpen WelcomeStep
-    , wizardCompletionVisible = False
+    , tutorialState = TutorialOpen WelcomeStep
+    , tutorialCompletionVisible = False
     }
 
 

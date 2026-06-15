@@ -142,6 +142,9 @@ port saveTutorialState : Encode.Value -> Cmd msg
 port getElementRect : String -> Cmd msg
 
 
+port openDisclosure : String -> Cmd msg
+
+
 port elementRectReceived : (Decode.Value -> msg) -> Sub msg
 
 
@@ -169,7 +172,7 @@ init flags =
     ( model
     , case model.tutorialState of
         TutorialOpen step ->
-            Cmd.batch (getElementRect (tutorialTargetSelector model step) :: baseCmds)
+            Cmd.batch (tutorialNavigateCmd model step :: baseCmds)
 
         _ ->
             Cmd.batch baseCmds
@@ -435,9 +438,9 @@ update msg model =
                                     if isNewExpense then
                                         case updatedModel.tutorialState of
                                             TutorialOpen FirstExpenseStep ->
-                                                ( { updatedModel | tutorialState = TutorialOpen DeleteExpenseStep }
-                                                , getElementRect (tutorialTargetSelector updatedModel DeleteExpenseStep)
-                                                )
+                                                 ( { updatedModel | tutorialState = TutorialOpen DeleteExpenseStep }
+                                                 , tutorialNavigateCmd updatedModel DeleteExpenseStep
+                                                 )
 
                                             _ ->
                                                 ( updatedModel, Cmd.none )
@@ -488,7 +491,7 @@ update msg model =
                         TutorialOpen AccountsStep ->
                             if not (List.isEmpty (Model.activeAccounts updatedModel)) then
                                 ( { updatedModel | tutorialState = TutorialOpen CollaboratorsStep, accountError = "" }
-                                , getElementRect (tutorialTargetSelector updatedModel CollaboratorsStep)
+                                , tutorialNavigateCmd updatedModel CollaboratorsStep
                                 )
 
                             else
@@ -685,7 +688,7 @@ update msg model =
                             previousTutorialStep step
                     in
                     ( { model | tutorialState = TutorialOpen prev }
-                    , getElementRect (tutorialTargetSelector model prev)
+                    , tutorialNavigateCmd model prev
                     )
 
                 _ ->
@@ -709,7 +712,7 @@ update msg model =
             ( { model | tutorialState = TutorialOpen step, tutorialCompletionVisible = False }
             , Cmd.batch
                 [ saveTutorialState (Encode.string "")
-                , getElementRect (tutorialTargetSelector model step)
+                , tutorialNavigateCmd model step
                 ]
             )
 
@@ -969,7 +972,7 @@ advanceTutorialFrom step model =
     case rawNextStep step of
         Just nextStep ->
             ( { model | tutorialState = TutorialOpen nextStep }
-            , getElementRect (tutorialTargetSelector model nextStep)
+            , tutorialNavigateCmd model nextStep
             )
 
         Nothing ->
@@ -1029,7 +1032,28 @@ tutorialAdvanceCmd : Model -> TutorialState -> TutorialState -> Cmd Msg
 tutorialAdvanceCmd model oldState newState =
     case ( oldState, newState ) of
         ( TutorialOpen SignInStep, TutorialOpen step ) ->
-            getElementRect (tutorialTargetSelector model step)
+            tutorialNavigateCmd model step
+
+        _ ->
+            Cmd.none
+
+
+tutorialNavigateCmd : Model -> TutorialStep -> Cmd Msg
+tutorialNavigateCmd model step =
+    Cmd.batch
+        [ getElementRect (tutorialTargetSelector model step)
+        , tutorialOpenDisclosureCmd step
+        ]
+
+
+tutorialOpenDisclosureCmd : TutorialStep -> Cmd Msg
+tutorialOpenDisclosureCmd step =
+    case step of
+        AccountsStep ->
+            openDisclosure "accounts-tool"
+
+        CollaboratorsStep ->
+            openDisclosure "members-tool"
 
         _ ->
             Cmd.none

@@ -2,7 +2,7 @@ module View.LedgerAccess exposing (Config, view)
 
 import Auth
 import Html exposing (Html, button, div, input, label, li, option, p, section, select, span, strong, text, ul)
-import Html.Attributes exposing (class, placeholder, type_, value)
+import Html.Attributes exposing (class, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Ledger exposing (LedgerSummary, Member)
 
@@ -91,7 +91,7 @@ ledgerNameForm config =
 
 memberControls : Config msg -> Html msg
 memberControls config =
-    Html.details [ class "members-disclosure" ]
+    Html.details [ class "members-disclosure", id "members-tool" ]
         [ Html.summary [ class "members-disclosure__summary" ]
             [ span [] [ text "Invitaciones y acceso" ]
             , strong [] [ text "Miembros" ]

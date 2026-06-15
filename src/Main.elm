@@ -649,6 +649,70 @@ view model =
     let
         rows =
             Model.visibleExpenses model
+
+        isWizardOpen =
+            case model.wizardState of
+                WizardOpen _ ->
+                    True
+
+                _ ->
+                    False
+
+        mainContent =
+            if isWizardOpen then
+                [ wizardView model ]
+
+            else
+                [ reopenWizardButton model
+                , wizardCompletionBanner model
+                , migrationPrompt model
+                , localRiskBanner model
+                , div [ class "layout" ]
+                    [ div [ class "input-area" ]
+                        [ ExpenseForm.view
+                            { form = model.form
+                            , accounts = Model.activeAccounts model
+                            , exchangeRate = model.exchangeRate
+                            , exchangeRateStatus = model.exchangeRateStatus
+                            , zone = model.zone
+                            , error = model.error
+                            , onDescription = UpdateDescription
+                            , onAmount = UpdateAmount
+                            , onAccount = UpdateAccount
+                            , onCreateAccount = OpenAccountTool
+                            , onCurrency = UpdateCurrency
+                            , onDate = UpdateDate
+                            , onMovementType = UpdateMovementType
+                            , onSubmit = AddExpense
+                            , onCancel = CancelEdit
+                            }
+                        ]
+                    , div [ class "admin-area" ]
+                        [ adminArea model
+                        ]
+                    , div [ class "content-stack" ]
+                        [ ExpenseTable.view
+                            { expenses = rows
+                            , accounts = Model.activeAccounts model
+                            , filterWindow = model.filterWindow
+                            , hiddenAccountIds = model.hiddenAccountIds
+                            , dateDisplay = model.dateDisplay
+                            , displayCurrency = model.displayCurrency
+                            , sortField = model.sortField
+                            , sortDirection = model.sortDirection
+                            , onSelectFilter = SelectFilter
+                            , onToggleAccount = ToggleAccountFilter
+                            , onSelectDateDisplay = SelectDateDisplay
+                            , onSelectDisplayCurrency = SelectDisplayCurrency
+                            , onSelectSort = SelectSort
+                            , onExportCsv = ExportCsv
+                            , onExportXlsx = ExportXlsx
+                            , onDelete = DeleteExpense
+                            , onEdit = EditExpense
+                            }
+                        ]
+                    ]
+                ]
     in
     div [ class "app" ]
         [ header [ class "topbar" ]
@@ -657,8 +721,12 @@ view model =
                     [ div []
                         [ h1 [] [ text "ContabilizAR" ] ]
                     , div [ class "topbar__actions" ]
-                        [ button [ class "topbar-setup-button", type_ "button", onClick ReopenWizard ]
-                            [ text "Configuracion inicial" ]
+                        [ if isWizardOpen then
+                            text ""
+
+                          else
+                            button [ class "topbar-setup-button", type_ "button", onClick ReopenWizard ]
+                                [ text "Configuracion inicial" ]
                         , AuthStatus.view
                             { authState = model.authState
                             , ledgerLoadState = model.ledgerLoadState
@@ -669,58 +737,7 @@ view model =
                     ]
                 ]
             ]
-        , main_ []
-            [ wizardView model
-            , reopenWizardButton model
-            , wizardCompletionBanner model
-            , migrationPrompt model
-            , localRiskBanner model
-            , div [ class "layout" ]
-                [ div [ class "input-area" ]
-                    [ ExpenseForm.view
-                        { form = model.form
-                        , accounts = Model.activeAccounts model
-                        , exchangeRate = model.exchangeRate
-                        , exchangeRateStatus = model.exchangeRateStatus
-                        , zone = model.zone
-                        , error = model.error
-                        , onDescription = UpdateDescription
-                        , onAmount = UpdateAmount
-                        , onAccount = UpdateAccount
-                        , onCreateAccount = OpenAccountTool
-                        , onCurrency = UpdateCurrency
-                        , onDate = UpdateDate
-                        , onMovementType = UpdateMovementType
-                        , onSubmit = AddExpense
-                        , onCancel = CancelEdit
-                        }
-                    ]
-                , div [ class "admin-area" ]
-                    [ adminArea model
-                    ]
-                , div [ class "content-stack" ]
-                    [ ExpenseTable.view
-                        { expenses = rows
-                        , accounts = Model.activeAccounts model
-                        , filterWindow = model.filterWindow
-                        , hiddenAccountIds = model.hiddenAccountIds
-                        , dateDisplay = model.dateDisplay
-                        , displayCurrency = model.displayCurrency
-                        , sortField = model.sortField
-                        , sortDirection = model.sortDirection
-                        , onSelectFilter = SelectFilter
-                        , onToggleAccount = ToggleAccountFilter
-                        , onSelectDateDisplay = SelectDateDisplay
-                        , onSelectDisplayCurrency = SelectDisplayCurrency
-                        , onSelectSort = SelectSort
-                        , onExportCsv = ExportCsv
-                        , onExportXlsx = ExportXlsx
-                        , onDelete = DeleteExpense
-                        , onEdit = EditExpense
-                        }
-                    ]
-                ]
-            ]
+        , main_ [] mainContent
         ]
 
 

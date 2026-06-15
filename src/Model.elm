@@ -92,6 +92,7 @@ type alias TargetRect =
     , left : Float
     , width : Float
     , height : Float
+    , viewportHeight : Float
     }
 
 

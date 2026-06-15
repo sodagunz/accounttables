@@ -39,7 +39,11 @@
             import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
 
             const LEDGER_CACHE_SCHEMA_VERSION = 3;
+            const LOCAL_LEDGER_SCHEMA_VERSION = 1;
             const LAST_SESSION_KEY = "contabilizar:lastSession";
+            const LOCAL_LEDGER_ID = "local";
+            const LOCAL_LEDGER_KEY = "contabilizar:localLedger";
+            const DEFAULT_LOCAL_LEDGER_NAME = "Libro contable de desconocido";
 
             const app = Elm.Main.init({
                 node: document.getElementById("app"),
@@ -48,6 +52,10 @@
 
             setupFirebaseAuth(app);
             setupLastAccountStorage(app);
+
+            app.ports.focusAccountTool.subscribe(() => {
+                focusAccountTool();
+            });
 
             app.ports.generateExpenseId.subscribe(() => {
                 app.ports.expenseIdGenerated.send(uuidv7());
@@ -194,9 +202,33 @@
                 });
             }
 
+            function focusAccountTool() {
+                const adminTool = document.getElementById("admin-tool");
+                const accountsTool = document.getElementById("accounts-tool");
+                const accountInput = document.getElementById("new-account-name");
+
+                if (adminTool) {
+                    adminTool.open = true;
+                }
+
+                if (accountsTool) {
+                    accountsTool.open = true;
+                    accountsTool.scrollIntoView({ behavior: "smooth", block: "center" });
+                }
+
+                window.requestAnimationFrame(() => {
+                    accountInput?.focus();
+                });
+            }
+
             function setupFirestore(app, auth, db) {
                 app.ports.loadLedgerData.subscribe(async ({ ledgerId }) => {
                     try {
+                        if (ledgerId === LOCAL_LEDGER_ID || !auth.currentUser?.uid) {
+                            emitLocalLedger(app, getLocalLedgerPayload());
+                            return;
+                        }
+
                         emitCachedLedger(app, auth, ledgerId);
                         await loadLedger(app, auth, db, ledgerId);
                     } catch (error) {
@@ -218,6 +250,21 @@
                     }
                     if (!event) {
                         console.error("No event provided for appendEvent");
+                        return;
+                    }
+
+                    if (ledgerId === LOCAL_LEDGER_ID || !auth.currentUser?.uid) {
+                        const localLedger = getLocalLedgerPayload();
+                        const actualSeq = (localLedger.lastEventSequence || 0) + 1;
+                        const localEvent = { ...event, sequence: actualSeq };
+                        emitLocalLedger(
+                            app,
+                            cacheLocalLedgerPayload({
+                                ...localLedger,
+                                events: [...localLedger.events, localEvent],
+                                lastEventSequence: actualSeq,
+                            }),
+                        );
                         return;
                     }
 
@@ -271,6 +318,28 @@
 
                 app.ports.saveAccount.subscribe(async ({ ledgerId, name }) => {
                     try {
+                        if (ledgerId === LOCAL_LEDGER_ID || !auth.currentUser?.uid) {
+                            const trimmedName = String(name || "").trim();
+                            if (!trimmedName) {
+                                throw new Error("El nombre de la cuenta no puede estar vacío.");
+                            }
+
+                            const localLedger = getLocalLedgerPayload();
+                            const account = {
+                                id: uuidv7(),
+                                name: trimmedName,
+                                deletedAt: null,
+                            };
+                            emitLocalLedger(
+                                app,
+                                cacheLocalLedgerPayload({
+                                    ...localLedger,
+                                    accounts: [account, ...localLedger.accounts],
+                                }),
+                            );
+                            return;
+                        }
+
                         await ensureLedger(auth, db, ledgerId);
                         const trimmedName = String(name || "").trim();
 
@@ -311,6 +380,23 @@
 
                 app.ports.deleteAccount.subscribe(async ({ ledgerId, accountId }) => {
                     try {
+                        if (ledgerId === LOCAL_LEDGER_ID || !auth.currentUser?.uid) {
+                            const localLedger = getLocalLedgerPayload();
+                            const deletedAt = new Date().toISOString();
+                            emitLocalLedger(
+                                app,
+                                cacheLocalLedgerPayload({
+                                    ...localLedger,
+                                    accounts: localLedger.accounts.map((account) =>
+                                        account.id === accountId
+                                            ? { ...account, deletedAt }
+                                            : account,
+                                    ),
+                                }),
+                            );
+                            return;
+                        }
+
                         await ensureLedger(auth, db, ledgerId);
                         const deletedAt = new Date().toISOString();
                         const cachedLedger = softDeleteCachedAccount(
@@ -466,6 +552,32 @@
 
                 app.ports.updateLedgerName.subscribe(async ({ ledgerId, name }) => {
                     try {
+                        if (ledgerId === LOCAL_LEDGER_ID || !auth.currentUser?.uid) {
+                            const trimmedName = String(name || "").trim();
+                            if (!trimmedName) {
+                                throw new Error(
+                                    "El nombre del libro contable no puede estar vacío.",
+                                );
+                            }
+
+                            const localLedger = getLocalLedgerPayload();
+                            emitLocalLedger(
+                                app,
+                                cacheLocalLedgerPayload({
+                                    ...localLedger,
+                                    ledgers: [
+                                        {
+                                            id: LOCAL_LEDGER_ID,
+                                            name: trimmedName,
+                                            ownerUid: "",
+                                            members: [],
+                                        },
+                                    ],
+                                }),
+                            );
+                            return;
+                        }
+
                         await ensureLedger(auth, db, ledgerId);
                         const trimmedName = String(name || "").trim();
                         if (!trimmedName) {
@@ -486,6 +598,50 @@
                         await loadLedger(app, auth, db, ledgerId);
                     } catch (error) {
                         console.error("Firestore ledger rename failed", error);
+                        app.ports.ledgerLoaded.send({
+                            status: "error",
+                            ledgerId,
+                            message: firestoreErrorMessage(error),
+                        });
+                    }
+                });
+
+                app.ports.prepareLocalMigration.subscribe(async () => {
+                    try {
+                        await ensureUserEmailIndex(auth, db);
+                        await ensurePersonalLedger(auth, db);
+                        await acceptPendingInvites(auth, db);
+
+                        const ledgers = await loadLedgerSummaries(auth, db);
+                        const selectedLedgerId =
+                            ledgers.find((ledger) => ledger.id === auth.currentUser?.uid)?.id ||
+                            ledgers[0]?.id ||
+                            "";
+
+                        app.ports.localMigrationPrepared.send({
+                            status: "ready",
+                            ledgers,
+                            selectedLedgerId,
+                        });
+                    } catch (error) {
+                        console.error("Local migration preparation failed", error);
+                        app.ports.localMigrationPrepared.send({
+                            status: "error",
+                            message: firestoreErrorMessage(error),
+                        });
+                    }
+                });
+
+                app.ports.mergeLocalLedgerToFirestore.subscribe(async ({ ledgerId }) => {
+                    try {
+                        await ensureUserEmailIndex(auth, db);
+                        await ensurePersonalLedger(auth, db);
+                        await acceptPendingInvites(auth, db);
+                        await mergeLocalLedgerIntoFirestore(auth, db, ledgerId);
+                        clearLocalLedgerCache();
+                        await loadLedger(app, auth, db, ledgerId);
+                    } catch (error) {
+                        console.error("Local migration upload failed", error);
                         app.ports.ledgerLoaded.send({
                             status: "error",
                             ledgerId,
@@ -581,6 +737,107 @@
                 }
             }
 
+            async function mergeLocalLedgerIntoFirestore(auth, db, ledgerId) {
+                if (!auth.currentUser?.uid) {
+                    throw new Error("No hay una sesión activa.");
+                }
+
+                if (!ledgerId) {
+                    throw new Error("Selecciona un libro contable para subir los datos locales.");
+                }
+
+                const localLedger = loadLocalLedgerCache();
+                if (!localLedger || !hasLocalLedgerData(localLedger)) {
+                    return;
+                }
+
+                const ledgerRef = doc(db, "ledgers", ledgerId);
+                const ledgerSnapshot = await getDoc(ledgerRef);
+                if (!ledgerSnapshot.exists()) {
+                    throw new Error("El libro destino no existe.");
+                }
+
+                const ledger = ledgerSnapshot.data();
+                const localLedgerName = localLedger.ledgers?.[0]?.name || DEFAULT_LOCAL_LEDGER_NAME;
+                const shouldRenameTarget =
+                    ledger.ownerUid === auth.currentUser.uid &&
+                    localLedgerName &&
+                    (localLedgerName !== DEFAULT_LOCAL_LEDGER_NAME ||
+                        isDefaultLedgerName(ledger.name || ""));
+
+                if (shouldRenameTarget) {
+                    await updateDoc(ledgerRef, {
+                        name:
+                            localLedgerName === DEFAULT_LOCAL_LEDGER_NAME
+                                ? defaultPersonalLedgerName(auth.currentUser)
+                                : localLedgerName,
+                        updatedAt: serverTimestamp(),
+                    });
+                }
+
+                const accountBatch = writeBatch(db);
+                let accountCount = 0;
+                for (const account of localLedger.accounts || []) {
+                    if (!account?.id) {
+                        continue;
+                    }
+
+                    accountBatch.set(
+                        doc(db, "ledgers", ledgerId, "accounts", account.id),
+                        {
+                            id: account.id,
+                            name: account.name || "Cuenta",
+                            deletedAt: account.deletedAt || null,
+                            updatedAt: serverTimestamp(),
+                        },
+                        { merge: true },
+                    );
+                    accountCount += 1;
+                }
+
+                if (accountCount > 0) {
+                    await accountBatch.commit();
+                }
+
+                const events = [...(localLedger.events || [])].sort(
+                    (left, right) => (left.sequence || 0) - (right.sequence || 0),
+                );
+                for (const event of events) {
+                    await appendEventToFirestore(db, ledgerId, event);
+                }
+            }
+
+            async function appendEventToFirestore(db, ledgerId, event) {
+                const eventId = uuidv7();
+                const ledgerRef = doc(db, "ledgers", ledgerId);
+                const eventRef = doc(db, "ledgers", ledgerId, "events", eventId);
+
+                await runTransaction(db, async (transaction) => {
+                    const ledgerSnapshot = await transaction.get(ledgerRef);
+                    if (!ledgerSnapshot.exists()) {
+                        throw new Error("Ledger does not exist");
+                    }
+
+                    const actualSeq = (ledgerSnapshot.data().nextEventSequence || 0) + 1;
+
+                    transaction.set(
+                        eventRef,
+                        {
+                            ...event,
+                            id: eventId,
+                            sequence: actualSeq,
+                            createdAt: serverTimestamp(),
+                        },
+                        { merge: true },
+                    );
+
+                    transaction.update(ledgerRef, {
+                        nextEventSequence: actualSeq,
+                        updatedAt: serverTimestamp(),
+                    });
+                });
+            }
+
             async function ensurePersonalLedger(auth, db) {
                 const uid = auth.currentUser?.uid;
 
@@ -594,15 +851,19 @@
                     email,
                     displayName: auth.currentUser.displayName || email,
                 };
+                const defaultLedgerName = defaultPersonalLedgerName(auth.currentUser);
                 const ledgerRef = doc(db, "ledgers", uid);
                 const ledgerSnapshot = await getDoc(ledgerRef);
 
                 if (ledgerSnapshot.exists()) {
+                    const currentName = ledgerSnapshot.data().name || "";
                     await setDoc(
                         ledgerRef,
                         {
                             id: uid,
-                            name: ledgerSnapshot.data().name || "Mi libro contable",
+                            name: isDefaultLedgerName(currentName)
+                                ? defaultLedgerName
+                                : currentName,
                             ownerUid: uid,
                             updatedAt: serverTimestamp(),
                         },
@@ -611,7 +872,7 @@
                 } else {
                     await setDoc(ledgerRef, {
                         id: uid,
-                        name: "Mi libro contable",
+                        name: defaultLedgerName,
                         ownerUid: uid,
                         memberUids: [uid],
                         memberEmails: [email],
@@ -747,8 +1008,137 @@
                 }
             }
 
+            function emitLocalLedger(app, payload) {
+                emitLedgerPayload(app, cacheLocalLedgerPayload(payload));
+            }
+
             function ledgerCacheKey(uid, ledgerId) {
                 return `contabilizar:ledger:${uid}:${ledgerId}`;
+            }
+
+            function defaultLocalLedgerPayload() {
+                return {
+                    status: "loaded",
+                    ledgerId: LOCAL_LEDGER_ID,
+                    lastAccountId: loadLastAccountId(LOCAL_LEDGER_ID),
+                    ledgers: [
+                        {
+                            id: LOCAL_LEDGER_ID,
+                            name: DEFAULT_LOCAL_LEDGER_NAME,
+                            ownerUid: "",
+                            members: [],
+                        },
+                    ],
+                    accounts: [],
+                    expenses: [],
+                    events: [],
+                    lastEventSequence: 0,
+                };
+            }
+
+            function normalizeLocalLedgerPayload(payload) {
+                const events = Array.isArray(payload?.events) ? payload.events : [];
+                const accounts = Array.isArray(payload?.accounts) ? payload.accounts : [];
+                const ledgerName =
+                    payload?.ledgers?.[0]?.name || payload?.ledgerName || DEFAULT_LOCAL_LEDGER_NAME;
+
+                return {
+                    status: "loaded",
+                    ledgerId: LOCAL_LEDGER_ID,
+                    lastAccountId:
+                        loadLastAccountId(LOCAL_LEDGER_ID) || payload?.lastAccountId || null,
+                    ledgers: [
+                        {
+                            id: LOCAL_LEDGER_ID,
+                            name: ledgerName,
+                            ownerUid: "",
+                            members: [],
+                        },
+                    ],
+                    accounts,
+                    expenses: [],
+                    events,
+                    lastEventSequence: computeLastEventSequence(events),
+                };
+            }
+
+            function getLocalLedgerPayload() {
+                return loadLocalLedgerCache() || defaultLocalLedgerPayload();
+            }
+
+            function hasLocalLedgerData(payload) {
+                const ledgerName = payload?.ledgers?.[0]?.name || DEFAULT_LOCAL_LEDGER_NAME;
+                return (
+                    (Array.isArray(payload?.events) && payload.events.length > 0) ||
+                    (Array.isArray(payload?.accounts) && payload.accounts.length > 0) ||
+                    ledgerName !== DEFAULT_LOCAL_LEDGER_NAME
+                );
+            }
+
+            function cacheLocalLedgerPayload(payload) {
+                const cachedPayload = normalizeLocalLedgerPayload(payload);
+
+                try {
+                    localStorage.setItem(
+                        LOCAL_LEDGER_KEY,
+                        JSON.stringify({
+                            schemaVersion: LOCAL_LEDGER_SCHEMA_VERSION,
+                            updatedAt: new Date().toISOString(),
+                            payload: cachedPayload,
+                        }),
+                    );
+                } catch (error) {
+                    console.warn("Could not cache local ledger data", error);
+                }
+
+                return cachedPayload;
+            }
+
+            function loadLocalLedgerCache() {
+                try {
+                    const rawCache = localStorage.getItem(LOCAL_LEDGER_KEY);
+                    if (!rawCache) {
+                        return null;
+                    }
+
+                    const cache = JSON.parse(rawCache);
+                    if (
+                        cache?.schemaVersion !== LOCAL_LEDGER_SCHEMA_VERSION ||
+                        cache?.payload?.ledgerId !== LOCAL_LEDGER_ID
+                    ) {
+                        localStorage.removeItem(LOCAL_LEDGER_KEY);
+                        return null;
+                    }
+
+                    return normalizeLocalLedgerPayload(cache.payload);
+                } catch (error) {
+                    console.warn("Could not load local ledger data", error);
+                    return null;
+                }
+            }
+
+            function clearLocalLedgerCache() {
+                try {
+                    localStorage.removeItem(LOCAL_LEDGER_KEY);
+                    localStorage.removeItem(lastAccountStorageKey(LOCAL_LEDGER_ID));
+                } catch (error) {
+                    console.warn("Could not clear local ledger data", error);
+                }
+            }
+
+            function defaultPersonalLedgerName(user) {
+                const rawName = String(user?.displayName || user?.email || "").trim();
+                const name = rawName || "desconocido";
+                return `Libro contable de ${name}`;
+            }
+
+            function isDefaultLedgerName(name) {
+                return (
+                    !name ||
+                    name === "Mi libro contable" ||
+                    name === DEFAULT_LOCAL_LEDGER_NAME ||
+                    name.startsWith("Libro contable de ")
+                );
             }
 
             function computeLastEventSequence(events) {
@@ -830,6 +1220,11 @@
 
             function loadStartupLedgerCache() {
                 try {
+                    const localLedger = loadLocalLedgerCache();
+                    if (localLedger) {
+                        return localLedger;
+                    }
+
                     const rawSession = localStorage.getItem(LAST_SESSION_KEY);
                     if (!rawSession) {
                         return null;

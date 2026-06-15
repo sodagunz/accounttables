@@ -1,5 +1,7 @@
 module Model exposing
-    ( Model
+    ( MigrationState(..)
+    , Model
+    , StorageMode(..)
     , activeAccounts
     , activeAccountsFromList
     , activeExpenses
@@ -23,6 +25,7 @@ import Util.Date exposing (DateDisplay(..))
 
 type alias Model =
     { form : Form
+    , storageMode : StorageMode
     , events : List Event
     , expenses : List Expense
     , accounts : List Account
@@ -46,12 +49,26 @@ type alias Model =
     , authState : AuthState
     , ledgerLoadState : LoadState
     , hiddenAccountIds : List String
+    , migrationState : MigrationState
     }
+
+
+type StorageMode
+    = LocalOnly
+    | CloudSynced
+
+
+type MigrationState
+    = NoMigration
+    | PreparingMigration
+    | ChoosingMigration (List Ledger.LedgerSummary) String
+    | UploadingMigration String
 
 
 initial : Model
 initial =
     { form = Accounting.emptyForm
+    , storageMode = LocalOnly
     , events = []
     , expenses = []
     , accounts = defaultAccounts
@@ -75,6 +92,7 @@ initial =
     , authState = AuthLoading
     , ledgerLoadState = NotLoaded
     , hiddenAccountIds = []
+    , migrationState = NoMigration
     }
 
 

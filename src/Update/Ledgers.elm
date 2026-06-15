@@ -2,7 +2,7 @@ module Update.Ledgers exposing (inviteGuest, removeGuest, rename, select)
 
 import Json.Encode as Encode
 import Ledger
-import Model exposing (Model, ledgerNameFor, selectedLedgerId)
+import Model exposing (Model, StorageMode(..), ledgerNameFor, selectedLedgerId)
 import String
 
 
@@ -33,9 +33,14 @@ inviteGuest model =
         ( { model | ledgerError = "Selecciona un libro contable." }, Nothing )
 
     else
-        ( { model | inviteEmail = "", ledgerError = "" }
-        , Just (Ledger.encodeGuestInvite (selectedLedgerId model) email)
-        )
+        case model.storageMode of
+            LocalOnly ->
+                ( { model | ledgerError = "Ingresa con Google para invitar colaboradores." }, Nothing )
+
+            CloudSynced ->
+                ( { model | inviteEmail = "", ledgerError = "" }
+                , Just (Ledger.encodeGuestInvite (selectedLedgerId model) email)
+                )
 
 
 removeGuest : String -> Model -> ( Model, Maybe Encode.Value )

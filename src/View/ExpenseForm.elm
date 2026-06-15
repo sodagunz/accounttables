@@ -20,6 +20,7 @@ type alias Config msg =
     , onDescription : String -> msg
     , onAmount : String -> msg
     , onAccount : String -> msg
+    , onCreateAccount : msg
     , onCurrency : String -> msg
     , onDate : String -> msg
     , onMovementType : MovementType -> msg
@@ -90,8 +91,7 @@ view config =
                 ]
             , label []
                 [ text "Cuenta"
-                , select [ value selectedAccountId, onInput config.onAccount ]
-                    (accountOptions config.accounts)
+                , accountControl config selectedAccountId
                 ]
             , div [ class "two-col" ]
                 [ label []
@@ -151,14 +151,37 @@ selectedOrDefaultAccountId selectedAccountId accounts =
             |> Maybe.withDefault ""
 
 
-accountOptions : List Account -> List (Html msg)
-accountOptions accounts =
-    case accounts of
+createAccountValue : String
+createAccountValue =
+    "__create_account__"
+
+
+accountControl : Config msg -> String -> Html msg
+accountControl config selectedAccountId =
+    case config.accounts of
         [] ->
-            [ option [ value "" ] [ text "Agrega una cuenta" ] ]
+            button
+                [ class "select-action"
+                , type_ "button"
+                , onClick config.onCreateAccount
+                ]
+                [ text "Agregar una cuenta" ]
 
         _ ->
-            List.map accountOption accounts
+            select
+                [ value selectedAccountId
+                , onInput
+                    (\value ->
+                        if value == createAccountValue then
+                            config.onCreateAccount
+
+                        else
+                            config.onAccount value
+                    )
+                ]
+                (List.map accountOption config.accounts
+                    ++ [ option [ value createAccountValue ] [ text "Agregar una cuenta" ] ]
+                )
 
 
 accountOption : Account -> Html msg

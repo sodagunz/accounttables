@@ -157,9 +157,50 @@ h1 {
 }
 
 main {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding: 24px clamp(16px, 4vw, 40px) 48px;
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: 24px clamp(16px, 4vw, 40px) 48px;
+}
+
+.local-risk {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    border: 1px solid #d5b86b;
+    border-radius: 8px;
+    background: #fff8df;
+    color: #4a3a12;
+    padding: 10px 12px;
+    font-size: 0.92rem;
+    line-height: 1.35;
+}
+
+.local-risk strong {
+    color: #2f260c;
+}
+
+.migration-panel {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 16px;
+    border: 1px solid #aac7bd;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #24302c;
+    padding: 14px;
+    box-shadow: 0 1px 2px rgba(20, 34, 30, 0.06);
+}
+
+.migration-panel strong {
+    color: #17352c;
+}
+
+.migration-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .layout {
@@ -232,8 +273,26 @@ select {
     background: #ffffff;
 }
 
+.select-action {
+    width: 100%;
+    border: 1px solid #bfcbc6;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #205c4c;
+    padding: 10px 11px;
+    text-align: left;
+    cursor: pointer;
+}
+
 input:focus,
 select:focus {
+    outline: 2px solid #2f806c;
+    outline-offset: 1px;
+    border-color: #2f806c;
+}
+
+.select-action:focus,
+.select-action:hover {
     outline: 2px solid #2f806c;
     outline-offset: 1px;
     border-color: #2f806c;

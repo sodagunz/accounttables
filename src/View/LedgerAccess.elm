@@ -97,9 +97,15 @@ memberControls config =
             , strong [] [ text "Miembros" ]
             ]
         , div [ class "members-disclosure__content" ]
-            [ memberList config
-            , inviteForm config
-            ]
+            (case config.authState of
+                Auth.SignedIn _ ->
+                    [ memberList config
+                    , inviteForm config
+                    ]
+
+                _ ->
+                    [ p [ class "empty empty--compact" ] [ text "Ingresa con Google para invitar colaboradores y sincronizar este libro." ] ]
+            )
         ]
 
 

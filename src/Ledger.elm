@@ -4,6 +4,7 @@ module Ledger exposing
     , LoadState(..)
     , Member
     , decodeLedger
+    , decodeLedgerSummaries
     , encodeAccountCreate
     , encodeAccountDelete
     , encodeGuestInvite
@@ -109,6 +110,12 @@ encodeMaybeString maybeString =
 decodeLedger : Decode.Value -> Result String LedgerData
 decodeLedger value =
     Decode.decodeValue ledgerPayloadDecoder value
+        |> Result.mapError Decode.errorToString
+
+
+decodeLedgerSummaries : Decode.Value -> Result String (List LedgerSummary)
+decodeLedgerSummaries value =
+    Decode.decodeValue (Decode.field "ledgers" (Decode.list ledgerSummaryDecoder)) value
         |> Result.mapError Decode.errorToString
 
 

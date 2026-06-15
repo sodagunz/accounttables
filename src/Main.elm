@@ -6,13 +6,14 @@ import Auth exposing (AuthState(..))
 import Browser
 import Events exposing (Event)
 import Export
-import Html exposing (Html, div, h1, header, main_, p, section, span, strong, text)
-import Html.Attributes exposing (class)
+import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
+import Html.Attributes exposing (class, type_, value)
+import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
-import Model exposing (Model)
+import Model exposing (MigrationState(..), Model, StorageMode(..))
 import Projector
 import Task
 import Time
@@ -34,6 +35,7 @@ type Msg
     | UpdateCurrency String
     | UpdateDate String
     | UpdateMovementType Accounting.MovementType
+    | OpenAccountTool
     | SelectFilter FilterWindow
     | SelectDateDisplay DateDisplay
     | SelectDisplayCurrency Accounting.Currency
@@ -61,6 +63,10 @@ type Msg
     | EditExpense String
     | CancelEdit
     | EventsLoaded Decode.Value
+    | LocalMigrationPrepared Decode.Value
+    | SelectMigrationLedger String
+    | ConfirmLocalMigration
+    | SkipLocalMigration
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -105,10 +111,22 @@ port saveLastAccountSelection : Encode.Value -> Cmd msg
 port appendEvent : Encode.Value -> Cmd msg
 
 
+port focusAccountTool : () -> Cmd msg
+
+
 port eventsLoaded : (Decode.Value -> msg) -> Sub msg
 
 
 port ledgerLoaded : (Decode.Value -> msg) -> Sub msg
+
+
+port prepareLocalMigration : () -> Cmd msg
+
+
+port localMigrationPrepared : (Decode.Value -> msg) -> Sub msg
+
+
+port mergeLocalLedgerToFirestore : Encode.Value -> Cmd msg
 
 
 main : Program Decode.Value Model Msg
@@ -139,6 +157,40 @@ modelFromFlags flags =
 
         Err _ ->
             Model.initial
+
+
+localLedgerId : String
+localLedgerId =
+    "local"
+
+
+localLedgerName : String
+localLedgerName =
+    "Libro contable de desconocido"
+
+
+ensureLocalLedger : Model -> Model
+ensureLocalLedger model =
+    if model.currentLedgerId == localLedgerId then
+        { model
+            | storageMode = LocalOnly
+            , ledgerLoadState = Loaded
+        }
+
+    else
+        { model
+            | storageMode = LocalOnly
+            , ledgerLoadState = Loaded
+            , currentLedgerId = localLedgerId
+            , ledgerName = localLedgerName
+            , ledgers =
+                [ { id = localLedgerId
+                  , name = localLedgerName
+                  , ownerUid = ""
+                  , members = []
+                  }
+                ]
+        }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -177,6 +229,9 @@ update msg model =
 
         UpdateMovementType movementType ->
             ( { model | form = Accounting.setMovementType movementType model.form }, Cmd.none )
+
+        OpenAccountTool ->
+            ( { model | accountError = "" }, focusAccountTool () )
 
         SelectFilter filterWindow ->
             ( { model | filterWindow = filterWindow }, Cmd.none )
@@ -467,6 +522,45 @@ update msg model =
                 Err error ->
                     ( { model | error = Decode.errorToString error }, Cmd.none )
 
+        LocalMigrationPrepared value ->
+            handleLocalMigrationPrepared value model
+
+        SelectMigrationLedger ledgerId ->
+            case model.migrationState of
+                ChoosingMigration ledgers _ ->
+                    ( { model | migrationState = ChoosingMigration ledgers ledgerId }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ConfirmLocalMigration ->
+            case model.migrationState of
+                ChoosingMigration _ ledgerId ->
+                    ( { model | migrationState = UploadingMigration ledgerId, ledgerLoadState = Loading }
+                    , mergeLocalLedgerToFirestore (Ledger.encodeLedgerRequest ledgerId)
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        SkipLocalMigration ->
+            case model.migrationState of
+                ChoosingMigration _ ledgerId ->
+                    ( { model | migrationState = NoMigration, ledgerLoadState = Loading }
+                    , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+                    )
+
+                UploadingMigration ledgerId ->
+                    ( { model | migrationState = NoMigration, ledgerLoadState = Loading }
+                    , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+                    )
+
+                PreparingMigration ->
+                    ( { model | migrationState = NoMigration }, Cmd.none )
+
+                NoMigration ->
+                    ( model, Cmd.none )
+
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
 payloadCmd toCmd payload =
@@ -497,7 +591,9 @@ view model =
                 ]
             ]
         , main_ []
-            [ div [ class "layout" ]
+            [ migrationPrompt model
+            , localRiskBanner model
+            , div [ class "layout" ]
                 [ div [ class "input-area" ]
                     [ ExpenseForm.view
                         { form = model.form
@@ -509,6 +605,7 @@ view model =
                         , onDescription = UpdateDescription
                         , onAmount = UpdateAmount
                         , onAccount = UpdateAccount
+                        , onCreateAccount = OpenAccountTool
                         , onCurrency = UpdateCurrency
                         , onDate = UpdateDate
                         , onMovementType = UpdateMovementType
@@ -545,10 +642,81 @@ view model =
         ]
 
 
+migrationPrompt : Model -> Html Msg
+migrationPrompt model =
+    case model.migrationState of
+        NoMigration ->
+            text ""
+
+        PreparingMigration ->
+            section [ class "migration-panel" ]
+                [ strong [] [ text "Preparando sincronizacion" ]
+                , p [] [ text "Estamos revisando tus libros de Firestore antes de subir los datos locales." ]
+                ]
+
+        UploadingMigration _ ->
+            section [ class "migration-panel" ]
+                [ strong [] [ text "Subiendo datos locales" ]
+                , p [] [ text "Estamos agregando tus cuentas y movimientos locales al libro elegido." ]
+                ]
+
+        ChoosingMigration ledgers selectedLedgerId ->
+            section [ class "migration-panel" ]
+                [ strong [] [ text "Subir datos locales" ]
+                , p [] [ text "Encontramos mas de un libro disponible. Elige donde quieres mergear las cuentas y movimientos guardados en este navegador." ]
+                , label []
+                    [ text "Libro destino"
+                    , select [ value selectedLedgerId, onInput SelectMigrationLedger ]
+                        (List.map migrationLedgerOption ledgers)
+                    ]
+                , div [ class "migration-panel__actions" ]
+                    [ button [ class "primary", type_ "button", onClick ConfirmLocalMigration ] [ text "Subir datos locales" ]
+                    , button [ class "cancel-button", type_ "button", onClick SkipLocalMigration ] [ text "Ahora no" ]
+                    ]
+                ]
+
+
+migrationLedgerOption : Ledger.LedgerSummary -> Html Msg
+migrationLedgerOption ledger =
+    option [ value ledger.id ] [ text ledger.name ]
+
+
+localRiskBanner : Model -> Html Msg
+localRiskBanner model =
+    case model.authState of
+        SignedIn _ ->
+            text ""
+
+        _ ->
+            if model.storageMode == LocalOnly then
+                let
+                    hasLocalData =
+                        not (List.isEmpty model.events)
+                            || not (List.isEmpty model.accounts)
+                            || model.ledgerName
+                            /= localLedgerName
+                in
+                section [ class "local-risk" ]
+                    [ strong [] [ text "Modo local" ]
+                    , span []
+                        [ text
+                            (if hasLocalData then
+                                "Tus datos estan guardados solo en este navegador. Inicia sesion con Google para respaldo y sincronizacion."
+
+                             else
+                                "Puedes usar la app sin Google. Los datos locales pueden perderse si se borra el navegador o cambias de dispositivo."
+                            )
+                        ]
+                    ]
+
+            else
+                text ""
+
+
 adminArea : Model -> Html Msg
 adminArea model =
     section [ class "panel admin-panel" ]
-        [ Html.details [ class "admin-disclosure" ]
+        [ Html.details [ class "admin-disclosure", Html.Attributes.id "admin-tool" ]
             [ Html.summary [ class "admin-disclosure__summary" ]
                 [ span [] [ text "Configuracion del libro" ]
                 , strong [] [ text "Administrar" ]
@@ -634,6 +802,7 @@ subscriptions _ =
         , ledgerLoaded LedgerLoaded
         , expenseIdGenerated ExpenseIdGenerated
         , eventsLoaded EventsLoaded
+        , localMigrationPrepared LocalMigrationPrepared
         ]
 
 
@@ -643,40 +812,64 @@ handleAuthStateChanged authState model =
         SignedIn user ->
             let
                 ledgerId =
-                    if model.currentLedgerId == "" then
+                    if model.currentLedgerId == "" || model.currentLedgerId == localLedgerId then
                         user.uid
 
                     else
                         model.currentLedgerId
             in
-            ( { model
-                | authState = authState
-                , ledgerLoadState = Loading
-                , currentLedgerId = ledgerId
-                , inviteEmail = ""
-                , error = ""
-                , accountError = ""
-                , ledgerError = ""
-              }
-            , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
-            )
+            if localDataExists model then
+                ( { model
+                    | authState = authState
+                    , storageMode = CloudSynced
+                    , ledgerLoadState = Loading
+                    , inviteEmail = ""
+                    , error = ""
+                    , accountError = ""
+                    , ledgerError = ""
+                    , migrationState = PreparingMigration
+                  }
+                , prepareLocalMigration ()
+                )
+
+            else
+                ( { model
+                    | authState = authState
+                    , storageMode = CloudSynced
+                    , ledgerLoadState = Loading
+                    , currentLedgerId = ledgerId
+                    , inviteEmail = ""
+                    , error = ""
+                    , accountError = ""
+                    , ledgerError = ""
+                  }
+                , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+                )
 
         SignedOut ->
             ( { model
                 | authState = authState
-                , ledgerLoadState = NotLoaded
-                , expenses = Model.sampleExpensesForModel model
-                , accounts = Model.defaultAccounts
-                , ledgers = []
-                , currentLedgerId = ""
-                , ledgerName = ""
                 , inviteEmail = ""
                 , error = ""
                 , accountError = ""
                 , ledgerError = ""
               }
+                |> ensureLocalLedger
                 |> Model.ensureSelectedAccount
-            , Cmd.none
+            , loadLedgerData (Ledger.encodeLedgerRequest localLedgerId)
+            )
+
+        AuthUnconfigured ->
+            ( { model
+                | authState = authState
+                , inviteEmail = ""
+                , error = ""
+                , accountError = ""
+                , ledgerError = ""
+              }
+                |> ensureLocalLedger
+                |> Model.ensureSelectedAccount
+            , loadLedgerData (Ledger.encodeLedgerRequest localLedgerId)
             )
 
         _ ->
@@ -690,7 +883,70 @@ handleLedgerLoaded value model =
             ( applyLedgerData ledger model, Cmd.none )
 
         Err error ->
-            ( { model | ledgerLoadState = LoadError error }, Cmd.none )
+            ( { model | ledgerLoadState = LoadError error, migrationState = NoMigration }, Cmd.none )
+
+
+handleLocalMigrationPrepared : Decode.Value -> Model -> ( Model, Cmd Msg )
+handleLocalMigrationPrepared value model =
+    let
+        status =
+            Decode.decodeValue (Decode.field "status" Decode.string) value
+                |> Result.withDefault "error"
+    in
+    if status == "ready" then
+        case Ledger.decodeLedgerSummaries value of
+            Ok ledgers ->
+                case ledgers of
+                    [] ->
+                        ( { model
+                            | migrationState = NoMigration
+                            , ledgerLoadState = LoadError "No se encontró un libro de Firestore para subir los datos locales."
+                          }
+                        , Cmd.none
+                        )
+
+                    [ ledger ] ->
+                        ( { model
+                            | migrationState = UploadingMigration ledger.id
+                            , ledgerLoadState = Loading
+                          }
+                        , mergeLocalLedgerToFirestore (Ledger.encodeLedgerRequest ledger.id)
+                        )
+
+                    firstLedger :: _ ->
+                        let
+                            selectedLedgerId =
+                                Decode.decodeValue (Decode.field "selectedLedgerId" Decode.string) value
+                                    |> Result.withDefault firstLedger.id
+                        in
+                        ( { model
+                            | migrationState = ChoosingMigration ledgers selectedLedgerId
+                            , ledgerLoadState = Loaded
+                          }
+                        , Cmd.none
+                        )
+
+            Err error ->
+                ( { model | migrationState = NoMigration, ledgerLoadState = LoadError error }, Cmd.none )
+
+    else
+        let
+            error =
+                Decode.decodeValue (Decode.field "message" Decode.string) value
+                    |> Result.withDefault "No se pudo preparar la migración local."
+        in
+        ( { model | migrationState = NoMigration, ledgerLoadState = LoadError error }, Cmd.none )
+
+
+localDataExists : Model -> Bool
+localDataExists model =
+    model.storageMode
+        == LocalOnly
+        && (not (List.isEmpty model.events)
+                || not (List.isEmpty model.accounts)
+                || model.ledgerName
+                /= localLedgerName
+           )
 
 
 applyLedgerData : Ledger.LedgerData -> Model -> Model
@@ -716,11 +972,18 @@ applyLedgerData ledger model =
         , ledgers = ledger.ledgers
         , currentLedgerId = ledger.currentLedgerId
         , ledgerName = Model.ledgerNameFor ledger.currentLedgerId ledger.ledgers
+        , storageMode =
+            if ledger.currentLedgerId == localLedgerId then
+                LocalOnly
+
+            else
+                CloudSynced
         , form = form
         , ledgerLoadState = Loaded
         , error = ""
         , accountError = ""
         , ledgerError = ""
+        , migrationState = NoMigration
     }
         |> Model.ensureSelectedAccount
 

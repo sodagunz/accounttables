@@ -898,12 +898,7 @@ tutorialView model =
                            else
                             button [ class "tutorial-tooltip__back", type_ "button", onClick TutorialBack ] [ text "Atras" ]
                          ]
-                            ++ (if step == DeleteExpenseStep then
-                                    [ button [ class "primary", type_ "button", onClick TutorialFinish ] [ text "Finalizar" ] ]
-
-                                else
-                                    [ button [ class "primary", type_ "button", onClick TutorialNext ] [ text "Siguiente" ] ]
-                               )
+                            ++ tutorialPrimaryButton step
                             ++ [ button [ class "tutorial-tooltip__skip", type_ "button", onClick TutorialSkip ] [ text "Saltar" ] ]
                         )
                     ]
@@ -960,6 +955,19 @@ tutorialStepText step =
 
         DeleteExpenseStep ->
             "Puedes eliminar o editar movimientos. Prueba a eliminar este."
+
+
+tutorialPrimaryButton : TutorialStep -> List (Html Msg)
+tutorialPrimaryButton step =
+    case step of
+        DeleteExpenseStep ->
+            [ button [ class "primary", type_ "button", onClick TutorialFinish ] [ text "Finalizar" ] ]
+
+        CollaboratorsStep ->
+            [ button [ class "primary", type_ "button", onClick TutorialNext ] [ text "Siguiente" ] ]
+
+        _ ->
+            []
 
 
 tutorialTargetSelector : Model -> TutorialStep -> String

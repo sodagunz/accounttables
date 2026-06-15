@@ -31,7 +31,7 @@ view config =
                 [ p [] [ text "Firebase no configurado." ] ]
 
             SignedOut ->
-                [ button [ type_ "button", class "auth-button", onClick config.onSignIn ] [ text "Ingresar con Google" ] ]
+                [ button [ type_ "button", class "auth-button", attribute "data-tutorial" "sign-in", onClick config.onSignIn ] [ text "Ingresar con Google" ] ]
 
             SignedIn user ->
                 [ div [ class "auth-user" ]

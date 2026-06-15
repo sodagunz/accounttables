@@ -422,7 +422,30 @@ update msg model =
                                               }
                                             )
                             in
-                            ( { updatedModel
+                            let
+                                isNewExpense =
+                                    case readyModel.form.editingId of
+                                        Nothing ->
+                                            True
+
+                                        Just _ ->
+                                            False
+
+                                ( modelAfterAdvance, advanceCmd ) =
+                                    if isNewExpense then
+                                        case updatedModel.tutorialState of
+                                            TutorialOpen FirstExpenseStep ->
+                                                ( { updatedModel | tutorialState = TutorialOpen DeleteExpenseStep }
+                                                , getElementRect (tutorialTargetSelector updatedModel DeleteExpenseStep)
+                                                )
+
+                                            _ ->
+                                                ( updatedModel, Cmd.none )
+
+                                    else
+                                        ( updatedModel, Cmd.none )
+                            in
+                            ( { modelAfterAdvance
                                 | form =
                                     { description = ""
                                     , amount = ""
@@ -442,6 +465,7 @@ update msg model =
                                         ]
                                     )
                                 , saveLastAccount readyModel.currentLedgerId readyModel.form.accountId
+                                , advanceCmd
                                 ]
                             )
 
@@ -458,8 +482,22 @@ update msg model =
             let
                 ( updatedModel, payload ) =
                     Accounts.add model
+
+                ( finalModel, advanceCmd ) =
+                    case updatedModel.tutorialState of
+                        TutorialOpen AccountsStep ->
+                            if not (List.isEmpty (Model.activeAccounts updatedModel)) then
+                                ( { updatedModel | tutorialState = TutorialOpen CollaboratorsStep, accountError = "" }
+                                , getElementRect (tutorialTargetSelector updatedModel CollaboratorsStep)
+                                )
+
+                            else
+                                ( updatedModel, Cmd.none )
+
+                        _ ->
+                            ( updatedModel, Cmd.none )
             in
-            ( updatedModel, payloadCmd saveAccount payload )
+            ( finalModel, Cmd.batch [ payloadCmd saveAccount payload, advanceCmd ] )
 
         DeleteAccount accountId ->
             let
@@ -529,17 +567,28 @@ update msg model =
                                 e
                         )
                         model.expenses
+
+                baseModel =
+                    { model
+                        | events = event :: model.events
+                        , expenses = Model.activeExpenses updatedExpenses
+                    }
             in
-            ( { model
-                | events = event :: model.events
-                , expenses = Model.activeExpenses updatedExpenses
-              }
-            , appendEvent
-                (Encode.object
-                    [ ( "ledgerId", Encode.string model.currentLedgerId )
-                    , ( "event", Events.eventEncoder event )
-                    ]
-                )
+            ( case baseModel.tutorialState of
+                TutorialOpen DeleteExpenseStep ->
+                    { baseModel | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
+
+                _ ->
+                    baseModel
+            , Cmd.batch
+                [ appendEvent
+                    (Encode.object
+                        [ ( "ledgerId", Encode.string model.currentLedgerId )
+                        , ( "event", Events.eventEncoder event )
+                        ]
+                    )
+                , saveTutorialState (Encode.string "completed")
+                ]
             )
 
         EditExpense expenseId ->
@@ -979,6 +1028,16 @@ reopenedTutorialStep model =
         CollaboratorsStep
 
 
+tutorialAdvanceCmd : Model -> TutorialState -> TutorialState -> Cmd Msg
+tutorialAdvanceCmd model oldState newState =
+    case ( oldState, newState ) of
+        ( TutorialOpen SignInStep, TutorialOpen step ) ->
+            getElementRect (tutorialTargetSelector model step)
+
+        _ ->
+            Cmd.none
+
+
 migrationPrompt : Model -> Html Msg
 migrationPrompt model =
     case model.migrationState of
@@ -1156,6 +1215,10 @@ handleAuthStateChanged authState model =
                     else
                         model.currentLedgerId
             in
+            let
+                newTutorialState =
+                    tutorialAfterAuth model
+            in
             if localDataExists model then
                 ( { model
                     | authState = authState
@@ -1166,9 +1229,12 @@ handleAuthStateChanged authState model =
                     , accountError = ""
                     , ledgerError = ""
                     , migrationState = PreparingMigration
-                    , tutorialState = tutorialAfterAuth model
+                    , tutorialState = newTutorialState
                    }
-                , prepareLocalMigration ()
+                , Cmd.batch
+                    [ prepareLocalMigration ()
+                    , tutorialAdvanceCmd model model.tutorialState newTutorialState
+                    ]
                 )
 
             else
@@ -1181,9 +1247,12 @@ handleAuthStateChanged authState model =
                     , error = ""
                     , accountError = ""
                     , ledgerError = ""
-                    , tutorialState = tutorialAfterAuth model
+                    , tutorialState = newTutorialState
                   }
-                , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+                , Cmd.batch
+                    [ loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+                    , tutorialAdvanceCmd model model.tutorialState newTutorialState
+                    ]
                 )
 
         SignedOut ->

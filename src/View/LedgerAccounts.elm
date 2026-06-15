@@ -26,7 +26,7 @@ view config =
                 ]
             , div [ class "accounts-disclosure__content" ]
                 [ Html.h2 [ class "section-title" ] [ text "Cuentas" ]
-                , Html.form [ class "inline-form", onSubmit config.onAdd ]
+                , Html.form [ class "inline-form", attribute "data-tutorial" "account-form", onSubmit config.onAdd ]
                     [ input
                         [ type_ "text"
                         , id "new-account-name"

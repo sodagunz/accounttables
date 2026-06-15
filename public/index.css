@@ -272,7 +272,7 @@ main {
     outline: none;
 }
 
-[data-tutorial] {
+.tutorial-target {
     position: relative;
     z-index: 1000;
 }

@@ -48,6 +48,7 @@ view config =
                     , attribute "aria-label" "Importe del movimiento"
                     , attribute "min" "0.01"
                     , step "0.01"
+                    , attribute "data-tutorial" "movement-amount"
                     , autofocus True
                     , value config.form.amount
                     , onInput config.onAmount
@@ -56,7 +57,7 @@ view config =
                 ]
             , label [ class "description-field" ]
                 [ text "Descripción"
-                , input [ class "description-field__input", type_ "text", attribute "data-tutorial" "description", value config.form.description, onInput config.onDescription ] []
+                , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
                 ]
             , div [ class "movement-type" ]
                 [ span [ class "movement-type__label" ] [ text "Tipo" ]
@@ -128,7 +129,7 @@ view config =
                                 IncomeMovement ->
                                     "Registrar ingreso"
               in
-              button [ class "primary primary--movement", type_ "submit" ] [ text buttonText ]
+              button [ class "primary primary--movement", type_ "submit", attribute "data-tutorial" "movement-submit" ] [ text buttonText ]
             , case config.form.editingId of
                 Just _ ->
                     button [ class "cancel-button", type_ "button", onClick config.onCancel ] [ text "Cancelar" ]

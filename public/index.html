@@ -62,8 +62,11 @@
             });
 
             app.ports.getElementRect.subscribe((selector) => {
+                const prev = document.querySelector(".tutorial-target");
+                if (prev) prev.classList.remove("tutorial-target");
                 const el = document.querySelector(selector);
                 if (!el) return;
+                el.classList.add("tutorial-target");
                 const rect = el.getBoundingClientRect();
                 app.ports.elementRectReceived.send({
                     id: selector,
@@ -77,8 +80,17 @@
                 if (el) el.open = true;
             });
 
+            app.ports.focusElement.subscribe((selector) => {
+                const el = document.querySelector(selector);
+                if (el) el.focus();
+            });
+
             app.ports.lockBodyScroll.subscribe((locked) => {
                 document.body.style.overflow = locked ? "hidden" : "";
+                if (!locked) {
+                    const prev = document.querySelector(".tutorial-target");
+                    if (prev) prev.classList.remove("tutorial-target");
+                }
             });
 
             app.ports.saveTutorialState.subscribe((state) => {

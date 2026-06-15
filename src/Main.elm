@@ -493,8 +493,12 @@ update msg model =
                     case updatedModel.tutorialState of
                         TutorialOpen AccountsStep ->
                             if not (List.isEmpty (Model.activeAccounts updatedModel)) then
-                                ( { updatedModel | tutorialState = TutorialOpen CollaboratorsStep, accountError = "" }
-                                , tutorialNavigateCmd updatedModel CollaboratorsStep
+                                let
+                                    nextAccountsStep =
+                                        tutorialStepAfterAccounts updatedModel
+                                in
+                                ( { updatedModel | tutorialState = TutorialOpen nextAccountsStep, accountError = "" }
+                                , tutorialNavigateCmd updatedModel nextAccountsStep
                                 )
 
                             else
@@ -1018,19 +1022,30 @@ tutorialTargetRectDecoder =
 
 advanceTutorialFrom : TutorialStep -> Model -> ( Model, Cmd Msg )
 advanceTutorialFrom step model =
-    case rawNextStep step of
-        Just nextStep ->
-            ( { model | tutorialState = TutorialOpen nextStep }
-            , tutorialNavigateCmd model nextStep
+    case step of
+        AccountsStep ->
+            let
+                next =
+                    tutorialStepAfterAccounts model
+            in
+            ( { model | tutorialState = TutorialOpen next }
+            , tutorialNavigateCmd model next
             )
 
-        Nothing ->
-            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
-            , Cmd.batch
-                [ lockBodyScroll False
-                , saveTutorialState (Encode.string "completed")
-                ]
-            )
+        _ ->
+            case rawNextStep step of
+                Just nextStep ->
+                    ( { model | tutorialState = TutorialOpen nextStep }
+                    , tutorialNavigateCmd model nextStep
+                    )
+
+                Nothing ->
+                    ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
+                    , Cmd.batch
+                        [ lockBodyScroll False
+                        , saveTutorialState (Encode.string "completed")
+                        ]
+                    )
 
 
 rawNextStep : TutorialStep -> Maybe TutorialStep
@@ -1077,7 +1092,7 @@ reopenedTutorialStep model =
         AccountsStep
 
     else
-        CollaboratorsStep
+        tutorialStepAfterAccounts model
 
 
 tutorialAdvanceCmd : Model -> TutorialState -> TutorialState -> Cmd Msg
@@ -1115,6 +1130,16 @@ tutorialOpenDisclosureCmd step =
 
         _ ->
             Cmd.none
+
+
+tutorialStepAfterAccounts : Model -> TutorialStep
+tutorialStepAfterAccounts model =
+    case model.authState of
+        SignedIn _ ->
+            CollaboratorsStep
+
+        _ ->
+            FirstExpenseStep
 
 
 migrationPrompt : Model -> Html Msg
@@ -1389,8 +1414,8 @@ handleLedgerLoaded value model =
 
                 advanceCmd =
                     case ( model.tutorialState, updatedModel.tutorialState ) of
-                        ( TutorialOpen AccountsStep, TutorialOpen CollaboratorsStep ) ->
-                            tutorialNavigateCmd updatedModel CollaboratorsStep
+                        ( TutorialOpen AccountsStep, TutorialOpen next ) ->
+                            tutorialNavigateCmd updatedModel next
 
                         _ ->
                             Cmd.none
@@ -1509,7 +1534,10 @@ adjustTutorialAfterLedgerLoad _ model =
     case model.tutorialState of
         TutorialOpen AccountsStep ->
             if not (List.isEmpty (Model.activeAccounts model)) then
-                { model | tutorialState = TutorialOpen CollaboratorsStep, accountError = "" }
+                { model
+                    | tutorialState = TutorialOpen (tutorialStepAfterAccounts model)
+                    , accountError = ""
+                }
 
             else
                 model

@@ -1015,6 +1015,19 @@ tutorialAllowsTargetClick step =
             True
 
 
+tutorialOpenDisclosures : TutorialStep -> List String
+tutorialOpenDisclosures step =
+    case step of
+        AccountsStep ->
+            [ "admin-tool", "accounts-tool" ]
+
+        CollaboratorsStep ->
+            [ "admin-tool", "members-tool" ]
+
+        _ ->
+            []
+
+
 prepareTutorialStep : TutorialStep -> Model -> Model
 prepareTutorialStep step model =
     case step of
@@ -1078,6 +1091,7 @@ encodeTutorialStep model step =
         , ( "showSkip", Encode.bool (tutorialShowSkip step) )
         , ( "done", Encode.bool (tutorialDoneButton step) )
         , ( "allowTargetClick", Encode.bool (tutorialAllowsTargetClick step) )
+        , ( "openDisclosures", Encode.list Encode.string (tutorialOpenDisclosures step) )
         ]
 
 

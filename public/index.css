@@ -272,8 +272,45 @@ main {
     outline: none;
 }
 
+.driver-overlay {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10000;
+    pointer-events: auto;
+}
+
+.driver-overlay path {
+    fill: rgba(0, 0, 0, 0.45);
+}
+
+.driver-active .driver-overlay {
+    cursor: default;
+}
+
+.driver-active-element {
+    position: relative !important;
+    z-index: 10001 !important;
+}
+
+.driver-popover {
+    position: fixed;
+    z-index: 10002;
+    box-sizing: border-box;
+    min-width: min(300px, calc(100vw - 32px));
+    margin: 0;
+    padding: 16px 18px;
+    background: #ffffff;
+}
+
+.driver-popover * {
+    box-sizing: border-box;
+}
+
 .driver-popover.driverjs-theme-contabilizar {
     max-width: 360px;
+    background: #ffffff;
     border: 1px solid #d4ddd9;
     border-radius: 8px;
     color: #2f3d38;
@@ -290,10 +327,22 @@ main {
     color: #2f3d38;
     font-size: 0.95rem;
     line-height: 1.4;
+    margin: 0;
 }
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-footer {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
     gap: 8px;
+    margin-top: 14px;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-navigation-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-end;
 }
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-next-btn,
@@ -304,12 +353,14 @@ main {
     font: inherit;
     font-weight: 800;
     text-shadow: none;
+    cursor: pointer;
 }
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-next-btn {
     border: 0;
     background: #17352c;
     color: #ffffff;
+    padding: 0 14px;
 }
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-next-btn:hover {
@@ -322,6 +373,7 @@ main {
     border: 0;
     background: transparent;
     color: #205c4c;
+    padding: 0;
 }
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-prev-btn:hover,
@@ -329,6 +381,65 @@ main {
     background: transparent;
     color: #205c4c;
     text-decoration: underline;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-side-top {
+    bottom: -16px;
+    border-top-color: #ffffff;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-side-bottom {
+    top: -16px;
+    border-bottom-color: #ffffff;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-side-left {
+    right: -16px;
+    border-left-color: #ffffff;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-side-right {
+    left: -16px;
+    border-right-color: #ffffff;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-start.driver-popover-arrow-side-top,
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-start.driver-popover-arrow-side-bottom {
+    left: 18px;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-end.driver-popover-arrow-side-top,
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-end.driver-popover-arrow-side-bottom {
+    right: 18px;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-center.driver-popover-arrow-side-top,
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-center.driver-popover-arrow-side-bottom {
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-start.driver-popover-arrow-side-left,
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-start.driver-popover-arrow-side-right {
+    top: 18px;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-end.driver-popover-arrow-side-left,
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-end.driver-popover-arrow-side-right {
+    bottom: 18px;
+}
+
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-center.driver-popover-arrow-side-left,
+.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-center.driver-popover-arrow-side-right {
+    top: 50%;
+    transform: translateY(-50%);
 }
 
 @media (max-width: 520px) {

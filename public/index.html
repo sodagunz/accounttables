@@ -291,7 +291,18 @@
                     return buttons;
                 };
 
+                const openTutorialDisclosures = (ids) => {
+                    if (!Array.isArray(ids)) return;
+
+                    ids.forEach((id) => {
+                        const el = document.getElementById(String(id || ""));
+                        if (el) el.open = true;
+                    });
+                };
+
                 const showTutorialStep = (step, retry = true) => {
+                    openTutorialDisclosures(step?.openDisclosures);
+
                     const selector = String(step?.selector || "");
                     const target = selector ? document.querySelector(selector) : null;
                     const isMobile = window.matchMedia("(max-width: 520px)").matches;
@@ -314,35 +325,43 @@
                     const showButtons = popoverButtonsFor(step);
 
                     target?.scrollIntoView({
-                        behavior: "smooth",
+                        behavior: isMobile ? "auto" : "smooth",
                         block: isMobile ? "center" : "nearest",
                         inline: "nearest",
                     });
 
-                    driver.setConfig({
-                        ...baseDriverConfig,
-                        nextBtnText: step?.done ? "Finalizar" : "Siguiente",
-                        stagePadding: isMobile ? 4 : baseDriverConfig.stagePadding,
-                        popoverOffset: isMobile ? 8 : 10,
-                    });
-
-                    driver.highlight({
-                        element: selector || undefined,
-                        disableActiveInteraction: !step?.allowTargetClick,
-                        popover: {
-                            title: String(step?.title || ""),
-                            description: String(step?.description || ""),
-                            side: step?.side || "bottom",
-                            align: step?.align || "start",
-                            showButtons,
+                    const highlightStep = () => {
+                        driver.setConfig({
+                            ...baseDriverConfig,
                             nextBtnText: step?.done ? "Finalizar" : "Siguiente",
-                            prevBtnText: "Atras",
-                            doneBtnText: "Finalizar",
-                            onNextClick: () => emitTutorialAction(step?.done ? "done" : "next"),
-                            onPrevClick: () => emitTutorialAction("back"),
-                            onCloseClick: () => emitTutorialAction("skip"),
-                        },
-                    });
+                            stagePadding: isMobile ? 4 : baseDriverConfig.stagePadding,
+                            popoverOffset: isMobile ? 8 : 10,
+                        });
+
+                        driver.highlight({
+                            element: selector || undefined,
+                            disableActiveInteraction: !step?.allowTargetClick,
+                            popover: {
+                                title: String(step?.title || ""),
+                                description: String(step?.description || ""),
+                                side: step?.side || "bottom",
+                                align: step?.align || "start",
+                                showButtons,
+                                nextBtnText: step?.done ? "Finalizar" : "Siguiente",
+                                prevBtnText: "Atras",
+                                doneBtnText: "Finalizar",
+                                onNextClick: () => emitTutorialAction(step?.done ? "done" : "next"),
+                                onPrevClick: () => emitTutorialAction("back"),
+                                onCloseClick: () => emitTutorialAction("skip"),
+                            },
+                        });
+                    };
+
+                    if (isMobile && target) {
+                        window.requestAnimationFrame(highlightStep);
+                    } else {
+                        highlightStep();
+                    }
                 };
 
                 const refreshTutorial = () => {

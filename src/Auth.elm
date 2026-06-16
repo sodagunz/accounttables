@@ -20,6 +20,7 @@ type alias User =
     , displayName : String
     , email : String
     , photoUrl : String
+    , acceptedInviteLedgerId : Maybe String
     }
 
 
@@ -56,8 +57,9 @@ authStateFromStatus status =
 
 userDecoder : Decode.Decoder User
 userDecoder =
-    Decode.map4 User
+    Decode.map5 User
         (Decode.field "uid" Decode.string)
         (Decode.field "displayName" Decode.string)
         (Decode.field "email" Decode.string)
         (Decode.field "photoUrl" Decode.string)
+        (Decode.maybe (Decode.field "acceptedInviteLedgerId" Decode.string))

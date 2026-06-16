@@ -19,12 +19,13 @@
 
       mkScripts = pkgs: [
         (pkgs.writeShellScriptBin "build" ''
-          exec elm make src/Main.elm --output=public/elm.js
+          exec elm make src/Main.elm --output=public/elm.min.js
         '')
         (pkgs.writeShellScriptBin "build-release" ''
-          exec elm make src/Main.elm --output=public/elm.js --optimize \
-            && uglifyjs public/elm.js --compress "pure_funcs='F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9',pure_getters,keep_fargs=false,unsafe_comps,unsafe" --output public/elm.min.js \
-            && uglifyjs public/elm.min.js --mangle --output public/elm.min.js
+          set -euo pipefail
+          elm make src/Main.elm --output=public/elm.min.js --optimize
+          uglifyjs public/elm.min.js --compress "pure_funcs='F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9',pure_getters,keep_fargs=false,unsafe_comps,unsafe" --output public/elm.min.js
+          uglifyjs public/elm.min.js --mangle --output public/elm.min.js
         '')
         (pkgs.writeShellScriptBin "deploy" ''
           exec firebase deploy
@@ -42,11 +43,16 @@
       apps = forAllSystems (pkgs: {
         build = {
           type = "app";
-          program = "${pkgs.writeShellScriptBin "build" "exec elm make src/Main.elm --output=public/elm.js"}/bin/build";
+          program = "${pkgs.writeShellScriptBin "build" "exec elm make src/Main.elm --output=public/elm.min.js"}/bin/build";
         };
         build-release = {
           type = "app";
-          program = "${pkgs.writeShellScriptBin "build-release" "exec elm make src/Main.elm --output=public/elm.js --optimize && uglifyjs public/elm.js --compress \"pure_funcs='F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9',pure_getters,keep_fargs=false,unsafe_comps,unsafe\" --output public/elm.min.js && uglifyjs public/elm.min.js --mangle --output public/elm.min.js"}/bin/build-release";
+          program = "${pkgs.writeShellScriptBin "build-release" ''
+            set -euo pipefail
+            ${pkgs.elmPackages.elm}/bin/elm make src/Main.elm --output=public/elm.min.js --optimize
+            ${pkgs.uglify-js}/bin/uglifyjs public/elm.min.js --compress "pure_funcs='F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9',pure_getters,keep_fargs=false,unsafe_comps,unsafe" --output public/elm.min.js
+            ${pkgs.uglify-js}/bin/uglifyjs public/elm.min.js --mangle --output public/elm.min.js
+          ''}/bin/build-release";
         };
         deploy = {
           type = "app";
@@ -86,7 +92,7 @@
           shellHook = ''
             export NODE_PATH=${pkgs.firebase-tools}/lib/node_modules:${pkgs.firebase-tools}/lib/node_modules/firebase-tools/node_modules
             echo "Elm accounting app dev shell"
-            echo "Available: build, update-rules, start-local, elm, elm-format, elm-test, elm-review, firebase, node, pnpm, prettier"
+            echo "Available: build, build-release, update-rules, start-local, elm, elm-format, elm-test, elm-review, firebase, node, pnpm, prettier"
           '';
         };
       });

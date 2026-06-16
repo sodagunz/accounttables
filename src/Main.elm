@@ -551,7 +551,7 @@ expensesConfig =
 
 exportVisibleTable : Export.Format -> Model -> Cmd Msg
 exportVisibleTable format model =
-    exportTable (Export.tablePayload format model.dateDisplay model.today (Model.activeAccounts model) (Model.visibleExpenses model))
+    exportTable (Export.tablePayload format model.dateDisplay model.today (Model.activeAccounts model) (Model.visibleMovements model))
 
 
 subscriptions : Model -> Sub Msg

@@ -2,29 +2,29 @@ module Projector exposing
     ( projectEvents
     )
 
-import Accounting exposing (Expense)
+import Accounting exposing (Movement)
 import Events exposing (Event(..), MovementCreatedData, MovementDeletedData, MovementUpdatedData, eventSequence)
 
 
-projectEvents : List Event -> List Expense
+projectEvents : List Event -> List Movement
 projectEvents events =
     List.foldl applyEvent [] (List.sortBy eventSequence events)
 
 
-applyEvent : Event -> List Expense -> List Expense
-applyEvent event expenses =
+applyEvent : Event -> List Movement -> List Movement
+applyEvent event movements =
     case event of
         MovementCreatedEvent _ data ->
-            movementCreated data :: expenses
+            movementCreated data :: movements
 
         MovementDeletedEvent _ data ->
-            List.map (markDeleted data.movementId) expenses
+            List.map (markDeleted data.movementId) movements
 
         MovementUpdatedEvent _ data ->
-            List.map (applyUpdate data) expenses
+            List.map (applyUpdate data) movements
 
 
-movementCreated : MovementCreatedData -> Expense
+movementCreated : MovementCreatedData -> Movement
 movementCreated data =
     { id = data.id
     , movementType = data.movementType
@@ -41,18 +41,18 @@ movementCreated data =
     }
 
 
-markDeleted : String -> Expense -> Expense
-markDeleted movementId expense =
-    if expense.id == movementId then
-        { expense | deletedAt = Just "deleted" }
+markDeleted : String -> Movement -> Movement
+markDeleted movementId movement =
+    if movement.id == movementId then
+        { movement | deletedAt = Just "deleted" }
 
     else
-        expense
+        movement
 
 
-applyUpdate : MovementUpdatedData -> Expense -> Expense
-applyUpdate data expense =
-    if expense.id == data.movementId then
+applyUpdate : MovementUpdatedData -> Movement -> Movement
+applyUpdate data movement =
+    if movement.id == data.movementId then
         { id = data.movementId
         , movementType = data.movementType
         , description = data.description
@@ -64,8 +64,8 @@ applyUpdate data expense =
         , ars = data.ars
         , usd = data.usd
         , date = data.date
-        , deletedAt = expense.deletedAt
+        , deletedAt = movement.deletedAt
         }
 
     else
-        expense
+        movement

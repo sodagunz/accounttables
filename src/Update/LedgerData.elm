@@ -104,10 +104,10 @@ apply ledger model =
 
         expenses =
             if List.isEmpty ledger.events then
-                Model.activeExpenses ledger.expenses
+                Model.activeMovements ledger.expenses
 
             else
-                Model.activeExpenses (Projector.projectEvents ledger.events)
+                Model.activeMovements (Projector.projectEvents ledger.events)
     in
     { model
         | events = ledger.events

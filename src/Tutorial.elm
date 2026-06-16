@@ -118,15 +118,15 @@ skipTutorialFrom config step model =
                 tutorialNavigateTo config (stepAfterAccounts model) model
 
         CollaboratorsStep ->
-            tutorialNavigateTo config FirstExpenseStep model
+            tutorialNavigateTo config FirstMovementStep model
 
-        FirstExpenseStep ->
+        FirstMovementStep ->
             completeTutorial config model
 
         AccountsStep ->
             ( model, Cmd.none )
 
-        DeleteExpenseStep ->
+        DeleteMovementStep ->
             ( model, Cmd.none )
 
 
@@ -207,10 +207,10 @@ targetSelector model step =
         CollaboratorsStep ->
             "[data-tutorial=\"invite-email\"]"
 
-        FirstExpenseStep ->
+        FirstMovementStep ->
             "[data-tutorial=\"movement-form\"]"
 
-        DeleteExpenseStep ->
+        DeleteMovementStep ->
             case model.tutorialExpenseId of
                 Just expenseId ->
                     "[data-tutorial=\"delete-" ++ expenseId ++ "\"]"
@@ -222,7 +222,7 @@ targetSelector model step =
 focusSelector : Model -> TutorialStep -> String
 focusSelector model step =
     case step of
-        FirstExpenseStep ->
+        FirstMovementStep ->
             "[data-tutorial=\"movement-amount\"]"
 
         _ ->
@@ -242,8 +242,8 @@ prepareState model =
 prepareStep : TutorialStep -> Model -> Model
 prepareStep step model =
     case step of
-        FirstExpenseStep ->
-            prefillExpenseForm model
+        FirstMovementStep ->
+            prefillMovementForm model
 
         _ ->
             model
@@ -259,12 +259,12 @@ nextStep step =
             Just CollaboratorsStep
 
         CollaboratorsStep ->
-            Just FirstExpenseStep
+            Just FirstMovementStep
 
-        FirstExpenseStep ->
-            Just DeleteExpenseStep
+        FirstMovementStep ->
+            Just DeleteMovementStep
 
-        DeleteExpenseStep ->
+        DeleteMovementStep ->
             Nothing
 
 
@@ -280,11 +280,11 @@ previousStep step =
         CollaboratorsStep ->
             AccountsStep
 
-        FirstExpenseStep ->
+        FirstMovementStep ->
             CollaboratorsStep
 
-        DeleteExpenseStep ->
-            FirstExpenseStep
+        DeleteMovementStep ->
+            FirstMovementStep
 
 
 reopenedStep : Model -> TutorialStep
@@ -303,7 +303,7 @@ stepAfterAccounts model =
             CollaboratorsStep
 
         _ ->
-            FirstExpenseStep
+            FirstMovementStep
 
 
 openDisclosureIds : TutorialStep -> List String
@@ -319,8 +319,8 @@ openDisclosureIds step =
             []
 
 
-prefillExpenseForm : Model -> Model
-prefillExpenseForm model =
+prefillMovementForm : Model -> Model
+prefillMovementForm model =
     let
         accountId =
             case model.form.accountId of
@@ -360,10 +360,10 @@ stepText step =
         CollaboratorsStep ->
             "Invita a alguien por email para trabajar juntos. Tambien puedes hacerlo despues."
 
-        FirstExpenseStep ->
+        FirstMovementStep ->
             "Registra tu primer movimiento. El importe y la descripcion ya estan completos. Presiona Guardar."
 
-        DeleteExpenseStep ->
+        DeleteMovementStep ->
             "Perfecto. Ahora borremos este movimiento de prueba para que todo quede limpio. Presiona el boton de eliminar."
 
 
@@ -379,10 +379,10 @@ stepName step =
         CollaboratorsStep ->
             "collaborators"
 
-        FirstExpenseStep ->
+        FirstMovementStep ->
             "first-expense"
 
-        DeleteExpenseStep ->
+        DeleteMovementStep ->
             "delete-expense"
 
 
@@ -398,10 +398,10 @@ stepSide step =
         CollaboratorsStep ->
             "right"
 
-        FirstExpenseStep ->
+        FirstMovementStep ->
             "right"
 
-        DeleteExpenseStep ->
+        DeleteMovementStep ->
             "left"
 
 
@@ -421,7 +421,7 @@ showSkip step =
         AccountsStep ->
             False
 
-        DeleteExpenseStep ->
+        DeleteMovementStep ->
             False
 
         _ ->
@@ -439,7 +439,7 @@ allowsTargetClick step =
         CollaboratorsStep ->
             False
 
-        DeleteExpenseStep ->
+        DeleteMovementStep ->
             True
 
         _ ->

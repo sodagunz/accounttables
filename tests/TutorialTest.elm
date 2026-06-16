@@ -24,7 +24,7 @@ suite =
         , test "reopens at first expense after account setup when signed out" <|
             \_ ->
                 Tutorial.reopenedStep { initialModel | accounts = [ activeAccount ] }
-                    |> Expect.equal FirstExpenseStep
+                    |> Expect.equal FirstMovementStep
         , test "reopens at collaborators after account setup when signed in" <|
             \_ ->
                 Tutorial.reopenedStep
@@ -47,7 +47,7 @@ suite =
                         initialModel.form
 
                     prepared =
-                        Tutorial.prepareStep FirstExpenseStep
+                        Tutorial.prepareStep FirstMovementStep
                             { initialModel
                                 | accounts = [ activeAccount ]
                                 , form = { form | accountId = "" }
@@ -62,7 +62,7 @@ suite =
                     prepared
         , test "encodes delete selector for the tutorial-created expense" <|
             \_ ->
-                Tutorial.encodeStep { initialModel | tutorialExpenseId = Just "movement-1" } DeleteExpenseStep
+                Tutorial.encodeStep { initialModel | tutorialExpenseId = Just "movement-1" } DeleteMovementStep
                     |> Decode.decodeValue (Decode.field "selector" Decode.string)
                     |> Expect.equal (Ok "[data-tutorial=\"delete-movement-1\"]")
         ]

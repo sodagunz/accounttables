@@ -1,7 +1,7 @@
 module Accounting exposing
     ( Account
     , Currency(..)
-    , Expense
+    , Movement
     , FilterWindow(..)
     , Form
     , MoneyTotal
@@ -9,7 +9,7 @@ module Accounting exposing
     , SortDirection(..)
     , SortField(..)
     , addMoney
-    , buildExpense
+    , buildMovement
     , cashflowFor
     , convert
     , currencyFromString
@@ -17,21 +17,21 @@ module Accounting exposing
     , descriptionDisplay
     , emptyForm
     , emptyMoney
-    , expenseMatchesFilter
-    , expensesFor
+    , movementMatchesFilter
+    , movementsFor
     , fallbackExchangeRate
-    , filteredExpenses
+    , filteredMovements
     , movementTypeFromString
     , movementTypeToString
-    , sampleExpenses
+    , sampleMovements
     , setAccount
     , setAmount
     , setCurrency
     , setDate
     , setDescription
     , setMovementType
-    , expenseToForm
-    , sortExpenses
+    , movementToForm
+    , sortMovements
     , summarizeMoney
     )
 
@@ -76,7 +76,7 @@ type MovementType
     | IncomeMovement
 
 
-type alias Expense =
+type alias Movement =
     { id : String
     , movementType : MovementType
     , description : Maybe String
@@ -157,20 +157,20 @@ setMovementType movementType form =
     { form | movementType = movementType }
 
 
-expenseToForm : Expense -> Form -> Form
-expenseToForm expense form =
-    { description = expense.description |> Maybe.withDefault ""
-    , amount = String.fromFloat expense.inputAmount
-    , accountId = expense.accountId
-    , currency = expense.inputCurrency
-    , date = expense.date
-    , movementType = expense.movementType
-    , editingId = Just expense.id
+movementToForm : Movement -> Form -> Form
+movementToForm movement form =
+    { description = movement.description |> Maybe.withDefault ""
+    , amount = String.fromFloat movement.inputAmount
+    , accountId = movement.accountId
+    , currency = movement.inputCurrency
+    , date = movement.date
+    , movementType = movement.movementType
+    , editingId = Just movement.id
     }
 
 
-buildExpense : Float -> String -> List Account -> Form -> Result String Expense
-buildExpense exchangeRate id accounts form =
+buildMovement : Float -> String -> List Account -> Form -> Result String Movement
+buildMovement exchangeRate id accounts form =
     let
         description =
             String.trim form.description
@@ -261,25 +261,25 @@ emptyMoney =
     { ars = 0, usd = 0 }
 
 
-summarizeMoney : List Expense -> MoneyTotal
+summarizeMoney : List Movement -> MoneyTotal
 summarizeMoney expenses =
     List.foldl addMoney emptyMoney expenses
 
 
-addMoney : Expense -> MoneyTotal -> MoneyTotal
-addMoney expense total =
-    { ars = total.ars + expense.ars
-    , usd = total.usd + expense.usd
+addMoney : Movement -> MoneyTotal -> MoneyTotal
+addMoney movement total =
+    { ars = total.ars + movement.ars
+    , usd = total.usd + movement.usd
     }
 
 
-expensesFor : Account -> List Expense -> List Expense
-expensesFor account expenses =
+movementsFor : Account -> List Movement -> List Movement
+movementsFor account expenses =
     List.filter (\expense -> expense.accountId == account.id) expenses
 
 
-sampleExpenses : Float -> String -> List Account -> List Expense
-sampleExpenses exchangeRate today accounts =
+sampleMovements : Float -> String -> List Account -> List Movement
+sampleMovements exchangeRate today accounts =
     let
         yesterday =
             Date.addDays -1 today
@@ -289,23 +289,23 @@ sampleExpenses exchangeRate today accounts =
     in
     case accounts of
         first :: second :: _ ->
-            [ sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
-            , sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000002" "Nafta" second 42 USD today
-            , sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
-            , sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000004" "Librería" second 18500 ARS lastWeek
+            [ sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
+            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000002" "Nafta" second 42 USD today
+            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
+            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000004" "Librería" second 18500 ARS lastWeek
             ]
 
         first :: [] ->
-            [ sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
-            , sampleExpense exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
+            [ sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
+            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
             ]
 
         [] ->
             []
 
 
-sampleExpense : Float -> String -> String -> Account -> Float -> Currency -> String -> Expense
-sampleExpense exchangeRate id description account amount currency date =
+sampleMovement : Float -> String -> String -> Account -> Float -> Currency -> String -> Movement
+sampleMovement exchangeRate id description account amount currency date =
     let
         converted =
             cashflowFor ExpenseMovement exchangeRate currency amount
@@ -325,44 +325,44 @@ sampleExpense exchangeRate id description account amount currency date =
     }
 
 
-filteredExpenses :
+filteredMovements :
     { model
-        | expenses : List Expense
+        | expenses : List Movement
         , filterWindow : FilterWindow
         , today : String
     }
-    -> List Expense
-filteredExpenses model =
-    List.filter (expenseMatchesFilter model) model.expenses
+    -> List Movement
+filteredMovements model =
+    List.filter (movementMatchesFilter model) model.expenses
 
 
-expenseMatchesFilter :
+movementMatchesFilter :
     { model
         | filterWindow : FilterWindow
         , today : String
     }
-    -> Expense
+    -> Movement
     -> Bool
-expenseMatchesFilter model expense =
+movementMatchesFilter model movement =
     case model.filterWindow of
         AllTime ->
             True
 
         ThisYear ->
-            String.left 4 expense.date == String.left 4 model.today
+            String.left 4 movement.date == String.left 4 model.today
 
         ThisMonth ->
-            String.left 7 expense.date == String.left 7 model.today
+            String.left 7 movement.date == String.left 7 model.today
 
         ThisWeek ->
-            Date.weekStartIso expense.date == Date.weekStartIso model.today
+            Date.weekStartIso movement.date == Date.weekStartIso model.today
 
         Today ->
-            expense.date == model.today
+            movement.date == model.today
 
 
-sortExpenses : SortField -> SortDirection -> List Expense -> List Expense
-sortExpenses sortField sortDirection expenses =
+sortMovements : SortField -> SortDirection -> List Movement -> List Movement
+sortMovements sortField sortDirection expenses =
     let
         sorted =
             case sortField of
@@ -392,31 +392,31 @@ sortExpenses sortField sortDirection expenses =
             List.reverse sorted
 
 
-compareByDate : Expense -> Expense -> Order
+compareByDate : Movement -> Movement -> Order
 compareByDate left right =
     compareThen left.id right.id (compare left.date right.date)
 
 
-compareByAccount : Expense -> Expense -> Order
+compareByAccount : Movement -> Movement -> Order
 compareByAccount left right =
     compareThen left.id right.id (compare (String.toLower left.accountName) (String.toLower right.accountName))
 
 
-compareByDescription : Expense -> Expense -> Order
+compareByDescription : Movement -> Movement -> Order
 compareByDescription left right =
     compareThen left.id right.id (compare (descriptionText left) (descriptionText right))
 
 
-descriptionText : Expense -> String
-descriptionText expense =
-    expense.description
+descriptionText : Movement -> String
+descriptionText movement =
+    movement.description
         |> Maybe.withDefault ""
         |> String.toLower
 
 
-descriptionDisplay : Expense -> String
-descriptionDisplay expense =
-    case Maybe.map String.trim expense.description of
+descriptionDisplay : Movement -> String
+descriptionDisplay movement =
+    case Maybe.map String.trim movement.description of
         Just description ->
             if description == "" then
                 "-"
@@ -428,17 +428,17 @@ descriptionDisplay expense =
             "-"
 
 
-compareByExchangeRate : Expense -> Expense -> Order
+compareByExchangeRate : Movement -> Movement -> Order
 compareByExchangeRate left right =
     compareThen left.id right.id (compare left.exchangeRate right.exchangeRate)
 
 
-compareByPesos : Expense -> Expense -> Order
+compareByPesos : Movement -> Movement -> Order
 compareByPesos left right =
     compareThen left.id right.id (compare left.ars right.ars)
 
 
-compareByDollars : Expense -> Expense -> Order
+compareByDollars : Movement -> Movement -> Order
 compareByDollars left right =
     compareThen left.id right.id (compare left.usd right.usd)
 

@@ -58,7 +58,7 @@ view : Config msg -> Model -> Html msg
 view config model =
     let
         rows =
-            Model.visibleExpenses model
+            Model.visibleMovements model
 
         isTutorialOpen =
             case model.tutorialState of

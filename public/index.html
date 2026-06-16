@@ -294,6 +294,7 @@
                 const showTutorialStep = (step, retry = true) => {
                     const selector = String(step?.selector || "");
                     const target = selector ? document.querySelector(selector) : null;
+                    const isMobile = window.matchMedia("(max-width: 520px)").matches;
 
                     if (selector && !target) {
                         if (retry) {
@@ -301,6 +302,7 @@
                             return;
                         }
 
+                        destroyTutorial();
                         emitTutorialAction("target-missing", {
                             selector,
                             step: String(step?.step || ""),
@@ -311,9 +313,17 @@
                     const driver = ensureDriver();
                     const showButtons = popoverButtonsFor(step);
 
+                    target?.scrollIntoView({
+                        behavior: "smooth",
+                        block: isMobile ? "center" : "nearest",
+                        inline: "nearest",
+                    });
+
                     driver.setConfig({
                         ...baseDriverConfig,
                         nextBtnText: step?.done ? "Finalizar" : "Siguiente",
+                        stagePadding: isMobile ? 4 : baseDriverConfig.stagePadding,
+                        popoverOffset: isMobile ? 8 : 10,
                     });
 
                     driver.highlight({

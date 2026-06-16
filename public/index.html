@@ -189,12 +189,22 @@
 
                 setupFirestore(app, auth, db);
 
-                onAuthStateChanged(auth, (user) => {
+                onAuthStateChanged(auth, async (user) => {
                     if (user) {
-                        app.ports.authStateChanged.send({
-                            status: "signed-in",
-                            user: serializeUser(user),
-                        });
+                        try {
+                            await ensureUserEmailIndex(auth, db);
+                            const acceptedInviteLedgerIds = await acceptPendingInvites(auth, db);
+                            app.ports.authStateChanged.send({
+                                status: "signed-in",
+                                user: serializeUser(user, acceptedInviteLedgerIds[0] || null),
+                            });
+                        } catch (error) {
+                            console.error("Firebase invite acceptance failed", error);
+                            app.ports.authStateChanged.send({
+                                status: "error",
+                                message: firestoreErrorMessage(error),
+                            });
+                        }
                     } else {
                         clearLastSession();
                         app.ports.authStateChanged.send({ status: "signed-out" });
@@ -1100,12 +1110,13 @@
                 const uid = auth.currentUser?.uid;
                 const email = normalizeEmail(auth.currentUser?.email);
                 if (!uid || !email) {
-                    return;
+                    return [];
                 }
 
                 const inviteSnapshot = await getDocs(
                     collection(db, "emailInvites", email, "ledgers"),
                 );
+                const acceptedLedgerIds = [];
                 for (const inviteDocument of inviteSnapshot.docs) {
                     const invite = inviteDocument.data();
                     const ledgerId = invite.ledgerId || inviteDocument.id;
@@ -1117,7 +1128,10 @@
 
                     await grantLedgerAccess(db, ledgerId, member);
                     await deleteDoc(inviteDocument.ref);
+                    acceptedLedgerIds.push(ledgerId);
                 }
+
+                return acceptedLedgerIds;
             }
 
             async function ensureUserEmailIndex(auth, db) {
@@ -1625,12 +1639,13 @@
                 return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
             }
 
-            function serializeUser(user) {
+            function serializeUser(user, acceptedInviteLedgerId = null) {
                 return {
                     uid: user.uid || "",
                     displayName: user.displayName || "",
                     email: user.email || "",
                     photoUrl: user.photoURL || "",
+                    acceptedInviteLedgerId,
                 };
             }
 

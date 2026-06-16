@@ -1451,61 +1451,89 @@ handleAuthStateChanged authState model =
         SignedIn user ->
             let
                 ledgerId =
-                    if model.currentLedgerId == "" || model.currentLedgerId == localLedgerId then
-                        user.uid
+                    case user.acceptedInviteLedgerId of
+                        Just invitedLedgerId ->
+                            invitedLedgerId
 
-                    else
-                        model.currentLedgerId
-            in
-            let
+                        Nothing ->
+                            if model.currentLedgerId == "" || model.currentLedgerId == localLedgerId then
+                                user.uid
+
+                            else
+                                model.currentLedgerId
+
                 newTutorialState =
                     tutorialAfterAuth model
             in
-            if localDataExists model then
-                let
-                    updatedModel =
-                        { model
-                            | authState = authState
-                            , storageMode = CloudSynced
-                            , ledgerLoadState = Loading
-                            , inviteEmail = ""
-                            , error = ""
-                            , accountError = ""
-                            , ledgerError = ""
-                            , migrationState = PreparingMigration
-                            , tutorialState = newTutorialState
-                        }
-                            |> prepareTutorialState
-                in
-                ( updatedModel
-                , Cmd.batch
-                    [ prepareLocalMigration ()
-                    , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
-                    ]
-                )
+            case user.acceptedInviteLedgerId of
+                Just invitedLedgerId ->
+                    ( { model
+                        | authState = authState
+                        , storageMode = CloudSynced
+                        , ledgerLoadState = Loading
+                        , currentLedgerId = invitedLedgerId
+                        , inviteEmail = ""
+                        , error = ""
+                        , accountError = ""
+                        , ledgerError = ""
+                        , migrationState = NoMigration
+                        , tutorialState = TutorialCompleted
+                        , tutorialCompletionVisible = False
+                        , tutorialExpenseId = Nothing
+                      }
+                    , Cmd.batch
+                        [ hideTutorial ()
+                        , saveTutorialState (Encode.string "completed")
+                        , loadLedgerData (Ledger.encodeLedgerRequest invitedLedgerId)
+                        ]
+                    )
 
-            else
-                let
-                    updatedModel =
-                        { model
-                            | authState = authState
-                            , storageMode = CloudSynced
-                            , ledgerLoadState = Loading
-                            , currentLedgerId = ledgerId
-                            , inviteEmail = ""
-                            , error = ""
-                            , accountError = ""
-                            , ledgerError = ""
-                            , tutorialState = newTutorialState
-                        }
-                            |> prepareTutorialState
-                in
-                ( updatedModel
-                , Cmd.batch
-                    [ loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
-                    , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
-                    ]
-                )
+                Nothing ->
+                    if localDataExists model then
+                        let
+                            updatedModel =
+                                { model
+                                    | authState = authState
+                                    , storageMode = CloudSynced
+                                    , ledgerLoadState = Loading
+                                    , inviteEmail = ""
+                                    , error = ""
+                                    , accountError = ""
+                                    , ledgerError = ""
+                                    , migrationState = PreparingMigration
+                                    , tutorialState = newTutorialState
+                                }
+                                    |> prepareTutorialState
+                        in
+                        ( updatedModel
+                        , Cmd.batch
+                            [ prepareLocalMigration ()
+                            , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
+                            ]
+                        )
+
+                    else
+                        let
+                            updatedModel =
+                                { model
+                                    | authState = authState
+                                    , storageMode = CloudSynced
+                                    , ledgerLoadState = Loading
+                                    , currentLedgerId = ledgerId
+                                    , inviteEmail = ""
+                                    , error = ""
+                                    , accountError = ""
+                                    , ledgerError = ""
+                                    , tutorialState = newTutorialState
+                                }
+                                    |> prepareTutorialState
+                        in
+                        ( updatedModel
+                        , Cmd.batch
+                            [ loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+                            , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
+                            ]
+                        )
 
         SignedOut ->
             let

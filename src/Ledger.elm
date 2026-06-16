@@ -11,6 +11,9 @@ module Ledger exposing
     , encodeGuestRemove
     , encodeLedgerName
     , encodeLedgerRequest
+    , ensureLocalLedger
+    , localLedgerId
+    , localLedgerName
     )
 
 import Accounting exposing (Account, Expense, currencyFromString, movementTypeFromString)
@@ -50,6 +53,58 @@ type alias LedgerData =
     , currentLedgerId : String
     , lastAccountId : Maybe String
     }
+
+
+localLedgerId : String
+localLedgerId =
+    "local"
+
+
+localLedgerName : String
+localLedgerName =
+    "Libro contable de desconocido"
+
+
+ensureLocalLedger :
+    storageMode
+    ->
+        { model
+            | currentLedgerId : String
+            , storageMode : storageMode
+            , ledgerLoadState : LoadState
+            , ledgerName : String
+            , ledgers : List LedgerSummary
+        }
+    ->
+        { model
+            | currentLedgerId : String
+            , storageMode : storageMode
+            , ledgerLoadState : LoadState
+            , ledgerName : String
+            , ledgers : List LedgerSummary
+        }
+ensureLocalLedger localOnly model =
+    if model.currentLedgerId == localLedgerId then
+        { model
+            | storageMode = localOnly
+            , ledgerLoadState = Loaded
+        }
+
+    else
+        { model
+            | storageMode = localOnly
+            , ledgerLoadState = Loaded
+            , currentLedgerId = localLedgerId
+            , ledgerName = localLedgerName
+            , ledgers =
+                [ { id = localLedgerId
+                  , name = localLedgerName
+                  , ownerUid = ""
+                  , members = []
+                  , invitedEmails = []
+                  }
+                ]
+        }
 
 
 encodeLedgerRequest : String -> Encode.Value

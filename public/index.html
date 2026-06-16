@@ -291,6 +291,19 @@
                     return buttons;
                 };
 
+                const labelCloseButton = (popover) => {
+                    const closeButton =
+                        popover?.closeButton ||
+                        popover?.closeBtn ||
+                        document.querySelector(".driver-popover-close-btn");
+
+                    if (!closeButton) return;
+
+                    closeButton.textContent = "Salir del tutorial";
+                    closeButton.setAttribute("aria-label", "Salir del tutorial");
+                    closeButton.setAttribute("title", "Salir del tutorial");
+                };
+
                 const openTutorialDisclosures = (ids) => {
                     if (!Array.isArray(ids)) return;
 
@@ -350,6 +363,7 @@
                                 nextBtnText: step?.done ? "Finalizar" : "Siguiente",
                                 prevBtnText: "Atras",
                                 doneBtnText: "Finalizar",
+                                onPopoverRender: labelCloseButton,
                                 onNextClick: () => emitTutorialAction(step?.done ? "done" : "next"),
                                 onPrevClick: () => emitTutorialAction("back"),
                                 onCloseClick: () => emitTutorialAction("skip"),

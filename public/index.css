@@ -374,6 +374,9 @@ main {
     background: transparent;
     color: #205c4c;
     padding: 0;
+    width: auto;
+    height: auto;
+    white-space: nowrap;
 }
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-prev-btn:hover,

@@ -54,7 +54,7 @@ type alias Model =
     , migrationState : MigrationState
     , tutorialState : TutorialState
     , tutorialCompletionVisible : Bool
-    , tutorialExpenseId : Maybe String
+    , tutorialMovementId : Maybe String
     }
 
 
@@ -114,7 +114,7 @@ initial =
     , migrationState = NoMigration
     , tutorialState = TutorialOpen SignInStep
     , tutorialCompletionVisible = False
-    , tutorialExpenseId = Nothing
+    , tutorialMovementId = Nothing
     }
 
 

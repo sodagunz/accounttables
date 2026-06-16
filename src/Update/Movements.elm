@@ -1,4 +1,4 @@
-module Update.Expenses exposing
+module Update.Movements exposing
     ( Config
     , cancelEdit
     , delete
@@ -88,7 +88,7 @@ persistMovement config readyModel movement =
                                 , date = movement.date
                                 }
 
-                        updatedExpenses =
+                        updatedMovements =
                             List.map
                                 (\existing ->
                                     if existing.id == editingId then
@@ -102,7 +102,7 @@ persistMovement config readyModel movement =
                     ( updateEvent
                     , { readyModel
                         | events = updateEvent :: readyModel.events
-                        , expenses = Model.activeMovements updatedExpenses
+                        , expenses = Model.activeMovements updatedMovements
                       }
                     )
 
@@ -137,7 +137,7 @@ persistMovement config readyModel movement =
             if isNewMovement then
                 case updatedModel.tutorialState of
                     TutorialOpen FirstMovementStep ->
-                        config.navigateTutorial DeleteMovementStep { updatedModel | tutorialExpenseId = Just movement.id }
+                        config.navigateTutorial DeleteMovementStep { updatedModel | tutorialMovementId = Just movement.id }
 
                     _ ->
                         ( updatedModel, Cmd.none )
@@ -169,9 +169,9 @@ delete : Config msg -> String -> Model -> ( Model, Cmd msg )
 delete config movementId model =
     let
         isTutorialDelete =
-            case ( model.tutorialState, model.tutorialExpenseId ) of
-                ( TutorialOpen DeleteMovementStep, Just tutorialExpenseId ) ->
-                    tutorialExpenseId == movementId
+            case ( model.tutorialState, model.tutorialMovementId ) of
+                ( TutorialOpen DeleteMovementStep, Just tutorialMovementId ) ->
+                    tutorialMovementId == movementId
 
                 _ ->
                     False
@@ -179,7 +179,7 @@ delete config movementId model =
         event =
             Events.MovementDeletedEvent 0 { movementId = movementId }
 
-        updatedExpenses =
+        updatedMovements =
             List.map
                 (\movement ->
                     if movement.id == movementId then
@@ -193,11 +193,11 @@ delete config movementId model =
         baseModel =
             { model
                 | events = event :: model.events
-                , expenses = Model.activeMovements updatedExpenses
+                , expenses = Model.activeMovements updatedMovements
             }
     in
     ( if isTutorialDelete then
-        { baseModel | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
+        { baseModel | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialMovementId = Nothing }
 
       else
         baseModel

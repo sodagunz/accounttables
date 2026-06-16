@@ -9,8 +9,8 @@ import Ledger
 import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..))
 import Util.Date exposing (DateDisplay)
 import View.AuthStatus as AuthStatus
-import View.ExpenseForm as ExpenseForm
-import View.ExpenseTable as ExpenseTable
+import View.MovementForm as MovementForm
+import View.MovementTable as MovementTable
 import View.LedgerAccess as LedgerAccess
 import View.LedgerAccounts as LedgerAccounts
 
@@ -28,7 +28,7 @@ type alias Config msg =
     , onCurrency : String -> msg
     , onDate : String -> msg
     , onMovementType : Accounting.MovementType -> msg
-    , onSubmitExpense : msg
+    , onSubmitMovement : msg
     , onCancelEdit : msg
     , onSelectFilter : FilterWindow -> msg
     , onToggleAccountFilter : String -> msg
@@ -37,8 +37,8 @@ type alias Config msg =
     , onSelectSort : SortField -> msg
     , onExportCsv : msg
     , onExportXlsx : msg
-    , onDeleteExpense : String -> msg
-    , onEditExpense : String -> msg
+    , onDeleteMovement : String -> msg
+    , onEditMovement : String -> msg
     , onSelectLedger : String -> msg
     , onLedgerName : String -> msg
     , onSaveLedgerName : msg
@@ -75,7 +75,7 @@ view config model =
             , localRiskBanner config model
             , div [ class "layout" ]
                 [ div [ class "input-area" ]
-                    [ ExpenseForm.view
+                    [ MovementForm.view
                         { form = model.form
                         , accounts = Model.activeAccounts model
                         , exchangeRate = model.exchangeRate
@@ -89,7 +89,7 @@ view config model =
                         , onCurrency = config.onCurrency
                         , onDate = config.onDate
                         , onMovementType = config.onMovementType
-                        , onSubmit = config.onSubmitExpense
+                        , onSubmit = config.onSubmitMovement
                         , onCancel = config.onCancelEdit
                         }
                     ]
@@ -97,7 +97,7 @@ view config model =
                     [ adminArea config model
                     ]
                 , div [ class "content-stack" ]
-                    [ ExpenseTable.view
+                    [ MovementTable.view
                         { expenses = rows
                         , accounts = Model.activeAccounts model
                         , filterWindow = model.filterWindow
@@ -113,8 +113,8 @@ view config model =
                         , onSelectSort = config.onSelectSort
                         , onExportCsv = config.onExportCsv
                         , onExportXlsx = config.onExportXlsx
-                        , onDelete = config.onDeleteExpense
-                        , onEdit = config.onEditExpense
+                        , onDelete = config.onDeleteMovement
+                        , onEdit = config.onEditMovement
                         }
                     ]
                 ]

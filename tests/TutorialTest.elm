@@ -62,7 +62,7 @@ suite =
                     prepared
         , test "encodes delete selector for the tutorial-created expense" <|
             \_ ->
-                Tutorial.encodeStep { initialModel | tutorialExpenseId = Just "movement-1" } DeleteMovementStep
+                Tutorial.encodeStep { initialModel | tutorialMovementId = Just "movement-1" } DeleteMovementStep
                     |> Decode.decodeValue (Decode.field "selector" Decode.string)
                     |> Expect.equal (Ok "[data-tutorial=\"delete-movement-1\"]")
         ]

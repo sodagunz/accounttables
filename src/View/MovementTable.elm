@@ -1,4 +1,4 @@
-module View.ExpenseTable exposing (Config, view)
+module View.MovementTable exposing (Config, view)
 
 import Accounting exposing (Account, Currency(..), Movement, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, movementsFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)

@@ -169,7 +169,7 @@ tutorialOpenDisclosureCmd config step =
 
 completeTutorial : Config msg -> Model -> ( Model, Cmd msg )
 completeTutorial config model =
-    ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
+    ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialMovementId = Nothing }
     , Cmd.batch
         [ config.hide ()
         , config.saveState (Encode.string "completed")
@@ -211,7 +211,7 @@ targetSelector model step =
             "[data-tutorial=\"movement-form\"]"
 
         DeleteMovementStep ->
-            case model.tutorialExpenseId of
+            case model.tutorialMovementId of
                 Just expenseId ->
                     "[data-tutorial=\"delete-" ++ expenseId ++ "\"]"
 

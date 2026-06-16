@@ -77,6 +77,7 @@
               nil
               zed-editor
               python314
+              uglify-js
             ]
             ++ mkScripts pkgs;
 

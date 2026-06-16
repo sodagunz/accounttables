@@ -282,7 +282,7 @@ main {
 }
 
 .driver-overlay path {
-    fill: rgba(0, 0, 0, 0.45);
+    fill: rgba(0, 0, 0, 0.585);
 }
 
 .driver-active .driver-overlay {
@@ -332,16 +332,17 @@ main {
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-footer {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     align-items: center;
-    gap: 8px;
-    margin-top: 14px;
+    gap: 12px 16px;
+    margin-top: 18px;
 }
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-navigation-btns {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 8px 10px;
     justify-content: flex-end;
 }
 
@@ -370,6 +371,10 @@ main {
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-prev-btn,
 .driver-popover.driverjs-theme-contabilizar .driver-popover-close-btn {
+    position: static !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
     border: 0;
     background: transparent;
     color: #205c4c;
@@ -377,6 +382,11 @@ main {
     width: auto;
     height: auto;
     white-space: nowrap;
+}
+
+.driver-popover.driverjs-theme-contabilizar > .driver-popover-close-btn {
+    display: flex;
+    margin: 0 0 14px auto;
 }
 
 .driver-popover.driverjs-theme-contabilizar .driver-popover-prev-btn:hover,

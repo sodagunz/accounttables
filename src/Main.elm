@@ -4,6 +4,7 @@ import Accounting exposing (FilterWindow(..), SortField(..))
 import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
 import Auth exposing (AuthState(..))
 import Browser
+import Config
 import Events exposing (Event)
 import Export
 import Flags
@@ -470,100 +471,82 @@ payloadCmd toCmd payload =
 
 view : Model -> Html Msg
 view model =
-    AppView.view viewConfig model
+    AppView.view (Config.view messages) model
 
 
-viewConfig : AppView.Config Msg
-viewConfig =
-    { localLedgerName = Ledger.localLedgerName
-    , onReopenTutorial = ReopenTutorial
-    , onDismissTutorialCompletion = DismissTutorialCompletion
-    , onSignIn = SignInWithGoogle
-    , onSignOut = SignOut
-    , onDescription = UpdateDescription
-    , onAmount = UpdateAmount
-    , onAccount = UpdateAccount
-    , onCreateAccount = OpenAccountTool
-    , onCurrency = UpdateCurrency
-    , onDate = UpdateDate
-    , onMovementType = UpdateMovementType
-    , onSubmitExpense = AddExpense
-    , onCancelEdit = CancelEdit
-    , onSelectFilter = SelectFilter
-    , onToggleAccountFilter = ToggleAccountFilter
-    , onSelectDateDisplay = SelectDateDisplay
-    , onSelectDisplayCurrency = SelectDisplayCurrency
-    , onSelectSort = SelectSort
-    , onExportCsv = ExportCsv
-    , onExportXlsx = ExportXlsx
-    , onDeleteExpense = DeleteExpense
-    , onEditExpense = EditExpense
-    , onSelectLedger = SelectLedger
-    , onLedgerName = UpdateLedgerName
-    , onSaveLedgerName = SaveLedgerName
-    , onInviteEmail = UpdateInviteEmail
-    , onInvite = InviteGuest
-    , onRemoveGuest = RemoveGuest
-    , onAccountName = UpdateNewAccountName
-    , onAddAccount = AddAccount
-    , onDeleteAccount = DeleteAccount
-    , onSelectMigrationLedger = SelectMigrationLedger
-    , onConfirmLocalMigration = ConfirmLocalMigration
-    , onSkipLocalMigration = SkipLocalMigration
+messages : Config.Messages Msg
+messages =
+    { reopenTutorial = ReopenTutorial
+    , dismissTutorialCompletion = DismissTutorialCompletion
+    , signIn = SignInWithGoogle
+    , signOut = SignOut
+    , description = UpdateDescription
+    , amount = UpdateAmount
+    , account = UpdateAccount
+    , createAccount = OpenAccountTool
+    , currency = UpdateCurrency
+    , date = UpdateDate
+    , movementType = UpdateMovementType
+    , submitExpense = AddExpense
+    , cancelEdit = CancelEdit
+    , selectFilter = SelectFilter
+    , toggleAccountFilter = ToggleAccountFilter
+    , selectDateDisplay = SelectDateDisplay
+    , selectDisplayCurrency = SelectDisplayCurrency
+    , selectSort = SelectSort
+    , exportCsv = ExportCsv
+    , exportXlsx = ExportXlsx
+    , deleteExpense = DeleteExpense
+    , editExpense = EditExpense
+    , selectLedger = SelectLedger
+    , ledgerName = UpdateLedgerName
+    , saveLedgerName = SaveLedgerName
+    , inviteEmail = UpdateInviteEmail
+    , invite = InviteGuest
+    , removeGuest = RemoveGuest
+    , accountName = UpdateNewAccountName
+    , addAccount = AddAccount
+    , deleteAccount = DeleteAccount
+    , selectMigrationLedger = SelectMigrationLedger
+    , confirmLocalMigration = ConfirmLocalMigration
+    , skipLocalMigration = SkipLocalMigration
+    }
+
+
+ports : Config.Ports Msg
+ports =
+    { showTutorialStep = showTutorialStep
+    , openDisclosure = openDisclosure
+    , focusElement = focusElement
+    , hideTutorial = hideTutorial
+    , saveTutorialState = saveTutorialState
+    , mergeLocalLedgerToFirestore = mergeLocalLedgerToFirestore
+    , prepareLocalMigration = prepareLocalMigration
+    , loadLedgerData = loadLedgerData
+    , generateExpenseId = generateExpenseId
+    , appendEvent = appendEvent
+    , saveLastAccount = saveLastAccount
     }
 
 
 tutorialConfig : Tutorial.Config Msg
 tutorialConfig =
-    { showStep = showTutorialStep
-    , openDisclosure = openDisclosure
-    , focusElement = focusElement
-    , hide = hideTutorial
-    , saveState = saveTutorialState
-    }
+    Config.tutorial ports
 
 
 ledgerDataConfig : LedgerData.Config Msg
 ledgerDataConfig =
-    { navigateTutorial = Tutorial.tutorialNavigateCmd tutorialConfig
-    , mergeLocalLedgerToFirestore =
-        \ledgerId -> mergeLocalLedgerToFirestore (Ledger.encodeLedgerRequest ledgerId)
-    }
+    Config.ledgerData tutorialConfig ports
 
 
 authUpdateConfig : AuthUpdate.Config Msg
 authUpdateConfig =
-    { prepareLocalMigration = prepareLocalMigration ()
-    , loadLedgerData = \ledgerId -> loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
-    , completeTutorial =
-        Cmd.batch
-            [ hideTutorial ()
-            , saveTutorialState (Encode.string "completed")
-            ]
-    , tutorialAdvanceCmd = Tutorial.tutorialAdvanceCmd tutorialConfig
-    , tutorialNavigateCmd = Tutorial.tutorialNavigateCmd tutorialConfig
-    }
+    Config.authUpdate tutorialConfig ports
 
 
 expensesConfig : Expenses.Config Msg
 expensesConfig =
-    { generateExpenseId = generateExpenseId ()
-    , appendEvent =
-        \ledgerId event ->
-            appendEvent
-                (Encode.object
-                    [ ( "ledgerId", Encode.string ledgerId )
-                    , ( "event", Events.eventEncoder event )
-                    ]
-                )
-    , saveLastAccount = saveLastAccount
-    , navigateTutorial = Tutorial.tutorialNavigateTo tutorialConfig
-    , completeTutorial =
-        Cmd.batch
-            [ hideTutorial ()
-            , saveTutorialState (Encode.string "completed")
-            ]
-    }
+    Config.expenses tutorialConfig ports
 
 
 exportVisibleTable : Export.Format -> Model -> Cmd Msg

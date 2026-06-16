@@ -1,6 +1,6 @@
 module View.ExpenseForm exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Form, MovementType(..), cashflowFor, currencyToString, movementTypeToString)
+import Accounting exposing (Account, Currency(..), Form, MovementType(..), currencyToString, movementTypeToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Html exposing (Html, button, div, input, label, option, p, section, select, span, strong, text)
 import Html.Attributes exposing (attribute, autofocus, checked, class, classList, for, id, name, step, type_, value)
@@ -37,7 +37,7 @@ view config =
     in
     section [ class "panel movement-panel" ]
         [ Html.h2 [ class "section-title movement-title" ] [ text "Registrar movimiento" ]
-        , Html.form [ class "form-grid", onSubmit config.onSubmit ]
+        , Html.form [ class "form-grid", attribute "data-tutorial" "movement-form", onSubmit config.onSubmit ]
             [ label []
                 [ text "Importe"
                 , input
@@ -112,7 +112,7 @@ view config =
                     text ""
 
                 Nothing ->
-                    conversionPreview config.exchangeRate config.form
+                    text ""
             , exchangeRateView config
             , p [ class "error" ] [ text config.error ]
             , let
@@ -129,7 +129,7 @@ view config =
                                 IncomeMovement ->
                                     "Registrar ingreso"
               in
-              button [ class "primary primary--movement", type_ "submit", attribute "data-tutorial" "movement-submit" ] [ text buttonText ]
+              button [ class "primary primary--movement", type_ "submit" ] [ text buttonText ]
             , case config.form.editingId of
                 Just _ ->
                     button [ class "cancel-button", type_ "button", onClick config.onCancel ] [ text "Cancelar" ]
@@ -188,27 +188,6 @@ accountControl config selectedAccountId =
 accountOption : Account -> Html msg
 accountOption account =
     option [ value account.id ] [ text account.name ]
-
-
-conversionPreview : Float -> Form -> Html msg
-conversionPreview exchangeRate form =
-    case String.toFloat form.amount of
-        Nothing ->
-            text ""
-
-        Just amount ->
-            let
-                converted =
-                    cashflowFor form.movementType exchangeRate form.currency amount
-            in
-            div [ class "conversion" ]
-                [ text
-                    ("Flujo: "
-                        ++ formatMoney ARS converted.ars
-                        ++ " / "
-                        ++ formatMoney USD converted.usd
-                    )
-                ]
 
 
 exchangeRateView : Config msg -> Html msg

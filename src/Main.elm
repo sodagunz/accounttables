@@ -975,6 +975,9 @@ tutorialSkipButton step =
         AccountsStep ->
             []
 
+        DeleteExpenseStep ->
+            []
+
         _ ->
             [ button [ class "tutorial-tooltip__skip", type_ "button", onClick TutorialSkip ] [ text "Saltar" ] ]
 
@@ -992,7 +995,7 @@ tutorialTargetSelector model step =
             "[data-tutorial=\"invite-email\"]"
 
         FirstExpenseStep ->
-            "[data-tutorial=\"movement-submit\"]"
+            "[data-tutorial=\"movement-form\"]"
 
         DeleteExpenseStep ->
             case List.head (Model.activeExpenses model.expenses) of
@@ -1000,7 +1003,7 @@ tutorialTargetSelector model step =
                     "[data-tutorial=\"delete-" ++ expense.id ++ "\"]"
 
                 Nothing ->
-                    "[data-tutorial=\"movement-submit\"]"
+                    "[data-tutorial=\"movement-form\"]"
 
 
 tutorialFocusSelector : Model -> TutorialStep -> String

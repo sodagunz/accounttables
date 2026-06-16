@@ -266,6 +266,7 @@ expenseRow dateDisplay displayCurrency onEdit onDelete expense =
                 , button
                     [ type_ "button"
                     , class "delete-button"
+                    , attribute "data-tutorial" ("delete-" ++ expense.id)
                     , onClick (onDelete expense.id)
                     ]
                     [ text "×" ]

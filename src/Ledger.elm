@@ -4,6 +4,7 @@ module Ledger exposing
     , LoadState(..)
     , Member
     , decodeLedger
+    , decodeLedgerSummaries
     , encodeAccountCreate
     , encodeAccountDelete
     , encodeGuestInvite
@@ -30,6 +31,7 @@ type alias LedgerSummary =
     , name : String
     , ownerUid : String
     , members : List Member
+    , invitedEmails : List String
     }
 
 
@@ -112,6 +114,12 @@ decodeLedger value =
         |> Result.mapError Decode.errorToString
 
 
+decodeLedgerSummaries : Decode.Value -> Result String (List LedgerSummary)
+decodeLedgerSummaries value =
+    Decode.decodeValue (Decode.field "ledgers" (Decode.list ledgerSummaryDecoder)) value
+        |> Result.mapError Decode.errorToString
+
+
 ledgerPayloadDecoder : Decode.Decoder LedgerData
 ledgerPayloadDecoder =
     Decode.field "status" Decode.string
@@ -155,11 +163,14 @@ accountDecoder =
 
 ledgerSummaryDecoder : Decode.Decoder LedgerSummary
 ledgerSummaryDecoder =
-    Decode.map4 LedgerSummary
+    Decode.map5 LedgerSummary
         (Decode.field "id" Decode.string)
         (Decode.field "name" Decode.string)
         (Decode.field "ownerUid" Decode.string)
         (Decode.field "members" (Decode.list memberDecoder))
+        (Decode.maybe (Decode.field "invitedEmails" (Decode.list Decode.string))
+            |> Decode.map (Maybe.withDefault [])
+        )
 
 
 memberDecoder : Decode.Decoder Member

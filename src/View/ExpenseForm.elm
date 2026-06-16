@@ -1,6 +1,6 @@
 module View.ExpenseForm exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Form, MovementType(..), cashflowFor, currencyToString, movementTypeToString)
+import Accounting exposing (Account, Currency(..), Form, MovementType(..), currencyToString, movementTypeToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Html exposing (Html, button, div, input, label, option, p, section, select, span, strong, text)
 import Html.Attributes exposing (attribute, autofocus, checked, class, classList, for, id, name, step, type_, value)
@@ -20,6 +20,7 @@ type alias Config msg =
     , onDescription : String -> msg
     , onAmount : String -> msg
     , onAccount : String -> msg
+    , onCreateAccount : msg
     , onCurrency : String -> msg
     , onDate : String -> msg
     , onMovementType : MovementType -> msg
@@ -36,7 +37,7 @@ view config =
     in
     section [ class "panel movement-panel" ]
         [ Html.h2 [ class "section-title movement-title" ] [ text "Registrar movimiento" ]
-        , Html.form [ class "form-grid", onSubmit config.onSubmit ]
+        , Html.form [ class "form-grid", attribute "data-tutorial" "movement-form", onSubmit config.onSubmit ]
             [ label []
                 [ text "Importe"
                 , input
@@ -47,6 +48,7 @@ view config =
                     , attribute "aria-label" "Importe del movimiento"
                     , attribute "min" "0.01"
                     , step "0.01"
+                    , attribute "data-tutorial" "movement-amount"
                     , autofocus True
                     , value config.form.amount
                     , onInput config.onAmount
@@ -90,8 +92,7 @@ view config =
                 ]
             , label []
                 [ text "Cuenta"
-                , select [ value selectedAccountId, onInput config.onAccount ]
-                    (accountOptions config.accounts)
+                , accountControl config selectedAccountId
                 ]
             , div [ class "two-col" ]
                 [ label []
@@ -111,7 +112,7 @@ view config =
                     text ""
 
                 Nothing ->
-                    conversionPreview config.exchangeRate config.form
+                    text ""
             , exchangeRateView config
             , p [ class "error" ] [ text config.error ]
             , let
@@ -151,40 +152,42 @@ selectedOrDefaultAccountId selectedAccountId accounts =
             |> Maybe.withDefault ""
 
 
-accountOptions : List Account -> List (Html msg)
-accountOptions accounts =
-    case accounts of
+createAccountValue : String
+createAccountValue =
+    "__create_account__"
+
+
+accountControl : Config msg -> String -> Html msg
+accountControl config selectedAccountId =
+    case config.accounts of
         [] ->
-            [ option [ value "" ] [ text "Agrega una cuenta" ] ]
+            button
+                [ class "select-action"
+                , type_ "button"
+                , onClick config.onCreateAccount
+                ]
+                [ text "Agregar una cuenta" ]
 
         _ ->
-            List.map accountOption accounts
+            select
+                [ value selectedAccountId
+                , onInput
+                    (\value ->
+                        if value == createAccountValue then
+                            config.onCreateAccount
+
+                        else
+                            config.onAccount value
+                    )
+                ]
+                (List.map accountOption config.accounts
+                    ++ [ option [ value createAccountValue ] [ text "Agregar una cuenta" ] ]
+                )
 
 
 accountOption : Account -> Html msg
 accountOption account =
     option [ value account.id ] [ text account.name ]
-
-
-conversionPreview : Float -> Form -> Html msg
-conversionPreview exchangeRate form =
-    case String.toFloat form.amount of
-        Nothing ->
-            text ""
-
-        Just amount ->
-            let
-                converted =
-                    cashflowFor form.movementType exchangeRate form.currency amount
-            in
-            div [ class "conversion" ]
-                [ text
-                    ("Flujo: "
-                        ++ formatMoney ARS converted.ars
-                        ++ " / "
-                        ++ formatMoney USD converted.usd
-                    )
-                ]
 
 
 exchangeRateView : Config msg -> Html msg

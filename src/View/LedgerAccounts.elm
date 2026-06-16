@@ -2,7 +2,7 @@ module View.LedgerAccounts exposing (Config, view)
 
 import Accounting exposing (Account)
 import Html exposing (Html, button, div, input, li, p, section, span, strong, text, ul)
-import Html.Attributes exposing (class, placeholder, type_, value)
+import Html.Attributes exposing (attribute, class, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 
 
@@ -19,16 +19,18 @@ type alias Config msg =
 view : Config msg -> Html msg
 view config =
     section [ class "admin-section accounts-panel" ]
-        [ Html.details [ class "accounts-disclosure" ]
+        [ Html.details [ class "accounts-disclosure", id "accounts-tool" ]
             [ Html.summary [ class "accounts-disclosure__summary" ]
                 [ span [] [ text "Crear o eliminar" ]
                 , strong [] [ text "Cuentas" ]
                 ]
             , div [ class "accounts-disclosure__content" ]
                 [ Html.h2 [ class "section-title" ] [ text "Cuentas" ]
-                , Html.form [ class "inline-form", onSubmit config.onAdd ]
+                , Html.form [ class "inline-form", attribute "data-tutorial" "account-form", onSubmit config.onAdd ]
                     [ input
                         [ type_ "text"
+                        , id "new-account-name"
+                        , attribute "data-tutorial" "account-name"
                         , placeholder "Cuenta"
                         , value config.newAccountName
                         , onInput config.onName

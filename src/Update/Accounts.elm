@@ -3,7 +3,7 @@ module Update.Accounts exposing (add, delete)
 import Auth exposing (AuthState(..))
 import Json.Encode as Encode
 import Ledger
-import Model exposing (Model, selectedLedgerId)
+import Model exposing (Model, StorageMode(..), selectedLedgerId)
 import String
 
 
@@ -28,7 +28,18 @@ add model =
                     )
 
             _ ->
-                ( { model | accountError = "Ingresa con Google para guardar cuentas en el libro contable." }, Nothing )
+                case model.storageMode of
+                    LocalOnly ->
+                        if selectedLedgerId model == "" then
+                            ( { model | accountError = "No hay un libro local activo." }, Nothing )
+
+                        else
+                            ( { model | newAccountName = "", accountError = "" }
+                            , Just (Ledger.encodeAccountCreate (selectedLedgerId model) name)
+                            )
+
+                    CloudSynced ->
+                        ( { model | accountError = "Ingresa con Google para guardar cuentas en el libro contable." }, Nothing )
 
 
 delete : String -> Model -> ( Model, Maybe Encode.Value )
@@ -44,4 +55,15 @@ delete accountId model =
                 )
 
         _ ->
-            ( { model | accountError = "Ingresa con Google para modificar cuentas del libro contable." }, Nothing )
+            case model.storageMode of
+                LocalOnly ->
+                    if selectedLedgerId model == "" then
+                        ( { model | accountError = "No hay un libro local activo." }, Nothing )
+
+                    else
+                        ( { model | accountError = "" }
+                        , Just (Ledger.encodeAccountDelete (selectedLedgerId model) accountId)
+                        )
+
+                CloudSynced ->
+                    ( { model | accountError = "Ingresa con Google para modificar cuentas del libro contable." }, Nothing )

@@ -6,13 +6,14 @@ import Auth exposing (AuthState(..))
 import Browser
 import Events exposing (Event)
 import Export
-import Html exposing (Html, div, h1, header, main_, p, section, span, strong, text)
-import Html.Attributes exposing (class)
+import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
+import Html.Attributes exposing (attribute, class, type_, value)
+import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
-import Model exposing (Model)
+import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), TutorialStep(..))
 import Projector
 import Task
 import Time
@@ -34,6 +35,7 @@ type Msg
     | UpdateCurrency String
     | UpdateDate String
     | UpdateMovementType Accounting.MovementType
+    | OpenAccountTool
     | SelectFilter FilterWindow
     | SelectDateDisplay DateDisplay
     | SelectDisplayCurrency Accounting.Currency
@@ -61,6 +63,17 @@ type Msg
     | EditExpense String
     | CancelEdit
     | EventsLoaded Decode.Value
+    | LocalMigrationPrepared Decode.Value
+    | SelectMigrationLedger String
+    | ConfirmLocalMigration
+    | SkipLocalMigration
+    | TutorialNext
+    | TutorialBack
+    | TutorialSkip
+    | TutorialFinish
+    | ReopenTutorial
+    | DismissTutorialCompletion
+    | TutorialActionReceived Decode.Value
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -105,10 +118,43 @@ port saveLastAccountSelection : Encode.Value -> Cmd msg
 port appendEvent : Encode.Value -> Cmd msg
 
 
+port focusAccountTool : () -> Cmd msg
+
+
 port eventsLoaded : (Decode.Value -> msg) -> Sub msg
 
 
 port ledgerLoaded : (Decode.Value -> msg) -> Sub msg
+
+
+port prepareLocalMigration : () -> Cmd msg
+
+
+port localMigrationPrepared : (Decode.Value -> msg) -> Sub msg
+
+
+port mergeLocalLedgerToFirestore : Encode.Value -> Cmd msg
+
+
+port saveTutorialState : Encode.Value -> Cmd msg
+
+
+port showTutorialStep : Encode.Value -> Cmd msg
+
+
+port openDisclosure : String -> Cmd msg
+
+
+port focusElement : String -> Cmd msg
+
+
+port hideTutorial : () -> Cmd msg
+
+
+port refreshTutorial : () -> Cmd msg
+
+
+port tutorialAction : (Decode.Value -> msg) -> Sub msg
 
 
 main : Program Decode.Value Model Msg
@@ -123,22 +169,99 @@ main =
 
 init : Decode.Value -> ( Model, Cmd Msg )
 init flags =
-    ( modelFromFlags flags
-    , Cmd.batch
-        [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
-        , Dolar.fetchOfficialDollar GotExchangeRate
-        ]
+    let
+        model =
+            modelFromFlags flags
+
+        baseCmds =
+            [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
+            , Dolar.fetchOfficialDollar GotExchangeRate
+            ]
+    in
+    ( model
+    , case model.tutorialState of
+        TutorialOpen step ->
+            Cmd.batch (tutorialNavigateCmd model step :: baseCmds)
+
+        _ ->
+            Cmd.batch baseCmds
     )
 
 
 modelFromFlags : Decode.Value -> Model
 modelFromFlags flags =
-    case Ledger.decodeLedger flags of
+    let
+        tutorialState =
+            decodeTutorialStateFromFlags flags
+
+        initialModel =
+            Model.initial
+
+        baseModel =
+            { initialModel | tutorialState = tutorialState }
+
+        ledgerResult =
+            case Decode.decodeValue (Decode.field "ledger" Decode.value) flags of
+                Ok ledgerValue ->
+                    Ledger.decodeLedger ledgerValue
+
+                Err _ ->
+                    Ledger.decodeLedger flags
+    in
+    case ledgerResult of
         Ok ledger ->
-            applyLedgerData ledger Model.initial
+            applyLedgerData ledger baseModel
 
         Err _ ->
-            Model.initial
+            baseModel
+
+
+decodeTutorialStateFromFlags : Decode.Value -> TutorialState
+decodeTutorialStateFromFlags flags =
+    case Decode.decodeValue (Decode.field "tutorialState" Decode.string) flags of
+        Ok "dismissed" ->
+            TutorialDismissed
+
+        Ok "completed" ->
+            TutorialCompleted
+
+        _ ->
+            TutorialOpen SignInStep
+
+
+localLedgerId : String
+localLedgerId =
+    "local"
+
+
+localLedgerName : String
+localLedgerName =
+    "Libro contable de desconocido"
+
+
+ensureLocalLedger : Model -> Model
+ensureLocalLedger model =
+    if model.currentLedgerId == localLedgerId then
+        { model
+            | storageMode = LocalOnly
+            , ledgerLoadState = Loaded
+        }
+
+    else
+        { model
+            | storageMode = LocalOnly
+            , ledgerLoadState = Loaded
+            , currentLedgerId = localLedgerId
+            , ledgerName = localLedgerName
+            , ledgers =
+                [ { id = localLedgerId
+                  , name = localLedgerName
+                  , ownerUid = ""
+                  , members = []
+                  , invitedEmails = []
+                  }
+                ]
+        }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -177,6 +300,9 @@ update msg model =
 
         UpdateMovementType movementType ->
             ( { model | form = Accounting.setMovementType movementType model.form }, Cmd.none )
+
+        OpenAccountTool ->
+            ( { model | accountError = "" }, focusAccountTool () )
 
         SelectFilter filterWindow ->
             ( { model | filterWindow = filterWindow }, Cmd.none )
@@ -308,7 +434,28 @@ update msg model =
                                               }
                                             )
                             in
-                            ( { updatedModel
+                            let
+                                isNewExpense =
+                                    case readyModel.form.editingId of
+                                        Nothing ->
+                                            True
+
+                                        Just _ ->
+                                            False
+
+                                ( modelAfterAdvance, advanceCmd ) =
+                                    if isNewExpense then
+                                        case updatedModel.tutorialState of
+                                            TutorialOpen FirstExpenseStep ->
+                                                tutorialNavigateTo DeleteExpenseStep { updatedModel | tutorialExpenseId = Just expense.id }
+
+                                            _ ->
+                                                ( updatedModel, Cmd.none )
+
+                                    else
+                                        ( updatedModel, Cmd.none )
+                            in
+                            ( { modelAfterAdvance
                                 | form =
                                     { description = ""
                                     , amount = ""
@@ -328,6 +475,7 @@ update msg model =
                                         ]
                                     )
                                 , saveLastAccount readyModel.currentLedgerId readyModel.form.accountId
+                                , advanceCmd
                                 ]
                             )
 
@@ -344,8 +492,30 @@ update msg model =
             let
                 ( updatedModel, payload ) =
                     Accounts.add model
+
+                ( finalModel, advanceCmd ) =
+                    case updatedModel.tutorialState of
+                        TutorialOpen AccountsStep ->
+                            if not (List.isEmpty (Model.activeAccounts updatedModel)) then
+                                let
+                                    nextAccountsStep =
+                                        tutorialStepAfterAccounts updatedModel
+                                in
+                                let
+                                    nextModel =
+                                        prepareTutorialStep nextAccountsStep { updatedModel | tutorialState = TutorialOpen nextAccountsStep, accountError = "" }
+                                in
+                                ( nextModel
+                                , tutorialNavigateCmd nextModel nextAccountsStep
+                                )
+
+                            else
+                                ( updatedModel, Cmd.none )
+
+                        _ ->
+                            ( updatedModel, Cmd.none )
             in
-            ( updatedModel, payloadCmd saveAccount payload )
+            ( finalModel, Cmd.batch [ payloadCmd saveAccount payload, advanceCmd ] )
 
         DeleteAccount accountId ->
             let
@@ -402,6 +572,14 @@ update msg model =
 
         DeleteExpense movementId ->
             let
+                isTutorialDelete =
+                    case ( model.tutorialState, model.tutorialExpenseId ) of
+                        ( TutorialOpen DeleteExpenseStep, Just tutorialExpenseId ) ->
+                            tutorialExpenseId == movementId
+
+                        _ ->
+                            False
+
                 event =
                     Events.MovementDeletedEvent 0 { movementId = movementId }
 
@@ -415,17 +593,36 @@ update msg model =
                                 e
                         )
                         model.expenses
+
+                baseModel =
+                    { model
+                        | events = event :: model.events
+                        , expenses = Model.activeExpenses updatedExpenses
+                    }
             in
-            ( { model
-                | events = event :: model.events
-                , expenses = Model.activeExpenses updatedExpenses
-              }
-            , appendEvent
-                (Encode.object
-                    [ ( "ledgerId", Encode.string model.currentLedgerId )
-                    , ( "event", Events.eventEncoder event )
-                    ]
-                )
+            ( if isTutorialDelete then
+                { baseModel | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
+
+              else
+                baseModel
+            , Cmd.batch
+                [ if isTutorialDelete then
+                    hideTutorial ()
+
+                  else
+                    Cmd.none
+                , appendEvent
+                    (Encode.object
+                        [ ( "ledgerId", Encode.string model.currentLedgerId )
+                        , ( "event", Events.eventEncoder event )
+                        ]
+                    )
+                , if isTutorialDelete then
+                    saveTutorialState (Encode.string "completed")
+
+                  else
+                    Cmd.none
+                ]
             )
 
         EditExpense expenseId ->
@@ -467,6 +664,98 @@ update msg model =
                 Err error ->
                     ( { model | error = Decode.errorToString error }, Cmd.none )
 
+        LocalMigrationPrepared value ->
+            handleLocalMigrationPrepared value model
+
+        SelectMigrationLedger ledgerId ->
+            case model.migrationState of
+                ChoosingMigration ledgers _ ->
+                    ( { model | migrationState = ChoosingMigration ledgers ledgerId }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ConfirmLocalMigration ->
+            case model.migrationState of
+                ChoosingMigration _ ledgerId ->
+                    ( { model | migrationState = UploadingMigration ledgerId, ledgerLoadState = Loading }
+                    , mergeLocalLedgerToFirestore (Ledger.encodeLedgerRequest ledgerId)
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        SkipLocalMigration ->
+            case model.migrationState of
+                ChoosingMigration _ ledgerId ->
+                    ( { model | migrationState = NoMigration, ledgerLoadState = Loading }
+                    , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+                    )
+
+                UploadingMigration ledgerId ->
+                    ( { model | migrationState = NoMigration, ledgerLoadState = Loading }
+                    , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+                    )
+
+                PreparingMigration ->
+                    ( { model | migrationState = NoMigration }, Cmd.none )
+
+                NoMigration ->
+                    ( model, Cmd.none )
+
+        TutorialNext ->
+            case model.tutorialState of
+                TutorialOpen step ->
+                    advanceTutorialFrom step model
+
+                _ ->
+                    ( model, Cmd.none )
+
+        TutorialBack ->
+            case model.tutorialState of
+                TutorialOpen step ->
+                    tutorialNavigateTo (previousTutorialStep step) model
+
+                _ ->
+                    ( model, Cmd.none )
+
+        TutorialSkip ->
+            case model.tutorialState of
+                TutorialOpen step ->
+                    skipTutorialFrom step model
+
+                _ ->
+                    ( model, Cmd.none )
+
+        TutorialFinish ->
+            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
+            , Cmd.batch
+                [ hideTutorial ()
+                , saveTutorialState (Encode.string "completed")
+                ]
+            )
+
+        ReopenTutorial ->
+            let
+                step =
+                    reopenedTutorialStep model
+
+                ( reopenedModel, navigateCmd ) =
+                    tutorialNavigateTo step { model | tutorialCompletionVisible = False, tutorialExpenseId = Nothing }
+            in
+            ( reopenedModel
+            , Cmd.batch
+                [ saveTutorialState (Encode.string "")
+                , navigateCmd
+                ]
+            )
+
+        DismissTutorialCompletion ->
+            ( { model | tutorialCompletionVisible = False }, Cmd.none )
+
+        TutorialActionReceived value ->
+            handleTutorialAction value model
+
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
 payloadCmd toCmd payload =
@@ -480,24 +769,21 @@ view model =
     let
         rows =
             Model.visibleExpenses model
-    in
-    div [ class "app" ]
-        [ header [ class "topbar" ]
-            [ div [ class "topbar__inner" ]
-                [ div [ class "topbar__content" ]
-                    [ div []
-                        [ h1 [] [ text "ContabilizAR" ] ]
-                    , AuthStatus.view
-                        { authState = model.authState
-                        , ledgerLoadState = model.ledgerLoadState
-                        , onSignIn = SignInWithGoogle
-                        , onSignOut = SignOut
-                        }
-                    ]
-                ]
-            ]
-        , main_ []
-            [ div [ class "layout" ]
+
+        isTutorialOpen =
+            case model.tutorialState of
+                TutorialOpen _ ->
+                    True
+
+                _ ->
+                    False
+
+        mainContent =
+            [ reopenTutorialButton model
+            , tutorialCompletionBanner model
+            , migrationPrompt model
+            , localRiskBanner model
+            , div [ class "layout" ]
                 [ div [ class "input-area" ]
                     [ ExpenseForm.view
                         { form = model.form
@@ -509,6 +795,7 @@ view model =
                         , onDescription = UpdateDescription
                         , onAmount = UpdateAmount
                         , onAccount = UpdateAccount
+                        , onCreateAccount = OpenAccountTool
                         , onCurrency = UpdateCurrency
                         , onDate = UpdateDate
                         , onMovementType = UpdateMovementType
@@ -542,13 +829,532 @@ view model =
                     ]
                 ]
             ]
+    in
+    div [ class "app" ]
+        [ header [ class "topbar" ]
+            [ div [ class "topbar__inner" ]
+                [ div [ class "topbar__content" ]
+                    [ div []
+                        [ h1 [] [ text "ContabilizAR" ] ]
+                    , div [ class "topbar__actions" ]
+                        [ if isTutorialOpen then
+                            text ""
+
+                          else
+                            button [ class "topbar-setup-button", type_ "button", onClick ReopenTutorial ]
+                                [ text "Configuracion inicial" ]
+                        , AuthStatus.view
+                            { authState = model.authState
+                            , ledgerLoadState = model.ledgerLoadState
+                            , onSignIn = SignInWithGoogle
+                            , onSignOut = SignOut
+                            }
+                        ]
+                    ]
+                ]
+            ]
+        , main_ [] mainContent
         ]
+
+
+tutorialCompletionBanner : Model -> Html Msg
+tutorialCompletionBanner model =
+    if model.tutorialCompletionVisible then
+        section [ class "tutorial-done-banner" ]
+            [ strong [] [ text "Listo" ]
+            , span [] [ text "Ya puedes empezar a registrar movimientos." ]
+            , button [ type_ "button", onClick DismissTutorialCompletion ] [ text "Cerrar" ]
+            ]
+
+    else
+        text ""
+
+
+reopenTutorialButton : Model -> Html Msg
+reopenTutorialButton model =
+    case model.tutorialState of
+        TutorialOpen _ ->
+            text ""
+
+        _ ->
+            section [ class "setup-shortcut" ]
+                [ button [ class "setup-shortcut__button", type_ "button", onClick ReopenTutorial ]
+                    [ text "Abrir configuracion inicial" ]
+                ]
+
+
+tutorialStepText : TutorialStep -> String
+tutorialStepText step =
+    case step of
+        SignInStep ->
+            "Para empezar, inicia sesion con Google. Si no quieres sincronizar, puedes saltar este paso."
+
+        AccountsStep ->
+            "Crea una cuenta para registrar movimientos. Dale un nombre y agregala."
+
+        CollaboratorsStep ->
+            "Invita a alguien por email para trabajar juntos. Tambien puedes hacerlo despues."
+
+        FirstExpenseStep ->
+            "Registra tu primer movimiento. El importe y la descripcion ya estan completos. Presiona Guardar."
+
+        DeleteExpenseStep ->
+            "Perfecto. Ahora borremos este movimiento de prueba para que todo quede limpio. Presiona el boton de eliminar."
+
+
+tutorialTargetSelector : Model -> TutorialStep -> String
+tutorialTargetSelector model step =
+    case step of
+        SignInStep ->
+            "[data-tutorial=\"sign-in\"]"
+
+        AccountsStep ->
+            "[data-tutorial=\"account-form\"]"
+
+        CollaboratorsStep ->
+            "[data-tutorial=\"invite-email\"]"
+
+        FirstExpenseStep ->
+            "[data-tutorial=\"movement-form\"]"
+
+        DeleteExpenseStep ->
+            case model.tutorialExpenseId of
+                Just expenseId ->
+                    "[data-tutorial=\"delete-" ++ expenseId ++ "\"]"
+
+                Nothing ->
+                    "[data-tutorial=\"movement-form\"]"
+
+
+tutorialFocusSelector : Model -> TutorialStep -> String
+tutorialFocusSelector model step =
+    case step of
+        FirstExpenseStep ->
+            "[data-tutorial=\"movement-amount\"]"
+
+        _ ->
+            tutorialTargetSelector model step
+
+
+tutorialStepName : TutorialStep -> String
+tutorialStepName step =
+    case step of
+        SignInStep ->
+            "sign-in"
+
+        AccountsStep ->
+            "accounts"
+
+        CollaboratorsStep ->
+            "collaborators"
+
+        FirstExpenseStep ->
+            "first-expense"
+
+        DeleteExpenseStep ->
+            "delete-expense"
+
+
+tutorialStepSide : TutorialStep -> String
+tutorialStepSide step =
+    case step of
+        SignInStep ->
+            "bottom"
+
+        AccountsStep ->
+            "right"
+
+        CollaboratorsStep ->
+            "right"
+
+        FirstExpenseStep ->
+            "right"
+
+        DeleteExpenseStep ->
+            "left"
+
+
+tutorialShowBack : TutorialStep -> Bool
+tutorialShowBack step =
+    step /= SignInStep
+
+
+tutorialShowNext : TutorialStep -> Bool
+tutorialShowNext step =
+    step == CollaboratorsStep
+
+
+tutorialShowSkip : TutorialStep -> Bool
+tutorialShowSkip step =
+    case step of
+        AccountsStep ->
+            False
+
+        DeleteExpenseStep ->
+            False
+
+        _ ->
+            True
+
+
+tutorialDoneButton : TutorialStep -> Bool
+tutorialDoneButton _ =
+    False
+
+
+tutorialAllowsTargetClick : TutorialStep -> Bool
+tutorialAllowsTargetClick step =
+    case step of
+        CollaboratorsStep ->
+            False
+
+        DeleteExpenseStep ->
+            True
+
+        _ ->
+            True
+
+
+tutorialOpenDisclosures : TutorialStep -> List String
+tutorialOpenDisclosures step =
+    case step of
+        AccountsStep ->
+            [ "admin-tool", "accounts-tool" ]
+
+        CollaboratorsStep ->
+            [ "admin-tool", "members-tool" ]
+
+        _ ->
+            []
+
+
+prepareTutorialStep : TutorialStep -> Model -> Model
+prepareTutorialStep step model =
+    case step of
+        FirstExpenseStep ->
+            prefillTutorialExpenseForm model
+
+        _ ->
+            model
+
+
+prepareTutorialState : Model -> Model
+prepareTutorialState model =
+    case model.tutorialState of
+        TutorialOpen step ->
+            prepareTutorialStep step model
+
+        _ ->
+            model
+
+
+prefillTutorialExpenseForm : Model -> Model
+prefillTutorialExpenseForm model =
+    let
+        accountId =
+            case model.form.accountId of
+                "" ->
+                    Model.activeAccounts model
+                        |> List.head
+                        |> Maybe.map .id
+                        |> Maybe.withDefault ""
+
+                selectedAccountId ->
+                    selectedAccountId
+
+        form =
+            model.form
+    in
+    { model
+        | form =
+            { form
+                | amount = "1000"
+                , description = "Venta de prueba"
+                , accountId = accountId
+                , movementType = Accounting.IncomeMovement
+                , editingId = Nothing
+            }
+    }
+
+
+encodeTutorialStep : Model -> TutorialStep -> Encode.Value
+encodeTutorialStep model step =
+    Encode.object
+        [ ( "step", Encode.string (tutorialStepName step) )
+        , ( "selector", Encode.string (tutorialTargetSelector model step) )
+        , ( "title", Encode.string "" )
+        , ( "description", Encode.string (tutorialStepText step) )
+        , ( "side", Encode.string (tutorialStepSide step) )
+        , ( "align", Encode.string "start" )
+        , ( "showBack", Encode.bool (tutorialShowBack step) )
+        , ( "showNext", Encode.bool (tutorialShowNext step) )
+        , ( "showSkip", Encode.bool (tutorialShowSkip step) )
+        , ( "done", Encode.bool (tutorialDoneButton step) )
+        , ( "allowTargetClick", Encode.bool (tutorialAllowsTargetClick step) )
+        , ( "openDisclosures", Encode.list Encode.string (tutorialOpenDisclosures step) )
+        ]
+
+
+tutorialActionDecoder : Decode.Decoder String
+tutorialActionDecoder =
+    Decode.field "action" Decode.string
+
+
+handleTutorialAction : Decode.Value -> Model -> ( Model, Cmd Msg )
+handleTutorialAction value model =
+    case Decode.decodeValue tutorialActionDecoder value of
+        Ok "next" ->
+            update TutorialNext model
+
+        Ok "back" ->
+            update TutorialBack model
+
+        Ok "skip" ->
+            update TutorialSkip model
+
+        Ok "done" ->
+            update TutorialFinish model
+
+        Ok "target-missing" ->
+            ( model, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
+
+
+advanceTutorialFrom : TutorialStep -> Model -> ( Model, Cmd Msg )
+advanceTutorialFrom step model =
+    case step of
+        AccountsStep ->
+            let
+                next =
+                    tutorialStepAfterAccounts model
+            in
+            tutorialNavigateTo next model
+
+        _ ->
+            case rawNextStep step of
+                Just nextStep ->
+                    tutorialNavigateTo nextStep model
+
+                Nothing ->
+                    ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
+                    , Cmd.batch
+                        [ hideTutorial ()
+                        , saveTutorialState (Encode.string "completed")
+                        ]
+                    )
+
+
+rawNextStep : TutorialStep -> Maybe TutorialStep
+rawNextStep step =
+    case step of
+        SignInStep ->
+            Just AccountsStep
+
+        AccountsStep ->
+            Just CollaboratorsStep
+
+        CollaboratorsStep ->
+            Just FirstExpenseStep
+
+        FirstExpenseStep ->
+            Just DeleteExpenseStep
+
+        DeleteExpenseStep ->
+            Nothing
+
+
+skipTutorialFrom : TutorialStep -> Model -> ( Model, Cmd Msg )
+skipTutorialFrom step model =
+    case step of
+        SignInStep ->
+            if List.isEmpty (Model.activeAccounts model) then
+                tutorialNavigateTo AccountsStep model
+
+            else
+                tutorialNavigateTo (tutorialStepAfterAccounts model) model
+
+        CollaboratorsStep ->
+            tutorialNavigateTo FirstExpenseStep model
+
+        FirstExpenseStep ->
+            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
+            , Cmd.batch
+                [ hideTutorial ()
+                , saveTutorialState (Encode.string "completed")
+                ]
+            )
+
+        AccountsStep ->
+            ( model, Cmd.none )
+
+        DeleteExpenseStep ->
+            ( model, Cmd.none )
+
+
+previousTutorialStep : TutorialStep -> TutorialStep
+previousTutorialStep step =
+    case step of
+        SignInStep ->
+            SignInStep
+
+        AccountsStep ->
+            SignInStep
+
+        CollaboratorsStep ->
+            AccountsStep
+
+        FirstExpenseStep ->
+            CollaboratorsStep
+
+        DeleteExpenseStep ->
+            FirstExpenseStep
+
+
+reopenedTutorialStep : Model -> TutorialStep
+reopenedTutorialStep model =
+    if List.isEmpty (Model.activeAccounts model) then
+        AccountsStep
+
+    else
+        tutorialStepAfterAccounts model
+
+
+tutorialAdvanceCmd : Model -> TutorialState -> TutorialState -> Cmd Msg
+tutorialAdvanceCmd model oldState newState =
+    case ( oldState, newState ) of
+        ( TutorialOpen SignInStep, TutorialOpen step ) ->
+            tutorialNavigateCmd model step
+
+        _ ->
+            Cmd.none
+
+
+tutorialNavigateCmd : Model -> TutorialStep -> Cmd Msg
+tutorialNavigateCmd model step =
+    Cmd.batch
+        [ tutorialOpenDisclosureCmd step
+        , showTutorialStep (encodeTutorialStep model step)
+        , focusElement (tutorialFocusSelector model step)
+        ]
+
+
+tutorialNavigateTo : TutorialStep -> Model -> ( Model, Cmd Msg )
+tutorialNavigateTo step model =
+    let
+        preparedModel =
+            prepareTutorialStep step { model | tutorialState = TutorialOpen step }
+    in
+    ( preparedModel
+    , tutorialNavigateCmd preparedModel step
+    )
+
+
+tutorialOpenDisclosureCmd : TutorialStep -> Cmd Msg
+tutorialOpenDisclosureCmd step =
+    case step of
+        AccountsStep ->
+            Cmd.batch
+                [ openDisclosure "admin-tool"
+                , openDisclosure "accounts-tool"
+                ]
+
+        CollaboratorsStep ->
+            Cmd.batch
+                [ openDisclosure "admin-tool"
+                , openDisclosure "members-tool"
+                ]
+
+        _ ->
+            Cmd.none
+
+
+tutorialStepAfterAccounts : Model -> TutorialStep
+tutorialStepAfterAccounts model =
+    case model.authState of
+        SignedIn _ ->
+            CollaboratorsStep
+
+        _ ->
+            FirstExpenseStep
+
+
+migrationPrompt : Model -> Html Msg
+migrationPrompt model =
+    case model.migrationState of
+        NoMigration ->
+            text ""
+
+        PreparingMigration ->
+            section [ class "migration-panel" ]
+                [ strong [] [ text "Preparando sincronizacion" ]
+                , p [] [ text "Estamos revisando tus libros de Firestore antes de subir los datos locales." ]
+                ]
+
+        UploadingMigration _ ->
+            section [ class "migration-panel" ]
+                [ strong [] [ text "Subiendo datos locales" ]
+                , p [] [ text "Estamos agregando tus cuentas y movimientos locales al libro elegido." ]
+                ]
+
+        ChoosingMigration ledgers selectedLedgerId ->
+            section [ class "migration-panel" ]
+                [ strong [] [ text "Subir datos locales" ]
+                , p [] [ text "Encontramos mas de un libro disponible. Elige donde quieres mergear las cuentas y movimientos guardados en este navegador." ]
+                , label []
+                    [ text "Libro destino"
+                    , select [ value selectedLedgerId, onInput SelectMigrationLedger ]
+                        (List.map migrationLedgerOption ledgers)
+                    ]
+                , div [ class "migration-panel__actions" ]
+                    [ button [ class "primary", type_ "button", onClick ConfirmLocalMigration ] [ text "Subir datos locales" ]
+                    , button [ class "cancel-button", type_ "button", onClick SkipLocalMigration ] [ text "Ahora no" ]
+                    ]
+                ]
+
+
+migrationLedgerOption : Ledger.LedgerSummary -> Html Msg
+migrationLedgerOption ledger =
+    option [ value ledger.id ] [ text ledger.name ]
+
+
+localRiskBanner : Model -> Html Msg
+localRiskBanner model =
+    case model.authState of
+        SignedIn _ ->
+            text ""
+
+        _ ->
+            if model.storageMode == LocalOnly then
+                let
+                    hasLocalData =
+                        not (List.isEmpty model.events)
+                            || not (List.isEmpty model.accounts)
+                            || model.ledgerName
+                            /= localLedgerName
+                in
+                section [ class "local-risk" ]
+                    [ strong [] [ text "Modo local" ]
+                    , span []
+                        [ text
+                            (if hasLocalData then
+                                "Tus datos estan guardados solo en este navegador. Inicia sesion con Google para respaldo y sincronizacion."
+
+                             else
+                                "Puedes usar la app sin Google. Los datos locales pueden perderse si se borra el navegador o cambias de dispositivo."
+                            )
+                        ]
+                    ]
+
+            else
+                text ""
 
 
 adminArea : Model -> Html Msg
 adminArea model =
     section [ class "panel admin-panel" ]
-        [ Html.details [ class "admin-disclosure" ]
+        [ Html.details [ class "admin-disclosure", Html.Attributes.id "admin-tool" ]
             [ Html.summary [ class "admin-disclosure__summary" ]
                 [ span [] [ text "Configuracion del libro" ]
                 , strong [] [ text "Administrar" ]
@@ -634,6 +1440,8 @@ subscriptions _ =
         , ledgerLoaded LedgerLoaded
         , expenseIdGenerated ExpenseIdGenerated
         , eventsLoaded EventsLoaded
+        , localMigrationPrepared LocalMigrationPrepared
+        , tutorialAction TutorialActionReceived
         ]
 
 
@@ -643,40 +1451,101 @@ handleAuthStateChanged authState model =
         SignedIn user ->
             let
                 ledgerId =
-                    if model.currentLedgerId == "" then
+                    if model.currentLedgerId == "" || model.currentLedgerId == localLedgerId then
                         user.uid
 
                     else
                         model.currentLedgerId
             in
-            ( { model
-                | authState = authState
-                , ledgerLoadState = Loading
-                , currentLedgerId = ledgerId
-                , inviteEmail = ""
-                , error = ""
-                , accountError = ""
-                , ledgerError = ""
-              }
-            , loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
-            )
+            let
+                newTutorialState =
+                    tutorialAfterAuth model
+            in
+            if localDataExists model then
+                let
+                    updatedModel =
+                        { model
+                            | authState = authState
+                            , storageMode = CloudSynced
+                            , ledgerLoadState = Loading
+                            , inviteEmail = ""
+                            , error = ""
+                            , accountError = ""
+                            , ledgerError = ""
+                            , migrationState = PreparingMigration
+                            , tutorialState = newTutorialState
+                        }
+                            |> prepareTutorialState
+                in
+                ( updatedModel
+                , Cmd.batch
+                    [ prepareLocalMigration ()
+                    , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
+                    ]
+                )
+
+            else
+                let
+                    updatedModel =
+                        { model
+                            | authState = authState
+                            , storageMode = CloudSynced
+                            , ledgerLoadState = Loading
+                            , currentLedgerId = ledgerId
+                            , inviteEmail = ""
+                            , error = ""
+                            , accountError = ""
+                            , ledgerError = ""
+                            , tutorialState = newTutorialState
+                        }
+                            |> prepareTutorialState
+                in
+                ( updatedModel
+                , Cmd.batch
+                    [ loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+                    , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
+                    ]
+                )
 
         SignedOut ->
+            let
+                signedOutModel =
+                    { model
+                        | authState = authState
+                        , inviteEmail = ""
+                        , error = ""
+                        , accountError = ""
+                        , ledgerError = ""
+                    }
+                        |> ensureLocalLedger
+                        |> Model.ensureSelectedAccount
+
+                tutorialCmd =
+                    case signedOutModel.tutorialState of
+                        TutorialOpen SignInStep ->
+                            tutorialNavigateCmd signedOutModel SignInStep
+
+                        _ ->
+                            Cmd.none
+            in
+            ( signedOutModel
+            , Cmd.batch
+                [ loadLedgerData (Ledger.encodeLedgerRequest localLedgerId)
+                , tutorialCmd
+                ]
+            )
+
+        AuthUnconfigured ->
             ( { model
                 | authState = authState
-                , ledgerLoadState = NotLoaded
-                , expenses = Model.sampleExpensesForModel model
-                , accounts = Model.defaultAccounts
-                , ledgers = []
-                , currentLedgerId = ""
-                , ledgerName = ""
                 , inviteEmail = ""
                 , error = ""
                 , accountError = ""
                 , ledgerError = ""
               }
+                |> ensureLocalLedger
                 |> Model.ensureSelectedAccount
-            , Cmd.none
+            , loadLedgerData (Ledger.encodeLedgerRequest localLedgerId)
             )
 
         _ ->
@@ -687,10 +1556,85 @@ handleLedgerLoaded : Decode.Value -> Model -> ( Model, Cmd Msg )
 handleLedgerLoaded value model =
     case Ledger.decodeLedger value of
         Ok ledger ->
-            ( applyLedgerData ledger model, Cmd.none )
+            let
+                updatedModel =
+                    applyLedgerData ledger model
+
+                advanceCmd =
+                    case ( model.tutorialState, updatedModel.tutorialState ) of
+                        ( TutorialOpen AccountsStep, TutorialOpen next ) ->
+                            tutorialNavigateCmd updatedModel next
+
+                        _ ->
+                            Cmd.none
+            in
+            ( updatedModel, advanceCmd )
 
         Err error ->
-            ( { model | ledgerLoadState = LoadError error }, Cmd.none )
+            ( { model | ledgerLoadState = LoadError error, migrationState = NoMigration }, Cmd.none )
+
+
+handleLocalMigrationPrepared : Decode.Value -> Model -> ( Model, Cmd Msg )
+handleLocalMigrationPrepared value model =
+    let
+        status =
+            Decode.decodeValue (Decode.field "status" Decode.string) value
+                |> Result.withDefault "error"
+    in
+    if status == "ready" then
+        case Ledger.decodeLedgerSummaries value of
+            Ok ledgers ->
+                case ledgers of
+                    [] ->
+                        ( { model
+                            | migrationState = NoMigration
+                            , ledgerLoadState = LoadError "No se encontró un libro de Firestore para subir los datos locales."
+                          }
+                        , Cmd.none
+                        )
+
+                    [ ledger ] ->
+                        ( { model
+                            | migrationState = UploadingMigration ledger.id
+                            , ledgerLoadState = Loading
+                          }
+                        , mergeLocalLedgerToFirestore (Ledger.encodeLedgerRequest ledger.id)
+                        )
+
+                    firstLedger :: _ ->
+                        let
+                            selectedLedgerId =
+                                Decode.decodeValue (Decode.field "selectedLedgerId" Decode.string) value
+                                    |> Result.withDefault firstLedger.id
+                        in
+                        ( { model
+                            | migrationState = ChoosingMigration ledgers selectedLedgerId
+                            , ledgerLoadState = Loaded
+                          }
+                        , Cmd.none
+                        )
+
+            Err error ->
+                ( { model | migrationState = NoMigration, ledgerLoadState = LoadError error }, Cmd.none )
+
+    else
+        let
+            error =
+                Decode.decodeValue (Decode.field "message" Decode.string) value
+                    |> Result.withDefault "No se pudo preparar la migración local."
+        in
+        ( { model | migrationState = NoMigration, ledgerLoadState = LoadError error }, Cmd.none )
+
+
+localDataExists : Model -> Bool
+localDataExists model =
+    model.storageMode
+        == LocalOnly
+        && (not (List.isEmpty model.events)
+                || not (List.isEmpty model.accounts)
+                || model.ledgerName
+                /= localLedgerName
+           )
 
 
 applyLedgerData : Ledger.LedgerData -> Model -> Model
@@ -716,13 +1660,53 @@ applyLedgerData ledger model =
         , ledgers = ledger.ledgers
         , currentLedgerId = ledger.currentLedgerId
         , ledgerName = Model.ledgerNameFor ledger.currentLedgerId ledger.ledgers
+        , storageMode =
+            if ledger.currentLedgerId == localLedgerId then
+                LocalOnly
+
+            else
+                CloudSynced
         , form = form
         , ledgerLoadState = Loaded
         , error = ""
         , accountError = ""
         , ledgerError = ""
+        , migrationState = NoMigration
     }
+        |> adjustTutorialAfterLedgerLoad model.ledgerLoadState
         |> Model.ensureSelectedAccount
+
+
+adjustTutorialAfterLedgerLoad : LoadState -> Model -> Model
+adjustTutorialAfterLedgerLoad _ model =
+    case model.tutorialState of
+        TutorialOpen AccountsStep ->
+            if not (List.isEmpty (Model.activeAccounts model)) then
+                let
+                    nextStep =
+                        tutorialStepAfterAccounts model
+                in
+                prepareTutorialStep nextStep
+                    { model
+                        | tutorialState = TutorialOpen nextStep
+                        , accountError = ""
+                    }
+
+            else
+                model
+
+        _ ->
+            model
+
+
+tutorialAfterAuth : Model -> TutorialState
+tutorialAfterAuth model =
+    case model.tutorialState of
+        TutorialOpen SignInStep ->
+            TutorialOpen (reopenedTutorialStep model)
+
+        _ ->
+            model.tutorialState
 
 
 formWithLoadedAccount : Maybe String -> List Accounting.Account -> Accounting.Form -> Accounting.Form

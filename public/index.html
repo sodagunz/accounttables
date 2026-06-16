@@ -64,36 +64,17 @@
                 focusAccountTool();
             });
 
-            app.ports.getElementRect.subscribe((selector) => {
-                const prev = document.querySelector(".tutorial-target");
-                if (prev) prev.classList.remove("tutorial-target");
-                const el = document.querySelector(selector);
-                if (!el) return;
-                el.classList.add("tutorial-target");
-                const rect = el.getBoundingClientRect();
-                app.ports.elementRectReceived.send({
-                    id: selector,
-                    rect: { top: rect.top, right: rect.right, bottom: rect.bottom, left: rect.left, width: rect.width, height: rect.height },
-                    viewportHeight: window.innerHeight,
-                });
-            });
-
             app.ports.openDisclosure.subscribe((id) => {
                 const el = document.getElementById(id);
                 if (el) el.open = true;
+                window.requestAnimationFrame(() => {
+                    window.contabilizarTutorialDriver?.refresh();
+                });
             });
 
             app.ports.focusElement.subscribe((selector) => {
                 const el = document.querySelector(selector);
                 if (el) el.focus();
-            });
-
-            app.ports.lockBodyScroll.subscribe((locked) => {
-                document.body.style.overflow = locked ? "hidden" : "";
-                if (!locked) {
-                    const prev = document.querySelector(".tutorial-target");
-                    if (prev) prev.classList.remove("tutorial-target");
-                }
             });
 
             app.ports.saveTutorialState.subscribe((state) => {
@@ -310,11 +291,16 @@
                     return buttons;
                 };
 
-                const showTutorialStep = (step) => {
+                const showTutorialStep = (step, retry = true) => {
                     const selector = String(step?.selector || "");
                     const target = selector ? document.querySelector(selector) : null;
 
                     if (selector && !target) {
+                        if (retry) {
+                            window.requestAnimationFrame(() => showTutorialStep(step, false));
+                            return;
+                        }
+
                         emitTutorialAction("target-missing", {
                             selector,
                             step: String(step?.step || ""),

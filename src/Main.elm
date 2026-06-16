@@ -7,13 +7,13 @@ import Browser
 import Events exposing (Event)
 import Export
 import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
-import Html.Attributes exposing (attribute, class, style, type_, value)
+import Html.Attributes exposing (attribute, class, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
-import Model exposing (MigrationState(..), Model, StorageMode(..), TargetRect, TutorialState(..), TutorialStep(..))
+import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), TutorialStep(..))
 import Projector
 import Task
 import Time
@@ -73,7 +73,7 @@ type Msg
     | TutorialFinish
     | ReopenTutorial
     | DismissTutorialCompletion
-    | ElementRectReceived Decode.Value
+    | TutorialActionReceived Decode.Value
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -139,7 +139,7 @@ port mergeLocalLedgerToFirestore : Encode.Value -> Cmd msg
 port saveTutorialState : Encode.Value -> Cmd msg
 
 
-port getElementRect : String -> Cmd msg
+port showTutorialStep : Encode.Value -> Cmd msg
 
 
 port openDisclosure : String -> Cmd msg
@@ -148,10 +148,13 @@ port openDisclosure : String -> Cmd msg
 port focusElement : String -> Cmd msg
 
 
-port lockBodyScroll : Bool -> Cmd msg
+port hideTutorial : () -> Cmd msg
 
 
-port elementRectReceived : (Decode.Value -> msg) -> Sub msg
+port refreshTutorial : () -> Cmd msg
+
+
+port tutorialAction : (Decode.Value -> msg) -> Sub msg
 
 
 main : Program Decode.Value Model Msg
@@ -178,7 +181,7 @@ init flags =
     ( model
     , case model.tutorialState of
         TutorialOpen step ->
-            Cmd.batch (lockBodyScroll True :: tutorialNavigateCmd model step :: baseCmds)
+            Cmd.batch (tutorialNavigateCmd model step :: baseCmds)
 
         _ ->
             Cmd.batch baseCmds
@@ -444,7 +447,7 @@ update msg model =
                                     if isNewExpense then
                                         case updatedModel.tutorialState of
                                             TutorialOpen FirstExpenseStep ->
-                                                tutorialNavigateTo DeleteExpenseStep updatedModel
+                                                tutorialNavigateTo DeleteExpenseStep { updatedModel | tutorialExpenseId = Just expense.id }
 
                                             _ ->
                                                 ( updatedModel, Cmd.none )
@@ -498,8 +501,12 @@ update msg model =
                                     nextAccountsStep =
                                         tutorialStepAfterAccounts updatedModel
                                 in
-                                ( { updatedModel | tutorialState = TutorialOpen nextAccountsStep, tutorialTargetRect = Nothing, accountError = "" }
-                                , tutorialNavigateCmd updatedModel nextAccountsStep
+                                let
+                                    nextModel =
+                                        prepareTutorialStep nextAccountsStep { updatedModel | tutorialState = TutorialOpen nextAccountsStep, accountError = "" }
+                                in
+                                ( nextModel
+                                , tutorialNavigateCmd nextModel nextAccountsStep
                                 )
 
                             else
@@ -565,6 +572,14 @@ update msg model =
 
         DeleteExpense movementId ->
             let
+                isTutorialDelete =
+                    case ( model.tutorialState, model.tutorialExpenseId ) of
+                        ( TutorialOpen DeleteExpenseStep, Just tutorialExpenseId ) ->
+                            tutorialExpenseId == movementId
+
+                        _ ->
+                            False
+
                 event =
                     Events.MovementDeletedEvent 0 { movementId = movementId }
 
@@ -585,15 +600,14 @@ update msg model =
                         , expenses = Model.activeExpenses updatedExpenses
                     }
             in
-            ( case baseModel.tutorialState of
-                TutorialOpen DeleteExpenseStep ->
-                    { baseModel | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
+            ( if isTutorialDelete then
+                { baseModel | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
 
-                _ ->
-                    baseModel
+              else
+                baseModel
             , Cmd.batch
-                [ if baseModel.tutorialState == TutorialOpen DeleteExpenseStep then
-                    lockBodyScroll False
+                [ if isTutorialDelete then
+                    hideTutorial ()
 
                   else
                     Cmd.none
@@ -603,7 +617,11 @@ update msg model =
                         , ( "event", Events.eventEncoder event )
                         ]
                     )
-                , saveTutorialState (Encode.string "completed")
+                , if isTutorialDelete then
+                    saveTutorialState (Encode.string "completed")
+
+                  else
+                    Cmd.none
                 ]
             )
 
@@ -704,15 +722,15 @@ update msg model =
         TutorialSkip ->
             case model.tutorialState of
                 TutorialOpen step ->
-                    advanceTutorialFrom step model
+                    skipTutorialFrom step model
 
                 _ ->
                     ( model, Cmd.none )
 
         TutorialFinish ->
-            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
+            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
             , Cmd.batch
-                [ lockBodyScroll False
+                [ hideTutorial ()
                 , saveTutorialState (Encode.string "completed")
                 ]
             )
@@ -721,25 +739,22 @@ update msg model =
             let
                 step =
                     reopenedTutorialStep model
+
+                ( reopenedModel, navigateCmd ) =
+                    tutorialNavigateTo step { model | tutorialCompletionVisible = False, tutorialExpenseId = Nothing }
             in
-            ( { model | tutorialState = TutorialOpen step, tutorialCompletionVisible = False, tutorialTargetRect = Nothing }
+            ( reopenedModel
             , Cmd.batch
-                [ lockBodyScroll True
-                , saveTutorialState (Encode.string "")
-                , tutorialNavigateCmd model step
+                [ saveTutorialState (Encode.string "")
+                , navigateCmd
                 ]
             )
 
         DismissTutorialCompletion ->
             ( { model | tutorialCompletionVisible = False }, Cmd.none )
 
-        ElementRectReceived value ->
-            case Decode.decodeValue tutorialTargetRectDecoder value of
-                Ok rect ->
-                    ( { model | tutorialTargetRect = Just rect }, Cmd.none )
-
-                Err _ ->
-                    ( model, Cmd.none )
+        TutorialActionReceived value ->
+            handleTutorialAction value model
 
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
@@ -768,52 +783,52 @@ view model =
             , tutorialCompletionBanner model
             , migrationPrompt model
             , localRiskBanner model
-                , div [ class "layout" ]
-                    [ div [ class "input-area" ]
-                        [ ExpenseForm.view
-                            { form = model.form
-                            , accounts = Model.activeAccounts model
-                            , exchangeRate = model.exchangeRate
-                            , exchangeRateStatus = model.exchangeRateStatus
-                            , zone = model.zone
-                            , error = model.error
-                            , onDescription = UpdateDescription
-                            , onAmount = UpdateAmount
-                            , onAccount = UpdateAccount
-                            , onCreateAccount = OpenAccountTool
-                            , onCurrency = UpdateCurrency
-                            , onDate = UpdateDate
-                            , onMovementType = UpdateMovementType
-                            , onSubmit = AddExpense
-                            , onCancel = CancelEdit
-                            }
-                        ]
-                    , div [ class "admin-area" ]
-                        [ adminArea model
-                        ]
-                    , div [ class "content-stack" ]
-                        [ ExpenseTable.view
-                            { expenses = rows
-                            , accounts = Model.activeAccounts model
-                            , filterWindow = model.filterWindow
-                            , hiddenAccountIds = model.hiddenAccountIds
-                            , dateDisplay = model.dateDisplay
-                            , displayCurrency = model.displayCurrency
-                            , sortField = model.sortField
-                            , sortDirection = model.sortDirection
-                            , onSelectFilter = SelectFilter
-                            , onToggleAccount = ToggleAccountFilter
-                            , onSelectDateDisplay = SelectDateDisplay
-                            , onSelectDisplayCurrency = SelectDisplayCurrency
-                            , onSelectSort = SelectSort
-                            , onExportCsv = ExportCsv
-                            , onExportXlsx = ExportXlsx
-                            , onDelete = DeleteExpense
-                            , onEdit = EditExpense
-                            }
-                        ]
+            , div [ class "layout" ]
+                [ div [ class "input-area" ]
+                    [ ExpenseForm.view
+                        { form = model.form
+                        , accounts = Model.activeAccounts model
+                        , exchangeRate = model.exchangeRate
+                        , exchangeRateStatus = model.exchangeRateStatus
+                        , zone = model.zone
+                        , error = model.error
+                        , onDescription = UpdateDescription
+                        , onAmount = UpdateAmount
+                        , onAccount = UpdateAccount
+                        , onCreateAccount = OpenAccountTool
+                        , onCurrency = UpdateCurrency
+                        , onDate = UpdateDate
+                        , onMovementType = UpdateMovementType
+                        , onSubmit = AddExpense
+                        , onCancel = CancelEdit
+                        }
+                    ]
+                , div [ class "admin-area" ]
+                    [ adminArea model
+                    ]
+                , div [ class "content-stack" ]
+                    [ ExpenseTable.view
+                        { expenses = rows
+                        , accounts = Model.activeAccounts model
+                        , filterWindow = model.filterWindow
+                        , hiddenAccountIds = model.hiddenAccountIds
+                        , dateDisplay = model.dateDisplay
+                        , displayCurrency = model.displayCurrency
+                        , sortField = model.sortField
+                        , sortDirection = model.sortDirection
+                        , onSelectFilter = SelectFilter
+                        , onToggleAccount = ToggleAccountFilter
+                        , onSelectDateDisplay = SelectDateDisplay
+                        , onSelectDisplayCurrency = SelectDisplayCurrency
+                        , onSelectSort = SelectSort
+                        , onExportCsv = ExportCsv
+                        , onExportXlsx = ExportXlsx
+                        , onDelete = DeleteExpense
+                        , onEdit = EditExpense
+                        }
                     ]
                 ]
+            ]
     in
     div [ class "app" ]
         [ header [ class "topbar" ]
@@ -839,7 +854,6 @@ view model =
                 ]
             ]
         , main_ [] mainContent
-        , tutorialView model
         ]
 
 
@@ -869,74 +883,6 @@ reopenTutorialButton model =
                 ]
 
 
-tutorialView : Model -> Html Msg
-tutorialView model =
-    case model.tutorialState of
-        TutorialOpen step ->
-            div [ class "tutorial-overlay" ]
-                [ case model.tutorialTargetRect of
-                    Just rect ->
-                        div
-                            [ class "tutorial-spotlight"
-                            , style "top" (String.fromFloat rect.top ++ "px")
-                            , style "left" (String.fromFloat rect.left ++ "px")
-                            , style "width" (String.fromFloat rect.width ++ "px")
-                            , style "height" (String.fromFloat rect.height ++ "px")
-                            ]
-                            []
-
-                    Nothing ->
-                        div [ class "tutorial-backdrop" ] []
-                , div
-                    (class "tutorial-tooltip" :: tutorialTooltipPosition model.tutorialTargetRect)
-                    [ p [] [ text (tutorialStepText step) ]
-                    , div [ class "tutorial-tooltip__actions" ]
-                        ([ if step == SignInStep then
-                            text ""
-
-                           else
-                            button [ class "tutorial-tooltip__back", type_ "button", onClick TutorialBack ] [ text "Atras" ]
-                         ]
-                            ++ tutorialPrimaryButton step
-                            ++ tutorialSkipButton step
-                        )
-                    ]
-                ]
-
-        _ ->
-            text ""
-
-
-tutorialTooltipPosition : Maybe TargetRect -> List (Html.Attribute Msg)
-tutorialTooltipPosition maybeRect =
-    case maybeRect of
-        Just rect ->
-            let
-                gap =
-                    8
-
-                midline =
-                    rect.viewportHeight / 2
-
-                below =
-                    rect.top < midline
-            in
-            if below then
-                [ style "top" (String.fromFloat (rect.bottom + gap) ++ "px")
-                , style "left" (String.fromFloat rect.left ++ "px")
-                ]
-
-            else
-                [ style "bottom" (String.fromFloat (rect.viewportHeight - rect.top + gap) ++ "px")
-                , style "left" (String.fromFloat rect.left ++ "px")
-                ]
-
-        Nothing ->
-            [ style "top" "50%"
-            , style "left" "50%"
-            ]
-
-
 tutorialStepText : TutorialStep -> String
 tutorialStepText step =
     case step of
@@ -950,36 +896,10 @@ tutorialStepText step =
             "Invita a alguien por email para trabajar juntos. Tambien puedes hacerlo despues."
 
         FirstExpenseStep ->
-            "Registra tu primer movimiento. Completa los campos y presiona \"Agregar\"."
+            "Registra tu primer movimiento. El importe y la descripcion ya estan completos. Presiona Guardar."
 
         DeleteExpenseStep ->
-            "Puedes eliminar o editar movimientos. Prueba a eliminar este."
-
-
-tutorialPrimaryButton : TutorialStep -> List (Html Msg)
-tutorialPrimaryButton step =
-    case step of
-        DeleteExpenseStep ->
-            [ button [ class "primary", type_ "button", onClick TutorialFinish ] [ text "Finalizar" ] ]
-
-        CollaboratorsStep ->
-            [ button [ class "primary", type_ "button", onClick TutorialNext ] [ text "Siguiente" ] ]
-
-        _ ->
-            []
-
-
-tutorialSkipButton : TutorialStep -> List (Html Msg)
-tutorialSkipButton step =
-    case step of
-        AccountsStep ->
-            []
-
-        DeleteExpenseStep ->
-            []
-
-        _ ->
-            [ button [ class "tutorial-tooltip__skip", type_ "button", onClick TutorialSkip ] [ text "Saltar" ] ]
+            "Perfecto. Ahora borremos este movimiento de prueba para que todo quede limpio. Presiona el boton de eliminar."
 
 
 tutorialTargetSelector : Model -> TutorialStep -> String
@@ -998,9 +918,9 @@ tutorialTargetSelector model step =
             "[data-tutorial=\"movement-form\"]"
 
         DeleteExpenseStep ->
-            case List.head (Model.activeExpenses model.expenses) of
-                Just expense ->
-                    "[data-tutorial=\"delete-" ++ expense.id ++ "\"]"
+            case model.tutorialExpenseId of
+                Just expenseId ->
+                    "[data-tutorial=\"delete-" ++ expenseId ++ "\"]"
 
                 Nothing ->
                     "[data-tutorial=\"movement-form\"]"
@@ -1016,16 +936,176 @@ tutorialFocusSelector model step =
             tutorialTargetSelector model step
 
 
-tutorialTargetRectDecoder : Decode.Decoder TargetRect
-tutorialTargetRectDecoder =
-    Decode.map7 TargetRect
-        (Decode.at [ "rect", "top" ] Decode.float)
-        (Decode.at [ "rect", "right" ] Decode.float)
-        (Decode.at [ "rect", "bottom" ] Decode.float)
-        (Decode.at [ "rect", "left" ] Decode.float)
-        (Decode.at [ "rect", "width" ] Decode.float)
-        (Decode.at [ "rect", "height" ] Decode.float)
-        (Decode.field "viewportHeight" Decode.float)
+tutorialStepName : TutorialStep -> String
+tutorialStepName step =
+    case step of
+        SignInStep ->
+            "sign-in"
+
+        AccountsStep ->
+            "accounts"
+
+        CollaboratorsStep ->
+            "collaborators"
+
+        FirstExpenseStep ->
+            "first-expense"
+
+        DeleteExpenseStep ->
+            "delete-expense"
+
+
+tutorialStepSide : TutorialStep -> String
+tutorialStepSide step =
+    case step of
+        SignInStep ->
+            "bottom"
+
+        AccountsStep ->
+            "right"
+
+        CollaboratorsStep ->
+            "right"
+
+        FirstExpenseStep ->
+            "right"
+
+        DeleteExpenseStep ->
+            "left"
+
+
+tutorialShowBack : TutorialStep -> Bool
+tutorialShowBack step =
+    step /= SignInStep
+
+
+tutorialShowNext : TutorialStep -> Bool
+tutorialShowNext step =
+    step == CollaboratorsStep
+
+
+tutorialShowSkip : TutorialStep -> Bool
+tutorialShowSkip step =
+    case step of
+        AccountsStep ->
+            False
+
+        DeleteExpenseStep ->
+            False
+
+        _ ->
+            True
+
+
+tutorialDoneButton : TutorialStep -> Bool
+tutorialDoneButton _ =
+    False
+
+
+tutorialAllowsTargetClick : TutorialStep -> Bool
+tutorialAllowsTargetClick step =
+    case step of
+        CollaboratorsStep ->
+            False
+
+        DeleteExpenseStep ->
+            True
+
+        _ ->
+            True
+
+
+prepareTutorialStep : TutorialStep -> Model -> Model
+prepareTutorialStep step model =
+    case step of
+        FirstExpenseStep ->
+            prefillTutorialExpenseForm model
+
+        _ ->
+            model
+
+
+prepareTutorialState : Model -> Model
+prepareTutorialState model =
+    case model.tutorialState of
+        TutorialOpen step ->
+            prepareTutorialStep step model
+
+        _ ->
+            model
+
+
+prefillTutorialExpenseForm : Model -> Model
+prefillTutorialExpenseForm model =
+    let
+        accountId =
+            case model.form.accountId of
+                "" ->
+                    Model.activeAccounts model
+                        |> List.head
+                        |> Maybe.map .id
+                        |> Maybe.withDefault ""
+
+                selectedAccountId ->
+                    selectedAccountId
+
+        form =
+            model.form
+    in
+    { model
+        | form =
+            { form
+                | amount = "1000"
+                , description = "Venta de prueba"
+                , accountId = accountId
+                , movementType = Accounting.IncomeMovement
+                , editingId = Nothing
+            }
+    }
+
+
+encodeTutorialStep : Model -> TutorialStep -> Encode.Value
+encodeTutorialStep model step =
+    Encode.object
+        [ ( "step", Encode.string (tutorialStepName step) )
+        , ( "selector", Encode.string (tutorialTargetSelector model step) )
+        , ( "title", Encode.string "" )
+        , ( "description", Encode.string (tutorialStepText step) )
+        , ( "side", Encode.string (tutorialStepSide step) )
+        , ( "align", Encode.string "start" )
+        , ( "showBack", Encode.bool (tutorialShowBack step) )
+        , ( "showNext", Encode.bool (tutorialShowNext step) )
+        , ( "showSkip", Encode.bool (tutorialShowSkip step) )
+        , ( "done", Encode.bool (tutorialDoneButton step) )
+        , ( "allowTargetClick", Encode.bool (tutorialAllowsTargetClick step) )
+        ]
+
+
+tutorialActionDecoder : Decode.Decoder String
+tutorialActionDecoder =
+    Decode.field "action" Decode.string
+
+
+handleTutorialAction : Decode.Value -> Model -> ( Model, Cmd Msg )
+handleTutorialAction value model =
+    case Decode.decodeValue tutorialActionDecoder value of
+        Ok "next" ->
+            update TutorialNext model
+
+        Ok "back" ->
+            update TutorialBack model
+
+        Ok "skip" ->
+            update TutorialSkip model
+
+        Ok "done" ->
+            update TutorialFinish model
+
+        Ok "target-missing" ->
+            ( model, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
 
 
 advanceTutorialFrom : TutorialStep -> Model -> ( Model, Cmd Msg )
@@ -1044,9 +1124,9 @@ advanceTutorialFrom step model =
                     tutorialNavigateTo nextStep model
 
                 Nothing ->
-                    ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True }
+                    ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
                     , Cmd.batch
-                        [ lockBodyScroll False
+                        [ hideTutorial ()
                         , saveTutorialState (Encode.string "completed")
                         ]
                     )
@@ -1069,6 +1149,34 @@ rawNextStep step =
 
         DeleteExpenseStep ->
             Nothing
+
+
+skipTutorialFrom : TutorialStep -> Model -> ( Model, Cmd Msg )
+skipTutorialFrom step model =
+    case step of
+        SignInStep ->
+            if List.isEmpty (Model.activeAccounts model) then
+                tutorialNavigateTo AccountsStep model
+
+            else
+                tutorialNavigateTo (tutorialStepAfterAccounts model) model
+
+        CollaboratorsStep ->
+            tutorialNavigateTo FirstExpenseStep model
+
+        FirstExpenseStep ->
+            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
+            , Cmd.batch
+                [ hideTutorial ()
+                , saveTutorialState (Encode.string "completed")
+                ]
+            )
+
+        AccountsStep ->
+            ( model, Cmd.none )
+
+        DeleteExpenseStep ->
+            ( model, Cmd.none )
 
 
 previousTutorialStep : TutorialStep -> TutorialStep
@@ -1113,15 +1221,19 @@ tutorialNavigateCmd : Model -> TutorialStep -> Cmd Msg
 tutorialNavigateCmd model step =
     Cmd.batch
         [ tutorialOpenDisclosureCmd step
-        , getElementRect (tutorialTargetSelector model step)
+        , showTutorialStep (encodeTutorialStep model step)
         , focusElement (tutorialFocusSelector model step)
         ]
 
 
 tutorialNavigateTo : TutorialStep -> Model -> ( Model, Cmd Msg )
 tutorialNavigateTo step model =
-    ( { model | tutorialState = TutorialOpen step, tutorialTargetRect = Nothing }
-    , tutorialNavigateCmd model step
+    let
+        preparedModel =
+            prepareTutorialStep step { model | tutorialState = TutorialOpen step }
+    in
+    ( preparedModel
+    , tutorialNavigateCmd preparedModel step
     )
 
 
@@ -1315,7 +1427,7 @@ subscriptions _ =
         , expenseIdGenerated ExpenseIdGenerated
         , eventsLoaded EventsLoaded
         , localMigrationPrepared LocalMigrationPrepared
-        , elementRectReceived ElementRectReceived
+        , tutorialAction TutorialActionReceived
         ]
 
 
@@ -1336,40 +1448,48 @@ handleAuthStateChanged authState model =
                     tutorialAfterAuth model
             in
             if localDataExists model then
-                ( { model
-                    | authState = authState
-                    , storageMode = CloudSynced
-                    , ledgerLoadState = Loading
-                    , inviteEmail = ""
-                    , error = ""
-                    , accountError = ""
-                    , ledgerError = ""
-                    , migrationState = PreparingMigration
-                    , tutorialState = newTutorialState
-                    , tutorialTargetRect = Nothing
-                   }
+                let
+                    updatedModel =
+                        { model
+                            | authState = authState
+                            , storageMode = CloudSynced
+                            , ledgerLoadState = Loading
+                            , inviteEmail = ""
+                            , error = ""
+                            , accountError = ""
+                            , ledgerError = ""
+                            , migrationState = PreparingMigration
+                            , tutorialState = newTutorialState
+                        }
+                            |> prepareTutorialState
+                in
+                ( updatedModel
                 , Cmd.batch
                     [ prepareLocalMigration ()
-                    , tutorialAdvanceCmd model model.tutorialState newTutorialState
+                    , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
                     ]
                 )
 
             else
-                ( { model
-                    | authState = authState
-                    , storageMode = CloudSynced
-                    , ledgerLoadState = Loading
-                    , currentLedgerId = ledgerId
-                    , inviteEmail = ""
-                    , error = ""
-                    , accountError = ""
-                    , ledgerError = ""
-                    , tutorialState = newTutorialState
-                    , tutorialTargetRect = Nothing
-                  }
+                let
+                    updatedModel =
+                        { model
+                            | authState = authState
+                            , storageMode = CloudSynced
+                            , ledgerLoadState = Loading
+                            , currentLedgerId = ledgerId
+                            , inviteEmail = ""
+                            , error = ""
+                            , accountError = ""
+                            , ledgerError = ""
+                            , tutorialState = newTutorialState
+                        }
+                            |> prepareTutorialState
+                in
+                ( updatedModel
                 , Cmd.batch
                     [ loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
-                    , tutorialAdvanceCmd model model.tutorialState newTutorialState
+                    , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
                     ]
                 )
 
@@ -1382,7 +1502,7 @@ handleAuthStateChanged authState model =
                         , error = ""
                         , accountError = ""
                         , ledgerError = ""
-                      }
+                    }
                         |> ensureLocalLedger
                         |> Model.ensureSelectedAccount
 
@@ -1548,11 +1668,15 @@ adjustTutorialAfterLedgerLoad _ model =
     case model.tutorialState of
         TutorialOpen AccountsStep ->
             if not (List.isEmpty (Model.activeAccounts model)) then
-                { model
-                    | tutorialState = TutorialOpen (tutorialStepAfterAccounts model)
-                    , accountError = ""
-                    , tutorialTargetRect = Nothing
-                }
+                let
+                    nextStep =
+                        tutorialStepAfterAccounts model
+                in
+                prepareTutorialStep nextStep
+                    { model
+                        | tutorialState = TutorialOpen nextStep
+                        , accountError = ""
+                    }
 
             else
                 model

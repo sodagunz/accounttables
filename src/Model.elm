@@ -2,7 +2,6 @@ module Model exposing
     ( MigrationState(..)
     , Model
     , StorageMode(..)
-    , TargetRect
     , TutorialState(..)
     , TutorialStep(..)
     , activeAccounts
@@ -55,7 +54,7 @@ type alias Model =
     , migrationState : MigrationState
     , tutorialState : TutorialState
     , tutorialCompletionVisible : Bool
-    , tutorialTargetRect : Maybe TargetRect
+    , tutorialExpenseId : Maybe String
     }
 
 
@@ -83,17 +82,6 @@ type TutorialState
     = TutorialOpen TutorialStep
     | TutorialDismissed
     | TutorialCompleted
-
-
-type alias TargetRect =
-    { top : Float
-    , right : Float
-    , bottom : Float
-    , left : Float
-    , width : Float
-    , height : Float
-    , viewportHeight : Float
-    }
 
 
 initial : Model
@@ -126,7 +114,7 @@ initial =
     , migrationState = NoMigration
     , tutorialState = TutorialOpen SignInStep
     , tutorialCompletionVisible = False
-    , tutorialTargetRect = Nothing
+    , tutorialExpenseId = Nothing
     }
 
 

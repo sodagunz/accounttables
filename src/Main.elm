@@ -1,23 +1,27 @@
 port module Main exposing (main)
 
-import Accounting exposing (FilterWindow(..), SortDirection(..), SortField(..))
+import Accounting exposing (FilterWindow(..), SortField(..))
 import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
 import Auth exposing (AuthState(..))
 import Browser
 import Events exposing (Event)
 import Export
+import Flags
 import Html exposing (Html)
 import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
 import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), TutorialStep(..))
-import Projector
 import Task
 import Time
 import Tutorial
 import Update.Accounts as Accounts
+import Update.Auth as AuthUpdate
+import Update.Expenses as Expenses
+import Update.LedgerData as LedgerData
 import Update.Ledgers as Ledgers
+import Update.Sorting as Sorting
 import Util.Date exposing (DateDisplay(..), dateToIso)
 import View.App as AppView
 
@@ -166,7 +170,7 @@ init : Decode.Value -> ( Model, Cmd Msg )
 init flags =
     let
         model =
-            modelFromFlags flags
+            Flags.modelFromFlags flags
 
         baseCmds =
             [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
@@ -176,87 +180,11 @@ init flags =
     ( model
     , case model.tutorialState of
         TutorialOpen step ->
-            Cmd.batch (tutorialNavigateCmd model step :: baseCmds)
+            Cmd.batch (Tutorial.tutorialNavigateCmd tutorialConfig model step :: baseCmds)
 
         _ ->
             Cmd.batch baseCmds
     )
-
-
-modelFromFlags : Decode.Value -> Model
-modelFromFlags flags =
-    let
-        tutorialState =
-            decodeTutorialStateFromFlags flags
-
-        initialModel =
-            Model.initial
-
-        baseModel =
-            { initialModel | tutorialState = tutorialState }
-
-        ledgerResult =
-            case Decode.decodeValue (Decode.field "ledger" Decode.value) flags of
-                Ok ledgerValue ->
-                    Ledger.decodeLedger ledgerValue
-
-                Err _ ->
-                    Ledger.decodeLedger flags
-    in
-    case ledgerResult of
-        Ok ledger ->
-            applyLedgerData ledger baseModel
-
-        Err _ ->
-            baseModel
-
-
-decodeTutorialStateFromFlags : Decode.Value -> TutorialState
-decodeTutorialStateFromFlags flags =
-    case Decode.decodeValue (Decode.field "tutorialState" Decode.string) flags of
-        Ok "dismissed" ->
-            TutorialDismissed
-
-        Ok "completed" ->
-            TutorialCompleted
-
-        _ ->
-            TutorialOpen SignInStep
-
-
-localLedgerId : String
-localLedgerId =
-    "local"
-
-
-localLedgerName : String
-localLedgerName =
-    "Libro contable de desconocido"
-
-
-ensureLocalLedger : Model -> Model
-ensureLocalLedger model =
-    if model.currentLedgerId == localLedgerId then
-        { model
-            | storageMode = LocalOnly
-            , ledgerLoadState = Loaded
-        }
-
-    else
-        { model
-            | storageMode = LocalOnly
-            , ledgerLoadState = Loaded
-            , currentLedgerId = localLedgerId
-            , ledgerName = localLedgerName
-            , ledgers =
-                [ { id = localLedgerId
-                  , name = localLedgerName
-                  , ownerUid = ""
-                  , members = []
-                  , invitedEmails = []
-                  }
-                ]
-        }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -309,7 +237,7 @@ update msg model =
             ( { model | displayCurrency = currency }, Cmd.none )
 
         SelectSort sortField ->
-            ( selectSort sortField model, Cmd.none )
+            ( Sorting.select sortField model, Cmd.none )
 
         ExportCsv ->
             ( model, exportVisibleTable Export.Csv model )
@@ -324,10 +252,10 @@ update msg model =
             ( model, signOutUser () )
 
         AuthStateChanged value ->
-            handleAuthStateChanged (Auth.decodeAuthState value) model
+            AuthUpdate.handleState authUpdateConfig (Auth.decodeAuthState value) model
 
         LedgerLoaded value ->
-            handleLedgerLoaded value model
+            LedgerData.handleLedgerLoaded ledgerDataConfig value model
 
         GotExchangeRate result ->
             case result of
@@ -343,142 +271,10 @@ update msg model =
                     ( { model | exchangeRateStatus = FailedRate }, Cmd.none )
 
         AddExpense ->
-            ( model, generateExpenseId () )
+            Expenses.requestId expensesConfig model
 
         ExpenseIdGenerated value ->
-            case Decode.decodeValue Decode.string value of
-                Ok expenseId ->
-                    let
-                        readyModel =
-                            Model.ensureSelectedAccount model
-
-                        rate =
-                            case readyModel.form.editingId of
-                                Just editingId ->
-                                    case List.head (List.filter (\e -> e.id == editingId) readyModel.expenses) of
-                                        Just expense ->
-                                            expense.exchangeRate
-
-                                        Nothing ->
-                                            readyModel.exchangeRate
-
-                                Nothing ->
-                                    readyModel.exchangeRate
-                    in
-                    case Accounting.buildExpense rate expenseId (Model.activeAccounts readyModel) readyModel.form of
-                        Ok expense ->
-                            let
-                                ( event, updatedModel ) =
-                                    case readyModel.form.editingId of
-                                        Just editingId ->
-                                            let
-                                                updateEvent =
-                                                    Events.MovementUpdatedEvent 0
-                                                        { movementId = editingId
-                                                        , movementType = expense.movementType
-                                                        , description = expense.description
-                                                        , accountId = expense.accountId
-                                                        , accountName = expense.accountName
-                                                        , inputAmount = expense.inputAmount
-                                                        , inputCurrency = expense.inputCurrency
-                                                        , exchangeRate = expense.exchangeRate
-                                                        , ars = expense.ars
-                                                        , usd = expense.usd
-                                                        , date = expense.date
-                                                        }
-
-                                                updatedExpenses =
-                                                    List.map
-                                                        (\e ->
-                                                            if e.id == editingId then
-                                                                expense
-
-                                                            else
-                                                                e
-                                                        )
-                                                        readyModel.expenses
-                                            in
-                                            ( updateEvent
-                                            , { readyModel
-                                                | events = updateEvent :: readyModel.events
-                                                , expenses = Model.activeExpenses updatedExpenses
-                                              }
-                                            )
-
-                                        Nothing ->
-                                            let
-                                                createEvent =
-                                                    Events.MovementCreatedEvent 0
-                                                        { id = expense.id
-                                                        , movementType = expense.movementType
-                                                        , description = expense.description
-                                                        , accountId = expense.accountId
-                                                        , accountName = expense.accountName
-                                                        , inputAmount = expense.inputAmount
-                                                        , inputCurrency = expense.inputCurrency
-                                                        , exchangeRate = expense.exchangeRate
-                                                        , ars = expense.ars
-                                                        , usd = expense.usd
-                                                        , date = expense.date
-                                                        }
-                                            in
-                                            ( createEvent
-                                            , { readyModel
-                                                | events = createEvent :: readyModel.events
-                                                , expenses = expense :: Model.activeExpenses readyModel.expenses
-                                              }
-                                            )
-                            in
-                            let
-                                isNewExpense =
-                                    case readyModel.form.editingId of
-                                        Nothing ->
-                                            True
-
-                                        Just _ ->
-                                            False
-
-                                ( modelAfterAdvance, advanceCmd ) =
-                                    if isNewExpense then
-                                        case updatedModel.tutorialState of
-                                            TutorialOpen FirstExpenseStep ->
-                                                tutorialNavigateTo DeleteExpenseStep { updatedModel | tutorialExpenseId = Just expense.id }
-
-                                            _ ->
-                                                ( updatedModel, Cmd.none )
-
-                                    else
-                                        ( updatedModel, Cmd.none )
-                            in
-                            ( { modelAfterAdvance
-                                | form =
-                                    { description = ""
-                                    , amount = ""
-                                    , accountId = readyModel.form.accountId
-                                    , currency = readyModel.form.currency
-                                    , date = readyModel.form.date
-                                    , movementType = readyModel.form.movementType
-                                    , editingId = Nothing
-                                    }
-                                , error = ""
-                              }
-                            , Cmd.batch
-                                [ appendEvent
-                                    (Encode.object
-                                        [ ( "ledgerId", Encode.string readyModel.currentLedgerId )
-                                        , ( "event", Events.eventEncoder event )
-                                        ]
-                                    )
-                                , saveLastAccount readyModel.currentLedgerId readyModel.form.accountId
-                                , advanceCmd
-                                ]
-                            )
-
-                        Err error ->
-                            ( { readyModel | error = error }, Cmd.none )
-
-                Err error ->
-                    ( { model | error = Decode.errorToString error }, Cmd.none )
+            Expenses.handleGeneratedId expensesConfig value model
 
         UpdateNewAccountName name ->
             ( { model | newAccountName = name }, Cmd.none )
@@ -501,7 +297,7 @@ update msg model =
                                         Tutorial.prepareStep nextAccountsStep { updatedModel | tutorialState = TutorialOpen nextAccountsStep, accountError = "" }
                                 in
                                 ( nextModel
-                                , tutorialNavigateCmd nextModel nextAccountsStep
+                                , Tutorial.tutorialNavigateCmd tutorialConfig nextModel nextAccountsStep
                                 )
 
                             else
@@ -566,101 +362,19 @@ update msg model =
             ( { model | hiddenAccountIds = updatedHidden }, Cmd.none )
 
         DeleteExpense movementId ->
-            let
-                isTutorialDelete =
-                    case ( model.tutorialState, model.tutorialExpenseId ) of
-                        ( TutorialOpen DeleteExpenseStep, Just tutorialExpenseId ) ->
-                            tutorialExpenseId == movementId
-
-                        _ ->
-                            False
-
-                event =
-                    Events.MovementDeletedEvent 0 { movementId = movementId }
-
-                updatedExpenses =
-                    List.map
-                        (\e ->
-                            if e.id == movementId then
-                                { e | deletedAt = Just "deleted" }
-
-                            else
-                                e
-                        )
-                        model.expenses
-
-                baseModel =
-                    { model
-                        | events = event :: model.events
-                        , expenses = Model.activeExpenses updatedExpenses
-                    }
-            in
-            ( if isTutorialDelete then
-                { baseModel | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
-
-              else
-                baseModel
-            , Cmd.batch
-                [ if isTutorialDelete then
-                    hideTutorial ()
-
-                  else
-                    Cmd.none
-                , appendEvent
-                    (Encode.object
-                        [ ( "ledgerId", Encode.string model.currentLedgerId )
-                        , ( "event", Events.eventEncoder event )
-                        ]
-                    )
-                , if isTutorialDelete then
-                    saveTutorialState (Encode.string "completed")
-
-                  else
-                    Cmd.none
-                ]
-            )
+            Expenses.delete expensesConfig movementId model
 
         EditExpense expenseId ->
-            case List.head (List.filter (\e -> e.id == expenseId) model.expenses) of
-                Just expense ->
-                    ( { model
-                        | form = Accounting.expenseToForm expense model.form
-                        , error = ""
-                      }
-                    , Cmd.none
-                    )
-
-                Nothing ->
-                    ( { model | error = "No se encontró el gasto a editar" }, Cmd.none )
+            Expenses.edit expenseId model
 
         CancelEdit ->
-            ( { model
-                | form = Accounting.emptyForm
-                , error = ""
-              }
-                |> Model.ensureSelectedAccount
-            , Cmd.none
-            )
+            Expenses.cancelEdit model
 
         EventsLoaded value ->
-            case Decode.decodeValue (Decode.list Events.eventDecoder) value of
-                Ok events ->
-                    let
-                        projectedExpenses =
-                            Projector.projectEvents events
-                    in
-                    ( { model
-                        | events = events
-                        , expenses = Model.activeExpenses projectedExpenses
-                      }
-                    , Cmd.none
-                    )
-
-                Err error ->
-                    ( { model | error = Decode.errorToString error }, Cmd.none )
+            Expenses.handleEventsLoaded value model
 
         LocalMigrationPrepared value ->
-            handleLocalMigrationPrepared value model
+            LedgerData.handleLocalMigrationPrepared ledgerDataConfig value model
 
         SelectMigrationLedger ledgerId ->
             case model.migrationState of
@@ -701,7 +415,7 @@ update msg model =
         TutorialNext ->
             case model.tutorialState of
                 TutorialOpen step ->
-                    advanceTutorialFrom step model
+                    Tutorial.advanceTutorialFrom tutorialConfig step model
 
                 _ ->
                     ( model, Cmd.none )
@@ -709,7 +423,7 @@ update msg model =
         TutorialBack ->
             case model.tutorialState of
                 TutorialOpen step ->
-                    tutorialNavigateTo (Tutorial.previousStep step) model
+                    Tutorial.tutorialNavigateTo tutorialConfig (Tutorial.previousStep step) model
 
                 _ ->
                     ( model, Cmd.none )
@@ -717,18 +431,13 @@ update msg model =
         TutorialSkip ->
             case model.tutorialState of
                 TutorialOpen step ->
-                    skipTutorialFrom step model
+                    Tutorial.skipTutorialFrom tutorialConfig step model
 
                 _ ->
                     ( model, Cmd.none )
 
         TutorialFinish ->
-            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
-            , Cmd.batch
-                [ hideTutorial ()
-                , saveTutorialState (Encode.string "completed")
-                ]
-            )
+            Tutorial.handleTutorialAction tutorialConfig (Encode.object [ ( "action", Encode.string "done" ) ]) model
 
         ReopenTutorial ->
             let
@@ -736,7 +445,7 @@ update msg model =
                     Tutorial.reopenedStep model
 
                 ( reopenedModel, navigateCmd ) =
-                    tutorialNavigateTo step { model | tutorialCompletionVisible = False, tutorialExpenseId = Nothing }
+                    Tutorial.tutorialNavigateTo tutorialConfig step { model | tutorialCompletionVisible = False, tutorialExpenseId = Nothing }
             in
             ( reopenedModel
             , Cmd.batch
@@ -749,7 +458,7 @@ update msg model =
             ( { model | tutorialCompletionVisible = False }, Cmd.none )
 
         TutorialActionReceived value ->
-            handleTutorialAction value model
+            Tutorial.handleTutorialAction tutorialConfig value model
 
 
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
@@ -766,7 +475,7 @@ view model =
 
 viewConfig : AppView.Config Msg
 viewConfig =
-    { localLedgerName = localLedgerName
+    { localLedgerName = Ledger.localLedgerName
     , onReopenTutorial = ReopenTutorial
     , onDismissTutorialCompletion = DismissTutorialCompletion
     , onSignIn = SignInWithGoogle
@@ -804,156 +513,57 @@ viewConfig =
     }
 
 
-handleTutorialAction : Decode.Value -> Model -> ( Model, Cmd Msg )
-handleTutorialAction value model =
-    case Decode.decodeValue Tutorial.actionDecoder value of
-        Ok "next" ->
-            update TutorialNext model
-
-        Ok "back" ->
-            update TutorialBack model
-
-        Ok "skip" ->
-            update TutorialSkip model
-
-        Ok "done" ->
-            update TutorialFinish model
-
-        Ok "target-missing" ->
-            ( model, Cmd.none )
-
-        _ ->
-            ( model, Cmd.none )
+tutorialConfig : Tutorial.Config Msg
+tutorialConfig =
+    { showStep = showTutorialStep
+    , openDisclosure = openDisclosure
+    , focusElement = focusElement
+    , hide = hideTutorial
+    , saveState = saveTutorialState
+    }
 
 
-advanceTutorialFrom : TutorialStep -> Model -> ( Model, Cmd Msg )
-advanceTutorialFrom step model =
-    case step of
-        AccountsStep ->
-            let
-                next =
-                    Tutorial.stepAfterAccounts model
-            in
-            tutorialNavigateTo next model
-
-        _ ->
-            case Tutorial.nextStep step of
-                Just nextStep ->
-                    tutorialNavigateTo nextStep model
-
-                Nothing ->
-                    ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
-                    , Cmd.batch
-                        [ hideTutorial ()
-                        , saveTutorialState (Encode.string "completed")
-                        ]
-                    )
+ledgerDataConfig : LedgerData.Config Msg
+ledgerDataConfig =
+    { navigateTutorial = Tutorial.tutorialNavigateCmd tutorialConfig
+    , mergeLocalLedgerToFirestore =
+        \ledgerId -> mergeLocalLedgerToFirestore (Ledger.encodeLedgerRequest ledgerId)
+    }
 
 
-skipTutorialFrom : TutorialStep -> Model -> ( Model, Cmd Msg )
-skipTutorialFrom step model =
-    case step of
-        SignInStep ->
-            if List.isEmpty (Model.activeAccounts model) then
-                tutorialNavigateTo AccountsStep model
-
-            else
-                tutorialNavigateTo (Tutorial.stepAfterAccounts model) model
-
-        CollaboratorsStep ->
-            tutorialNavigateTo FirstExpenseStep model
-
-        FirstExpenseStep ->
-            ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
-            , Cmd.batch
-                [ hideTutorial ()
-                , saveTutorialState (Encode.string "completed")
-                ]
-            )
-
-        AccountsStep ->
-            ( model, Cmd.none )
-
-        DeleteExpenseStep ->
-            ( model, Cmd.none )
+authUpdateConfig : AuthUpdate.Config Msg
+authUpdateConfig =
+    { prepareLocalMigration = prepareLocalMigration ()
+    , loadLedgerData = \ledgerId -> loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
+    , completeTutorial =
+        Cmd.batch
+            [ hideTutorial ()
+            , saveTutorialState (Encode.string "completed")
+            ]
+    , tutorialAdvanceCmd = Tutorial.tutorialAdvanceCmd tutorialConfig
+    , tutorialNavigateCmd = Tutorial.tutorialNavigateCmd tutorialConfig
+    }
 
 
-tutorialAdvanceCmd : Model -> TutorialState -> TutorialState -> Cmd Msg
-tutorialAdvanceCmd model oldState newState =
-    case ( oldState, newState ) of
-        ( TutorialOpen SignInStep, TutorialOpen step ) ->
-            tutorialNavigateCmd model step
-
-        _ ->
-            Cmd.none
-
-
-tutorialNavigateCmd : Model -> TutorialStep -> Cmd Msg
-tutorialNavigateCmd model step =
-    Cmd.batch
-        [ tutorialOpenDisclosureCmd step
-        , showTutorialStep (Tutorial.encodeStep model step)
-        , focusElement (Tutorial.focusSelector model step)
-        ]
-
-
-tutorialNavigateTo : TutorialStep -> Model -> ( Model, Cmd Msg )
-tutorialNavigateTo step model =
-    let
-        preparedModel =
-            Tutorial.prepareStep step { model | tutorialState = TutorialOpen step }
-    in
-    ( preparedModel
-    , tutorialNavigateCmd preparedModel step
-    )
-
-
-tutorialOpenDisclosureCmd : TutorialStep -> Cmd Msg
-tutorialOpenDisclosureCmd step =
-    Tutorial.openDisclosureIds step
-        |> List.map openDisclosure
-        |> Cmd.batch
-
-
-selectSort : SortField -> Model -> Model
-selectSort sortField model =
-    if model.sortField == sortField then
-        { model | sortDirection = toggleSortDirection model.sortDirection }
-
-    else
-        { model | sortField = sortField, sortDirection = defaultSortDirection sortField }
-
-
-toggleSortDirection : SortDirection -> SortDirection
-toggleSortDirection sortDirection =
-    case sortDirection of
-        Ascending ->
-            Descending
-
-        Descending ->
-            Ascending
-
-
-defaultSortDirection : SortField -> SortDirection
-defaultSortDirection sortField =
-    case sortField of
-        SortByDate ->
-            Descending
-
-        SortByAccount ->
-            Ascending
-
-        SortByDescription ->
-            Ascending
-
-        SortByExchangeRate ->
-            Descending
-
-        SortByPesos ->
-            Descending
-
-        SortByDollars ->
-            Descending
+expensesConfig : Expenses.Config Msg
+expensesConfig =
+    { generateExpenseId = generateExpenseId ()
+    , appendEvent =
+        \ledgerId event ->
+            appendEvent
+                (Encode.object
+                    [ ( "ledgerId", Encode.string ledgerId )
+                    , ( "event", Events.eventEncoder event )
+                    ]
+                )
+    , saveLastAccount = saveLastAccount
+    , navigateTutorial = Tutorial.tutorialNavigateTo tutorialConfig
+    , completeTutorial =
+        Cmd.batch
+            [ hideTutorial ()
+            , saveTutorialState (Encode.string "completed")
+            ]
+    }
 
 
 exportVisibleTable : Export.Format -> Model -> Cmd Msg
@@ -971,316 +581,6 @@ subscriptions _ =
         , localMigrationPrepared LocalMigrationPrepared
         , tutorialAction TutorialActionReceived
         ]
-
-
-handleAuthStateChanged : AuthState -> Model -> ( Model, Cmd Msg )
-handleAuthStateChanged authState model =
-    case authState of
-        SignedIn user ->
-            let
-                ledgerId =
-                    case user.acceptedInviteLedgerId of
-                        Just invitedLedgerId ->
-                            invitedLedgerId
-
-                        Nothing ->
-                            if model.currentLedgerId == "" || model.currentLedgerId == localLedgerId then
-                                user.uid
-
-                            else
-                                model.currentLedgerId
-
-                newTutorialState =
-                    tutorialAfterAuth model
-            in
-            case user.acceptedInviteLedgerId of
-                Just invitedLedgerId ->
-                    ( { model
-                        | authState = authState
-                        , storageMode = CloudSynced
-                        , ledgerLoadState = Loading
-                        , currentLedgerId = invitedLedgerId
-                        , inviteEmail = ""
-                        , error = ""
-                        , accountError = ""
-                        , ledgerError = ""
-                        , migrationState = NoMigration
-                        , tutorialState = TutorialCompleted
-                        , tutorialCompletionVisible = False
-                        , tutorialExpenseId = Nothing
-                      }
-                    , Cmd.batch
-                        [ hideTutorial ()
-                        , saveTutorialState (Encode.string "completed")
-                        , loadLedgerData (Ledger.encodeLedgerRequest invitedLedgerId)
-                        ]
-                    )
-
-                Nothing ->
-                    if localDataExists model then
-                        let
-                            updatedModel =
-                                { model
-                                    | authState = authState
-                                    , storageMode = CloudSynced
-                                    , ledgerLoadState = Loading
-                                    , inviteEmail = ""
-                                    , error = ""
-                                    , accountError = ""
-                                    , ledgerError = ""
-                                    , migrationState = PreparingMigration
-                                    , tutorialState = newTutorialState
-                                }
-                                    |> Tutorial.prepareState
-                        in
-                        ( updatedModel
-                        , Cmd.batch
-                            [ prepareLocalMigration ()
-                            , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
-                            ]
-                        )
-
-                    else
-                        let
-                            updatedModel =
-                                { model
-                                    | authState = authState
-                                    , storageMode = CloudSynced
-                                    , ledgerLoadState = Loading
-                                    , currentLedgerId = ledgerId
-                                    , inviteEmail = ""
-                                    , error = ""
-                                    , accountError = ""
-                                    , ledgerError = ""
-                                    , tutorialState = newTutorialState
-                                }
-                                    |> Tutorial.prepareState
-                        in
-                        ( updatedModel
-                        , Cmd.batch
-                            [ loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
-                            , tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
-                            ]
-                        )
-
-        SignedOut ->
-            let
-                signedOutModel =
-                    { model
-                        | authState = authState
-                        , inviteEmail = ""
-                        , error = ""
-                        , accountError = ""
-                        , ledgerError = ""
-                    }
-                        |> ensureLocalLedger
-                        |> Model.ensureSelectedAccount
-
-                tutorialCmd =
-                    case signedOutModel.tutorialState of
-                        TutorialOpen SignInStep ->
-                            tutorialNavigateCmd signedOutModel SignInStep
-
-                        _ ->
-                            Cmd.none
-            in
-            ( signedOutModel
-            , Cmd.batch
-                [ loadLedgerData (Ledger.encodeLedgerRequest localLedgerId)
-                , tutorialCmd
-                ]
-            )
-
-        AuthUnconfigured ->
-            ( { model
-                | authState = authState
-                , inviteEmail = ""
-                , error = ""
-                , accountError = ""
-                , ledgerError = ""
-              }
-                |> ensureLocalLedger
-                |> Model.ensureSelectedAccount
-            , loadLedgerData (Ledger.encodeLedgerRequest localLedgerId)
-            )
-
-        _ ->
-            ( { model | authState = authState }, Cmd.none )
-
-
-handleLedgerLoaded : Decode.Value -> Model -> ( Model, Cmd Msg )
-handleLedgerLoaded value model =
-    case Ledger.decodeLedger value of
-        Ok ledger ->
-            let
-                updatedModel =
-                    applyLedgerData ledger model
-
-                advanceCmd =
-                    case ( model.tutorialState, updatedModel.tutorialState ) of
-                        ( TutorialOpen AccountsStep, TutorialOpen next ) ->
-                            tutorialNavigateCmd updatedModel next
-
-                        _ ->
-                            Cmd.none
-            in
-            ( updatedModel, advanceCmd )
-
-        Err error ->
-            ( { model | ledgerLoadState = LoadError error, migrationState = NoMigration }, Cmd.none )
-
-
-handleLocalMigrationPrepared : Decode.Value -> Model -> ( Model, Cmd Msg )
-handleLocalMigrationPrepared value model =
-    let
-        status =
-            Decode.decodeValue (Decode.field "status" Decode.string) value
-                |> Result.withDefault "error"
-    in
-    if status == "ready" then
-        case Ledger.decodeLedgerSummaries value of
-            Ok ledgers ->
-                case ledgers of
-                    [] ->
-                        ( { model
-                            | migrationState = NoMigration
-                            , ledgerLoadState = LoadError "No se encontró un libro de Firestore para subir los datos locales."
-                          }
-                        , Cmd.none
-                        )
-
-                    [ ledger ] ->
-                        ( { model
-                            | migrationState = UploadingMigration ledger.id
-                            , ledgerLoadState = Loading
-                          }
-                        , mergeLocalLedgerToFirestore (Ledger.encodeLedgerRequest ledger.id)
-                        )
-
-                    firstLedger :: _ ->
-                        let
-                            selectedLedgerId =
-                                Decode.decodeValue (Decode.field "selectedLedgerId" Decode.string) value
-                                    |> Result.withDefault firstLedger.id
-                        in
-                        ( { model
-                            | migrationState = ChoosingMigration ledgers selectedLedgerId
-                            , ledgerLoadState = Loaded
-                          }
-                        , Cmd.none
-                        )
-
-            Err error ->
-                ( { model | migrationState = NoMigration, ledgerLoadState = LoadError error }, Cmd.none )
-
-    else
-        let
-            error =
-                Decode.decodeValue (Decode.field "message" Decode.string) value
-                    |> Result.withDefault "No se pudo preparar la migración local."
-        in
-        ( { model | migrationState = NoMigration, ledgerLoadState = LoadError error }, Cmd.none )
-
-
-localDataExists : Model -> Bool
-localDataExists model =
-    model.storageMode
-        == LocalOnly
-        && (not (List.isEmpty model.events)
-                || not (List.isEmpty model.accounts)
-                || model.ledgerName
-                /= localLedgerName
-           )
-
-
-applyLedgerData : Ledger.LedgerData -> Model -> Model
-applyLedgerData ledger model =
-    let
-        accounts =
-            Model.activeAccountsFromList ledger.accounts
-
-        form =
-            formWithLoadedAccount ledger.lastAccountId accounts model.form
-
-        expenses =
-            if List.isEmpty ledger.events then
-                Model.activeExpenses ledger.expenses
-
-            else
-                Model.activeExpenses (Projector.projectEvents ledger.events)
-    in
-    { model
-        | events = ledger.events
-        , expenses = expenses
-        , accounts = accounts
-        , ledgers = ledger.ledgers
-        , currentLedgerId = ledger.currentLedgerId
-        , ledgerName = Model.ledgerNameFor ledger.currentLedgerId ledger.ledgers
-        , storageMode =
-            if ledger.currentLedgerId == localLedgerId then
-                LocalOnly
-
-            else
-                CloudSynced
-        , form = form
-        , ledgerLoadState = Loaded
-        , error = ""
-        , accountError = ""
-        , ledgerError = ""
-        , migrationState = NoMigration
-    }
-        |> adjustTutorialAfterLedgerLoad model.ledgerLoadState
-        |> Model.ensureSelectedAccount
-
-
-adjustTutorialAfterLedgerLoad : LoadState -> Model -> Model
-adjustTutorialAfterLedgerLoad _ model =
-    case model.tutorialState of
-        TutorialOpen AccountsStep ->
-            if not (List.isEmpty (Model.activeAccounts model)) then
-                let
-                    nextStep =
-                        Tutorial.stepAfterAccounts model
-                in
-                Tutorial.prepareStep nextStep
-                    { model
-                        | tutorialState = TutorialOpen nextStep
-                        , accountError = ""
-                    }
-
-            else
-                model
-
-        _ ->
-            model
-
-
-tutorialAfterAuth : Model -> TutorialState
-tutorialAfterAuth model =
-    case model.tutorialState of
-        TutorialOpen SignInStep ->
-            TutorialOpen (Tutorial.reopenedStep model)
-
-        _ ->
-            model.tutorialState
-
-
-formWithLoadedAccount : Maybe String -> List Accounting.Account -> Accounting.Form -> Accounting.Form
-formWithLoadedAccount lastAccountId accounts form =
-    case lastAccountId of
-        Just accountId ->
-            if List.any (\account -> account.id == accountId) accounts then
-                Accounting.setAccount accountId form
-
-            else
-                Accounting.setAccount "" form
-
-        Nothing ->
-            if List.any (\account -> account.id == form.accountId) accounts then
-                form
-
-            else
-                Accounting.setAccount "" form
 
 
 saveLastAccount : String -> String -> Cmd Msg

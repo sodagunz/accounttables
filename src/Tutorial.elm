@@ -1,15 +1,24 @@
 module Tutorial exposing
-    ( actionDecoder
+    ( Config
+    , actionDecoder
+    , advanceTutorialFrom
+    , decodeTutorialStateFromFlags
     , encodeStep
     , focusSelector
+    , handleTutorialAction
     , nextStep
     , openDisclosureIds
     , prepareState
     , prepareStep
     , previousStep
     , reopenedStep
+    , skipTutorialFrom
     , stepAfterAccounts
     , targetSelector
+    , tutorialAdvanceCmd
+    , tutorialNavigateCmd
+    , tutorialNavigateTo
+    , tutorialOpenDisclosureCmd
     )
 
 import Accounting
@@ -19,9 +28,153 @@ import Json.Encode as Encode
 import Model exposing (Model, TutorialState(..), TutorialStep(..))
 
 
+type alias Config msg =
+    { showStep : Encode.Value -> Cmd msg
+    , openDisclosure : String -> Cmd msg
+    , focusElement : String -> Cmd msg
+    , hide : () -> Cmd msg
+    , saveState : Encode.Value -> Cmd msg
+    }
+
+
+decodeTutorialStateFromFlags : Decode.Value -> TutorialState
+decodeTutorialStateFromFlags flags =
+    case Decode.decodeValue (Decode.field "tutorialState" Decode.string) flags of
+        Ok "dismissed" ->
+            TutorialDismissed
+
+        Ok "completed" ->
+            TutorialCompleted
+
+        _ ->
+            TutorialOpen SignInStep
+
+
 actionDecoder : Decode.Decoder String
 actionDecoder =
     Decode.field "action" Decode.string
+
+
+handleTutorialAction : Config msg -> Decode.Value -> Model -> ( Model, Cmd msg )
+handleTutorialAction config value model =
+    case Decode.decodeValue actionDecoder value of
+        Ok "next" ->
+            case model.tutorialState of
+                TutorialOpen step ->
+                    advanceTutorialFrom config step model
+
+                _ ->
+                    ( model, Cmd.none )
+
+        Ok "back" ->
+            case model.tutorialState of
+                TutorialOpen step ->
+                    tutorialNavigateTo config (previousStep step) model
+
+                _ ->
+                    ( model, Cmd.none )
+
+        Ok "skip" ->
+            case model.tutorialState of
+                TutorialOpen step ->
+                    skipTutorialFrom config step model
+
+                _ ->
+                    ( model, Cmd.none )
+
+        Ok "done" ->
+            completeTutorial config model
+
+        Ok "target-missing" ->
+            ( model, Cmd.none )
+
+        _ ->
+            ( model, Cmd.none )
+
+
+advanceTutorialFrom : Config msg -> TutorialStep -> Model -> ( Model, Cmd msg )
+advanceTutorialFrom config step model =
+    case step of
+        AccountsStep ->
+            tutorialNavigateTo config (stepAfterAccounts model) model
+
+        _ ->
+            case nextStep step of
+                Just next ->
+                    tutorialNavigateTo config next model
+
+                Nothing ->
+                    completeTutorial config model
+
+
+skipTutorialFrom : Config msg -> TutorialStep -> Model -> ( Model, Cmd msg )
+skipTutorialFrom config step model =
+    case step of
+        SignInStep ->
+            if List.isEmpty (Model.activeAccounts model) then
+                tutorialNavigateTo config AccountsStep model
+
+            else
+                tutorialNavigateTo config (stepAfterAccounts model) model
+
+        CollaboratorsStep ->
+            tutorialNavigateTo config FirstExpenseStep model
+
+        FirstExpenseStep ->
+            completeTutorial config model
+
+        AccountsStep ->
+            ( model, Cmd.none )
+
+        DeleteExpenseStep ->
+            ( model, Cmd.none )
+
+
+tutorialAdvanceCmd : Config msg -> Model -> TutorialState -> TutorialState -> Cmd msg
+tutorialAdvanceCmd config model oldState newState =
+    case ( oldState, newState ) of
+        ( TutorialOpen SignInStep, TutorialOpen step ) ->
+            tutorialNavigateCmd config model step
+
+        _ ->
+            Cmd.none
+
+
+tutorialNavigateCmd : Config msg -> Model -> TutorialStep -> Cmd msg
+tutorialNavigateCmd config model step =
+    Cmd.batch
+        [ tutorialOpenDisclosureCmd config step
+        , config.showStep (encodeStep model step)
+        , config.focusElement (focusSelector model step)
+        ]
+
+
+tutorialNavigateTo : Config msg -> TutorialStep -> Model -> ( Model, Cmd msg )
+tutorialNavigateTo config step model =
+    let
+        preparedModel =
+            prepareStep step { model | tutorialState = TutorialOpen step }
+    in
+    ( preparedModel
+    , tutorialNavigateCmd config preparedModel step
+    )
+
+
+tutorialOpenDisclosureCmd : Config msg -> TutorialStep -> Cmd msg
+tutorialOpenDisclosureCmd config step =
+    openDisclosureIds step
+        |> List.map config.openDisclosure
+        |> Cmd.batch
+
+
+completeTutorial : Config msg -> Model -> ( Model, Cmd msg )
+completeTutorial config model =
+    ( { model | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialExpenseId = Nothing }
+    , Cmd.batch
+        [ config.hide ()
+        , config.saveState (Encode.string "completed")
+        ]
+    )
 
 
 encodeStep : Model -> TutorialStep -> Encode.Value

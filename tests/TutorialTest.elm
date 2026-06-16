@@ -3,7 +3,8 @@ module TutorialTest exposing (suite)
 import Auth exposing (AuthState(..))
 import Expect
 import Json.Decode as Decode
-import Model exposing (TutorialStep(..))
+import Json.Encode as Encode
+import Model exposing (TutorialState(..), TutorialStep(..))
 import Test exposing (Test, describe, test)
 import Tutorial
 
@@ -15,6 +16,11 @@ suite =
             \_ ->
                 Tutorial.reopenedStep initialModel
                     |> Expect.equal AccountsStep
+        , test "decodes completed state from startup flags" <|
+            \_ ->
+                Encode.object [ ( "tutorialState", Encode.string "completed" ) ]
+                    |> Tutorial.decodeTutorialStateFromFlags
+                    |> Expect.equal TutorialCompleted
         , test "reopens at first expense after account setup when signed out" <|
             \_ ->
                 Tutorial.reopenedStep { initialModel | accounts = [ activeAccount ] }

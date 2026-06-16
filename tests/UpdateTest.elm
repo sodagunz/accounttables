@@ -111,6 +111,24 @@ suite =
                             }
                 in
                 Expect.equal "active" updatedModel.form.accountId
+        , test "ensureLocalLedger activates the browser-local ledger" <|
+            \_ ->
+                let
+                    updatedModel =
+                        Ledger.ensureLocalLedger LocalOnly
+                            { initialModel
+                                | currentLedgerId = ""
+                                , storageMode = CloudSynced
+                                , ledgerLoadState = Loading
+                            }
+                in
+                Expect.all
+                    [ \model -> Expect.equal Ledger.localLedgerId model.currentLedgerId
+                    , \model -> Expect.equal Ledger.localLedgerName model.ledgerName
+                    , \model -> Expect.equal LocalOnly model.storageMode
+                    , \model -> Expect.equal Loaded model.ledgerLoadState
+                    ]
+                    updatedModel
         ]
 
 

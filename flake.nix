@@ -103,15 +103,16 @@
               elmPackages.elm-test
               elmPackages.elm-review
               firebase-tools
+              google-cloud-sdk
               git
+              nil
               nodejs_22
               pnpm
               prettier
               prettierd
-              nil
-              zed-editor
               python314
               uglify-js
+              zed-editor
             ]
             ++ mkScripts pkgs;
 

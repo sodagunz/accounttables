@@ -18,3 +18,5 @@ jobs:
       - run: nix run .#test
 
       - run: nix run .#format -- --validate
+
+      - run: nix run .#review

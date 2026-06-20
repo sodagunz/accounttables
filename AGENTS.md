@@ -10,6 +10,7 @@ nix run .#deploy             # firebase deploy
 nix run .#format             # format src/ tests/ in place
 nix run .#format -- --validate  # CI check (read-only)
 nix run .#test               # run all tests
+nix run .#review             # elm-review (lint)
 
 nix develop          # enter dev shell
 ```

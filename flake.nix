@@ -43,6 +43,9 @@
         (pkgs.writeShellScriptBin "test" ''
           exec elm-test
         '')
+        (pkgs.writeShellScriptBin "review" ''
+          exec elm-review --config review/
+        '')
       ];
     in
     {
@@ -82,6 +85,10 @@
           type = "app";
           program = "${pkgs.writeShellScriptBin "test" "exec ${pkgs.elmPackages.elm-test}/bin/elm-test"}/bin/test";
         };
+        review = {
+          type = "app";
+          program = "${pkgs.writeShellScriptBin "review" "exec ${pkgs.elmPackages.elm-review}/bin/elm-review --config review/"}/bin/review";
+        };
       });
 
       devShells = forAllSystems (pkgs: {
@@ -108,7 +115,7 @@
           shellHook = ''
             export NODE_PATH=${pkgs.firebase-tools}/lib/node_modules:${pkgs.firebase-tools}/lib/node_modules/firebase-tools/node_modules
             echo "Elm accounting app dev shell"
-            echo "Available: build, build-release, update-rules, run-local, format, test, elm, elm-format, elm-test, elm-review, firebase, node, pnpm, prettier"
+            echo "Available: build, build-release, update-rules, run-local, format, test, review, elm, elm-format, elm-test, elm-review, firebase, node, pnpm, prettier"
           '';
         };
       });

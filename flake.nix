@@ -1,5 +1,5 @@
 {
-  description = "contabilizar development environment";
+  description = "accounttables development environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";

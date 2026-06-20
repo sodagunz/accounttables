@@ -7,7 +7,8 @@ nix run .#build              # default build (public/elm.min.js)
 nix run .#build-release      # optimized + uglified
 nix run .#run-local        # dev server on port 8008
 nix run .#deploy             # firebase deploy
-nix run .#format             # formatting check (elm-format src/ tests/ --validate)
+nix run .#format             # format src/ tests/ in place
+nix run .#format -- --validate  # CI check (read-only)
 nix run .#test               # run all tests
 
 nix develop          # enter dev shell

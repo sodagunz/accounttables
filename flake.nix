@@ -38,7 +38,7 @@
           exec python3 -m http.server 8008 -d $(git rev-parse --show-toplevel)/public
         '')
         (pkgs.writeShellScriptBin "format" ''
-          exec elm-format src/ tests/ --validate
+          exec elm-format src/ tests/ "$@"
         '')
         (pkgs.writeShellScriptBin "test" ''
           exec elm-test
@@ -74,7 +74,9 @@
         };
         format = {
           type = "app";
-          program = "${pkgs.writeShellScriptBin "format" "exec ${pkgs.elmPackages.elm-format}/bin/elm-format src/ tests/ --validate"}/bin/format";
+          program = "${pkgs.writeShellScriptBin "format" ''
+            exec ${pkgs.elmPackages.elm-format}/bin/elm-format src/ tests/ "$@"
+          ''}/bin/format";
         };
         test = {
           type = "app";

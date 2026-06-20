@@ -40,7 +40,7 @@ formatToString format =
 
 filename : Format -> String -> String
 filename format today =
-    "contabilizar-gastos-"
+    "accounttables-gastos-"
         ++ today
         ++ (case format of
                 Csv ->

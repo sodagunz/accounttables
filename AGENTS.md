@@ -1,4 +1,4 @@
-# ContabilizAR — AGENTS.md
+# accounttables — AGENTS.md
 
 ## Build & dev
 

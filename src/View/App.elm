@@ -128,7 +128,7 @@ view config model =
             [ div [ class "topbar__inner" ]
                 [ div [ class "topbar__content" ]
                     [ div []
-                        [ h1 [] [ text "ContabilizAR" ] ]
+                        [ h1 [] [ text "accounttables" ] ]
                     , div [ class "topbar__actions" ]
                         [ if isTutorialOpen then
                             text ""

@@ -53,7 +53,7 @@ app.ports.openDisclosure.subscribe((id) => {
     const el = document.getElementById(id);
     if (el) el.open = true;
     window.requestAnimationFrame(() => {
-        window.contabilizarTutorialDriver?.refresh();
+        window.accounttablesTutorialDriver?.refresh();
     });
 });
 
@@ -238,7 +238,7 @@ function setupTutorialDriver(app) {
         overlayOpacity: 0.585,
         stagePadding: 6,
         stageRadius: 6,
-        popoverClass: "driverjs-theme-contabilizar",
+        popoverClass: "driverjs-theme-accounttables",
         nextBtnText: "Siguiente",
         prevBtnText: "Atras",
         doneBtnText: "Finalizar",
@@ -391,7 +391,7 @@ function setupTutorialDriver(app) {
         app.ports.refreshTutorial.subscribe(refreshTutorial);
     }
 
-    window.contabilizarTutorialDriver = {
+    window.accounttablesTutorialDriver = {
         showStep: showTutorialStep,
         hide: destroyTutorial,
         refresh: refreshTutorial,

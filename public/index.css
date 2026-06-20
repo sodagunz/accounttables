@@ -308,7 +308,7 @@ main {
     box-sizing: border-box;
 }
 
-.driver-popover.driverjs-theme-contabilizar {
+.driver-popover.driverjs-theme-accounttables {
     max-width: 360px;
     background: #ffffff;
     border: 1px solid #d4ddd9;
@@ -317,20 +317,20 @@ main {
     box-shadow: 0 8px 20px rgba(20, 34, 30, 0.15);
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-title {
+.driver-popover.driverjs-theme-accounttables .driver-popover-title {
     color: #17352c;
     font-size: 1rem;
     font-weight: 800;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-description {
+.driver-popover.driverjs-theme-accounttables .driver-popover-description {
     color: #2f3d38;
     font-size: 0.95rem;
     line-height: 1.4;
     margin: 0;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-footer {
+.driver-popover.driverjs-theme-accounttables .driver-popover-footer {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
@@ -339,16 +339,16 @@ main {
     margin-top: 18px;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-navigation-btns {
+.driver-popover.driverjs-theme-accounttables .driver-popover-navigation-btns {
     display: flex;
     flex-wrap: wrap;
     gap: 8px 10px;
     justify-content: flex-end;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-next-btn,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-prev-btn,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-close-btn {
+.driver-popover.driverjs-theme-accounttables .driver-popover-next-btn,
+.driver-popover.driverjs-theme-accounttables .driver-popover-prev-btn,
+.driver-popover.driverjs-theme-accounttables .driver-popover-close-btn {
     min-height: 36px;
     border-radius: 6px;
     font: inherit;
@@ -357,20 +357,20 @@ main {
     cursor: pointer;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-next-btn {
+.driver-popover.driverjs-theme-accounttables .driver-popover-next-btn {
     border: 0;
     background: #17352c;
     color: #ffffff;
     padding: 0 14px;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-next-btn:hover {
+.driver-popover.driverjs-theme-accounttables .driver-popover-next-btn:hover {
     background: #0e2b23;
     color: #ffffff;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-prev-btn,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-close-btn {
+.driver-popover.driverjs-theme-accounttables .driver-popover-prev-btn,
+.driver-popover.driverjs-theme-accounttables .driver-popover-close-btn {
     position: static !important;
     display: inline-flex;
     align-items: center;
@@ -384,79 +384,79 @@ main {
     white-space: nowrap;
 }
 
-.driver-popover.driverjs-theme-contabilizar > .driver-popover-close-btn {
+.driver-popover.driverjs-theme-accounttables > .driver-popover-close-btn {
     display: flex;
     margin: 0 0 14px auto;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-prev-btn:hover,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-close-btn:hover {
+.driver-popover.driverjs-theme-accounttables .driver-popover-prev-btn:hover,
+.driver-popover.driverjs-theme-accounttables .driver-popover-close-btn:hover {
     background: transparent;
     color: #205c4c;
     text-decoration: underline;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow {
     position: absolute;
     width: 0;
     height: 0;
     border: 8px solid transparent;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-side-top {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-side-top {
     bottom: -16px;
     border-top-color: #ffffff;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-side-bottom {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-side-bottom {
     top: -16px;
     border-bottom-color: #ffffff;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-side-left {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-side-left {
     right: -16px;
     border-left-color: #ffffff;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-side-right {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-side-right {
     left: -16px;
     border-right-color: #ffffff;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-start.driver-popover-arrow-side-top,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-start.driver-popover-arrow-side-bottom {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-start.driver-popover-arrow-side-top,
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-start.driver-popover-arrow-side-bottom {
     left: 18px;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-end.driver-popover-arrow-side-top,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-end.driver-popover-arrow-side-bottom {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-end.driver-popover-arrow-side-top,
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-end.driver-popover-arrow-side-bottom {
     right: 18px;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-center.driver-popover-arrow-side-top,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-center.driver-popover-arrow-side-bottom {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-center.driver-popover-arrow-side-top,
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-center.driver-popover-arrow-side-bottom {
     left: 50%;
     transform: translateX(-50%);
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-start.driver-popover-arrow-side-left,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-start.driver-popover-arrow-side-right {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-start.driver-popover-arrow-side-left,
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-start.driver-popover-arrow-side-right {
     top: 18px;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-end.driver-popover-arrow-side-left,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-end.driver-popover-arrow-side-right {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-end.driver-popover-arrow-side-left,
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-end.driver-popover-arrow-side-right {
     bottom: 18px;
 }
 
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-center.driver-popover-arrow-side-left,
-.driver-popover.driverjs-theme-contabilizar .driver-popover-arrow-align-center.driver-popover-arrow-side-right {
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-center.driver-popover-arrow-side-left,
+.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-center.driver-popover-arrow-side-right {
     top: 50%;
     transform: translateY(-50%);
 }
 
 @media (max-width: 520px) {
-    .driver-popover.driverjs-theme-contabilizar {
+    .driver-popover.driverjs-theme-accounttables {
         position: fixed !important;
         inset: auto 0 0 0 !important;
         width: 100vw !important;
@@ -468,17 +468,17 @@ main {
         padding: 16px;
     }
 
-    .driver-popover.driverjs-theme-contabilizar .driver-popover-arrow {
+    .driver-popover.driverjs-theme-accounttables .driver-popover-arrow {
         display: none;
     }
 
-    .driver-popover.driverjs-theme-contabilizar .driver-popover-footer {
+    .driver-popover.driverjs-theme-accounttables .driver-popover-footer {
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-start;
     }
 
-    .driver-popover.driverjs-theme-contabilizar .driver-popover-next-btn {
+    .driver-popover.driverjs-theme-accounttables .driver-popover-next-btn {
         min-width: 120px;
     }
 }

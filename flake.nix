@@ -23,9 +23,13 @@
         '')
         (pkgs.writeShellScriptBin "build-release" ''
           set -euo pipefail
+          echo "Compiling optimized Elm..."
           elm make src/Main.elm --output=public/elm.min.js --optimize
-          uglifyjs public/elm.min.js --compress "pure_funcs='F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9',pure_getters,keep_fargs=false,unsafe_comps,unsafe" --output public/elm.min.js
-          uglifyjs public/elm.min.js --mangle --output public/elm.min.js
+          echo "Compressing with uglifyjs..."
+          uglifyjs public/elm.min.js --compress "pure_funcs='F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9',pure_getters,keep_fargs=false,unsafe_comps,unsafe" --timings --output public/elm.min.js
+          echo "Mangling with uglifyjs..."
+          uglifyjs public/elm.min.js --mangle --timings --output public/elm.min.js
+          echo "Release build written to public/elm.min.js"
         '')
         (pkgs.writeShellScriptBin "deploy" ''
           exec ${pkgs.firebase-tools}/bin/firebase deploy
@@ -58,9 +62,13 @@
           type = "app";
           program = "${pkgs.writeShellScriptBin "build-release" ''
             set -euo pipefail
+            echo "Compiling optimized Elm..."
             ${pkgs.elmPackages.elm}/bin/elm make src/Main.elm --output=public/elm.min.js --optimize
-            ${pkgs.uglify-js}/bin/uglifyjs public/elm.min.js --compress "pure_funcs='F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9',pure_getters,keep_fargs=false,unsafe_comps,unsafe" --output public/elm.min.js
-            ${pkgs.uglify-js}/bin/uglifyjs public/elm.min.js --mangle --output public/elm.min.js
+            echo "Compressing with uglifyjs..."
+            ${pkgs.uglify-js}/bin/uglifyjs public/elm.min.js --compress "pure_funcs='F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9',pure_getters,keep_fargs=false,unsafe_comps,unsafe" --timings --output public/elm.min.js
+            echo "Mangling with uglifyjs..."
+            ${pkgs.uglify-js}/bin/uglifyjs public/elm.min.js --mangle --timings --output public/elm.min.js
+            echo "Release build written to public/elm.min.js"
           ''}/bin/build-release";
         };
         deploy = {

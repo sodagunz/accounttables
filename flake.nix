@@ -32,7 +32,7 @@
           echo "Release build written to public/elm.min.js"
         '')
         (pkgs.writeShellScriptBin "deploy" ''
-          exec ${pkgs.firebase-tools}/bin/firebase deploy
+          exec ${pkgs.firebase-tools}/bin/firebase deploy --project contabilizar-78c2d
         '')
         (pkgs.writeShellScriptBin "update-rules" ''
           exec env GOOGLE_APPLICATION_CREDENTIALS=.secrets/contabilizar-admin-api.json
@@ -73,7 +73,7 @@
         };
         deploy = {
           type = "app";
-          program = "${pkgs.writeShellScriptBin "deploy" "exec ${pkgs.firebase-tools}/bin/firebase deploy"}/bin/deploy";
+          program = "${pkgs.writeShellScriptBin "deploy" "exec ${pkgs.firebase-tools}/bin/firebase deploy --project contabilizar-78c2d"}/bin/deploy";
         };
         update-rules = {
           type = "app";

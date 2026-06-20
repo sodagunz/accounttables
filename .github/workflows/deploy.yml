@@ -39,6 +39,15 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: contabilizar-78c2d
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: verify google credentials env
+        run: |
+          test -n "$GOOGLE_APPLICATION_CREDENTIALS"
+          test -f "$GOOGLE_APPLICATION_CREDENTIALS"
+          echo "GOOGLE_APPLICATION_CREDENTIALS is set"
 
       - run: nix run .#build-release
 

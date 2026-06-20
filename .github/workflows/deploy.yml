@@ -9,6 +9,11 @@ on:
         description: Tag to deploy (defaults to latest)
         required: false
         default: ""
+      dry-run:
+        description: Validate deploy without publishing changes
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -35,11 +40,21 @@ jobs:
         with:
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: google-github-actions/auth@v2
+      - run: nix run .#build-release
+
+      - id: auth
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_DEPLOY_SERVICE_ACCOUNT }}
+          project_id: contabilizar-78c2d
+          create_credentials_file: true
+          export_environment_variables: true
 
-      - run: nix run .#build-release
+      - name: deploy
+        if: ${{ github.event_name != 'workflow_dispatch' || !inputs['dry-run'] }}
+        run: nix run .#deploy
 
-      - run: nix run .#deploy
+      - name: deploy dry-run
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs['dry-run'] }}
+        run: nix run .#deploy -- --dry-run

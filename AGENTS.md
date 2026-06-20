@@ -7,14 +7,15 @@ nix run .#build              # default build (public/elm.min.js)
 nix run .#build-release      # optimized + uglified
 nix run .#run-local        # dev server on port 8008
 nix run .#deploy             # firebase deploy
+nix run .#format             # formatting check (elm-format src/ tests/ --validate)
+nix run .#test               # run all tests
 
 nix develop          # enter dev shell
-elm-test             # run all tests (inside dev shell)
-elm-format src/ tests/ --validate  # formatting check (inside dev shell)
 ```
 
 Enter dev env: `nix develop`.  
 Serve from `public/`: `python3 -m http.server 8008` (or `nix run .#run-local`).  
+Deploy: `nix run .#deploy` (runs `firebase deploy`).
 Deploy: `nix run .#deploy` (runs `firebase deploy`).
 
 `public/` is the Firebase hosting root (SPA rewrites to `/index.html`).  

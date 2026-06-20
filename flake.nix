@@ -52,7 +52,7 @@
       apps = forAllSystems (pkgs: {
         build = {
           type = "app";
-          program = "${pkgs.writeShellScriptBin "build" "exec elm make src/Main.elm --output=public/elm.min.js"}/bin/build";
+          program = "${pkgs.writeShellScriptBin "build" "exec ${pkgs.elmPackages.elm}/bin/elm make src/Main.elm --output=public/elm.min.js"}/bin/build";
         };
         build-release = {
           type = "app";

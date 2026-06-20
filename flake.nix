@@ -38,7 +38,7 @@
           exec python3 -m http.server 8008 -d $(git rev-parse --show-toplevel)/public
         '')
         (pkgs.writeShellScriptBin "format" ''
-          exec elm-format src/ tests/ "$@"
+          exec elm-format --elm-version 0.19 src/ tests/ "$@"
         '')
         (pkgs.writeShellScriptBin "test" ''
           exec elm-test
@@ -83,12 +83,12 @@
         };
         test = {
           type = "app";
-          program = "${pkgs.writeShellScriptBin "test" "exec ${pkgs.elmPackages.elm-test}/bin/elm-test"}/bin/test";
+          program = "${pkgs.writeShellScriptBin "test" "exec ${pkgs.elmPackages.elm-test}/bin/elm-test --compiler ${pkgs.elmPackages.elm}/bin/elm"}/bin/test";
         };
         review = {
           type = "app";
           program = "${pkgs.writeShellScriptBin "review" ''
-            exec ${pkgs.elmPackages.elm-review}/bin/elm-review --config review/ "$@"
+            exec ${pkgs.elmPackages.elm-review}/bin/elm-review --config review/ --compiler ${pkgs.elmPackages.elm}/bin/elm "$@"
           ''}/bin/review";
         };
       });

@@ -1,4 +1,4 @@
-module View.ExpenseForm exposing (Config, view)
+module View.MovementForm exposing (Config, view)
 
 import Accounting exposing (Account, Currency(..), Form, MovementType(..), currencyToString, movementTypeToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))

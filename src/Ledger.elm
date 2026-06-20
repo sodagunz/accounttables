@@ -16,7 +16,7 @@ module Ledger exposing
     , localLedgerName
     )
 
-import Accounting exposing (Account, Expense, currencyFromString, movementTypeFromString)
+import Accounting exposing (Account, Movement, currencyFromString, movementTypeFromString)
 import Events exposing (Event)
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -47,7 +47,7 @@ type alias Member =
 
 type alias LedgerData =
     { events : List Event
-    , expenses : List Expense
+    , expenses : List Movement
     , accounts : List Account
     , ledgers : List LedgerSummary
     , currentLedgerId : String
@@ -195,7 +195,7 @@ ledgerPayloadDecoder =
                             (Decode.field "ledgers" (Decode.list ledgerSummaryDecoder))
                             (Decode.field "ledgerId" Decode.string)
                             (Decode.field "accounts" (Decode.list accountDecoder))
-                            (Decode.field "expenses" (Decode.list expenseDecoder))
+                            (Decode.field "expenses" (Decode.list movementDecoder))
                             (Decode.maybe (Decode.field "lastAccountId" Decode.string))
                             (Decode.field "events" (Decode.list Events.eventDecoder))
 
@@ -236,8 +236,8 @@ memberDecoder =
         (Decode.field "displayName" Decode.string)
 
 
-expenseDecoder : Decode.Decoder Expense
-expenseDecoder =
+movementDecoder : Decode.Decoder Movement
+movementDecoder =
     Decode.map8
         (\id movementType description accountId accountName inputAmount inputCurrency exchangeRate ->
             \ars usd date deletedAt ->
@@ -264,8 +264,8 @@ expenseDecoder =
         (Decode.field "inputCurrency" (Decode.map currencyFromString Decode.string))
         (Decode.field "exchangeRate" Decode.float)
         |> Decode.andThen
-            (\buildExpense ->
-                Decode.map4 buildExpense
+            (\buildMovement ->
+                Decode.map4 buildMovement
                     (Decode.field "ars" Decode.float)
                     (Decode.field "usd" Decode.float)
                     (Decode.field "date" Decode.string)

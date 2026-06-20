@@ -1,6 +1,6 @@
 module Export exposing (Format(..), tablePayload)
 
-import Accounting exposing (Account, Currency(..), Expense, MoneyTotal, descriptionDisplay, expensesFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), Movement, MoneyTotal, descriptionDisplay, movementsFor, summarizeMoney)
 import Json.Encode as Encode
 import Util.Date exposing (DateDisplay, formatDate)
 import Util.Format exposing (formatMoney)
@@ -17,14 +17,14 @@ type alias TableRow =
     }
 
 
-tablePayload : Format -> DateDisplay -> String -> List Account -> List Expense -> Encode.Value
-tablePayload format dateDisplay today accounts expenses =
+tablePayload : Format -> DateDisplay -> String -> List Account -> List Movement -> Encode.Value
+tablePayload format dateDisplay today accounts movements =
     Encode.object
         [ ( "format", Encode.string (formatToString format) )
         , ( "filename", Encode.string (filename format today) )
         , ( "sheetName", Encode.string "Gastos" )
         , ( "headers", Encode.list Encode.string headers )
-        , ( "rows", Encode.list rowEncoder (expenseRows dateDisplay expenses ++ subtotalRows accounts expenses) )
+        , ( "rows", Encode.list rowEncoder (movementRows dateDisplay movements ++ subtotalRows accounts movements) )
         ]
 
 
@@ -63,33 +63,33 @@ headers =
     ]
 
 
-expenseRows : DateDisplay -> List Expense -> List TableRow
-expenseRows dateDisplay expenses =
-    List.map (expenseRow dateDisplay) expenses
+movementRows : DateDisplay -> List Movement -> List TableRow
+movementRows dateDisplay movements =
+    List.map (movementRow dateDisplay) movements
 
 
-expenseRow : DateDisplay -> Expense -> TableRow
-expenseRow dateDisplay expense =
-    { label = "expense"
+movementRow : DateDisplay -> Movement -> TableRow
+movementRow dateDisplay movement =
+    { label = "movement"
     , cells =
-        [ formatDate dateDisplay expense.date
-        , expense.accountName
-        , descriptionDisplay expense
-        , formatMoney expense.inputCurrency expense.inputAmount
-        , formatMoney ARS expense.exchangeRate
-        , formatMoney ARS expense.ars
-        , formatMoney USD expense.usd
+        [ formatDate dateDisplay movement.date
+        , movement.accountName
+        , descriptionDisplay movement
+        , formatMoney movement.inputCurrency movement.inputAmount
+        , formatMoney ARS movement.exchangeRate
+        , formatMoney ARS movement.ars
+        , formatMoney USD movement.usd
         ]
     }
 
 
-subtotalRows : List Account -> List Expense -> List TableRow
-subtotalRows accounts expenses =
+subtotalRows : List Account -> List Movement -> List TableRow
+subtotalRows accounts movements =
     let
         grandTotal =
-            summarizeMoney expenses
+            summarizeMoney movements
     in
-    List.map (\account -> totalRow ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (expensesFor account expenses))) accounts
+    List.map (\account -> totalRow ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (movementsFor account movements))) accounts
         ++ [ totalRow "Total" "total" grandTotal ]
 
 

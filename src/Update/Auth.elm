@@ -63,7 +63,7 @@ handleSignedIn config authState user model =
                 , migrationState = NoMigration
                 , tutorialState = TutorialCompleted
                 , tutorialCompletionVisible = False
-                , tutorialExpenseId = Nothing
+                , tutorialMovementId = Nothing
               }
             , Cmd.batch
                 [ config.completeTutorial

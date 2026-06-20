@@ -1,6 +1,6 @@
-module View.ExpenseTable exposing (Config, view)
+module View.MovementTable exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, expensesFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), Movement, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, movementsFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, checked, class, classList, for, id, name, type_, value)
 import Html.Events exposing (onClick)
@@ -9,7 +9,7 @@ import Util.Format exposing (formatMoney, formatNumber)
 
 
 type alias Config msg =
-    { expenses : List Expense
+    { expenses : List Movement
     , accounts : List Account
     , filterWindow : FilterWindow
     , hiddenAccountIds : List String
@@ -96,7 +96,7 @@ expenseTableBody config =
                             , th [ class "actions-header" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Acciones" ] ]
                             ]
                         ]
-                    , tbody [] (List.map (expenseRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
+                    , tbody [] (List.map (movementRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
                     ]
                 ]
             ]
@@ -237,37 +237,37 @@ exportControls config =
         ]
 
 
-expenseRow : DateDisplay -> Currency -> (String -> msg) -> (String -> msg) -> Expense -> Html msg
-expenseRow dateDisplay displayCurrency onEdit onDelete expense =
+movementRow : DateDisplay -> Currency -> (String -> msg) -> (String -> msg) -> Movement -> Html msg
+movementRow dateDisplay displayCurrency onEdit onDelete movement =
     tr []
-        [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay expense.date) ]
-        , td [ attribute "data-label" "Cuenta" ] [ text expense.accountName ]
-        , td [ attribute "data-label" "Descripción" ] [ text (descriptionDisplay expense) ]
+        [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay movement.date) ]
+        , td [ attribute "data-label" "Cuenta" ] [ text movement.accountName ]
+        , td [ attribute "data-label" "Descripción" ] [ text (descriptionDisplay movement) ]
         , let
             displayAmount =
-                case expense.movementType of
+                case movement.movementType of
                     ExpenseMovement ->
-                        -expense.inputAmount
+                        -movement.inputAmount
 
                     IncomeMovement ->
-                        expense.inputAmount
+                        movement.inputAmount
           in
-          td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney expense.inputCurrency displayAmount) ]
-        , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber expense.exchangeRate) ]
-        , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency expense)) ]
+          td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney movement.inputCurrency displayAmount) ]
+        , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber movement.exchangeRate) ]
+        , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency movement)) ]
         , td [ class "action-cell", attribute "data-label" "" ]
             [ div [ class "action-buttons" ]
                 [ button
                     [ type_ "button"
                     , class "edit-button"
-                    , onClick (onEdit expense.id)
+                    , onClick (onEdit movement.id)
                     ]
                     [ text "✎" ]
                 , button
                     [ type_ "button"
                     , class "delete-button"
-                    , attribute "data-tutorial" ("delete-" ++ expense.id)
-                    , onClick (onDelete expense.id)
+                    , attribute "data-tutorial" ("delete-" ++ movement.id)
+                    , onClick (onDelete movement.id)
                     ]
                     [ text "×" ]
                 ]
@@ -335,13 +335,13 @@ sortableHeader config sortField alignment labelText =
         ]
 
 
-subtotalRows : List Account -> List Expense -> Currency -> List (Html msg)
+subtotalRows : List Account -> List Movement -> Currency -> List (Html msg)
 subtotalRows accounts expenses displayCurrency =
     let
         grandTotal =
             summarizeMoney expenses
     in
-    List.map (\account -> totalRow displayCurrency ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (expensesFor account expenses))) accounts
+    List.map (\account -> totalRow displayCurrency ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (movementsFor account expenses))) accounts
         ++ [ totalRow displayCurrency "Total" "grand-total" grandTotal ]
 
 

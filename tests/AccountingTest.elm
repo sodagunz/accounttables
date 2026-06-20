@@ -28,8 +28,8 @@ suite =
                     accounts =
                         [ { id = "cash", name = "Caja", deletedAt = Nothing } ]
                 in
-                case Accounting.buildExpense 1000 "movement-1" accounts form of
-                    Ok expense ->
+                case Accounting.buildMovement 1000 "movement-1" accounts form of
+                    Ok movement ->
                         Expect.all
                             [ \actual -> Expect.equal "movement-1" actual.id
                             , \actual -> Expect.equal (Just "Venta") actual.description
@@ -38,7 +38,7 @@ suite =
                             , \actual -> Expect.within (Expect.Absolute 0.0001) 1.5 actual.usd
                             , \actual -> Expect.equal IncomeMovement actual.movementType
                             ]
-                            expense
+                            movement
 
                     Err error ->
                         Expect.fail error
@@ -58,6 +58,6 @@ suite =
                     accounts =
                         [ { id = "deleted", name = "Vieja", deletedAt = Just "deleted" } ]
                 in
-                Accounting.buildExpense 1000 "movement-1" accounts form
+                Accounting.buildMovement 1000 "movement-1" accounts form
                     |> Expect.equal (Err "Selecciona una cuenta.")
         ]

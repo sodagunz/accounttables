@@ -6,17 +6,17 @@ module Model exposing
     , TutorialStep(..)
     , activeAccounts
     , activeAccountsFromList
-    , activeExpenses
+    , activeMovements
     , defaultAccounts
     , ensureSelectedAccount
     , initial
     , ledgerNameFor
-    , sampleExpensesForModel
+    , sampleMovementsForModel
     , selectedLedgerId
-    , visibleExpenses
+    , visibleMovements
     )
 
-import Accounting exposing (Account, Currency(..), Expense, FilterWindow(..), Form, SortDirection(..), SortField(..))
+import Accounting exposing (Account, Currency(..), Movement, FilterWindow(..), Form, SortDirection(..), SortField(..))
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Auth exposing (AuthState(..))
 import Events exposing (Event)
@@ -29,7 +29,7 @@ type alias Model =
     { form : Form
     , storageMode : StorageMode
     , events : List Event
-    , expenses : List Expense
+    , expenses : List Movement
     , accounts : List Account
     , ledgers : List Ledger.LedgerSummary
     , currentLedgerId : String
@@ -54,7 +54,7 @@ type alias Model =
     , migrationState : MigrationState
     , tutorialState : TutorialState
     , tutorialCompletionVisible : Bool
-    , tutorialExpenseId : Maybe String
+    , tutorialMovementId : Maybe String
     }
 
 
@@ -74,8 +74,8 @@ type TutorialStep
     = SignInStep
     | AccountsStep
     | CollaboratorsStep
-    | FirstExpenseStep
-    | DeleteExpenseStep
+    | FirstMovementStep
+    | DeleteMovementStep
 
 
 type TutorialState
@@ -114,24 +114,24 @@ initial =
     , migrationState = NoMigration
     , tutorialState = TutorialOpen SignInStep
     , tutorialCompletionVisible = False
-    , tutorialExpenseId = Nothing
+    , tutorialMovementId = Nothing
     }
 
 
-visibleExpenses : Model -> List Expense
-visibleExpenses model =
-    Accounting.filteredExpenses { model | expenses = activeExpenses model.expenses }
+visibleMovements : Model -> List Movement
+visibleMovements model =
+    Accounting.filteredMovements { model | expenses = activeMovements model.expenses }
         |> List.filter (\e -> not (List.member e.accountId model.hiddenAccountIds))
-        |> Accounting.sortExpenses model.sortField model.sortDirection
+        |> Accounting.sortMovements model.sortField model.sortDirection
 
 
-sampleExpensesForModel : Model -> List Expense
-sampleExpensesForModel model =
+sampleMovementsForModel : Model -> List Movement
+sampleMovementsForModel model =
     if model.today == "" then
         []
 
     else
-        Accounting.sampleExpenses model.exchangeRate model.today model.accounts
+        Accounting.sampleMovements model.exchangeRate model.today model.accounts
 
 
 defaultAccounts : List Account
@@ -149,9 +149,9 @@ activeAccountsFromList accounts =
     List.filter (\account -> account.deletedAt == Nothing) accounts
 
 
-activeExpenses : List Expense -> List Expense
-activeExpenses expenses =
-    List.filter (\expense -> expense.deletedAt == Nothing) expenses
+activeMovements : List Movement -> List Movement
+activeMovements movements =
+    List.filter (\movement -> movement.deletedAt == Nothing) movements
 
 
 ensureSelectedAccount : Model -> Model

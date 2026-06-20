@@ -2,7 +2,7 @@ module Config exposing
     ( Messages
     , Ports
     , authUpdate
-    , expenses
+    , movements
     , ledgerData
     , tutorial
     , view
@@ -15,7 +15,7 @@ import Ledger
 import Model exposing (Model, TutorialState, TutorialStep)
 import Tutorial
 import Update.Auth as AuthUpdate
-import Update.Expenses as Expenses
+import Update.Movements as Movements
 import Update.LedgerData as LedgerData
 import Util.Date exposing (DateDisplay)
 import View.App as AppView
@@ -33,7 +33,7 @@ type alias Messages msg =
     , currency : String -> msg
     , date : String -> msg
     , movementType : Accounting.MovementType -> msg
-    , submitExpense : msg
+    , submitMovement : msg
     , cancelEdit : msg
     , selectFilter : FilterWindow -> msg
     , toggleAccountFilter : String -> msg
@@ -42,8 +42,8 @@ type alias Messages msg =
     , selectSort : SortField -> msg
     , exportCsv : msg
     , exportXlsx : msg
-    , deleteExpense : String -> msg
-    , editExpense : String -> msg
+    , deleteMovement : String -> msg
+    , editMovement : String -> msg
     , selectLedger : String -> msg
     , ledgerName : String -> msg
     , saveLedgerName : msg
@@ -88,7 +88,7 @@ view messages =
     , onCurrency = messages.currency
     , onDate = messages.date
     , onMovementType = messages.movementType
-    , onSubmitExpense = messages.submitExpense
+    , onSubmitMovement = messages.submitMovement
     , onCancelEdit = messages.cancelEdit
     , onSelectFilter = messages.selectFilter
     , onToggleAccountFilter = messages.toggleAccountFilter
@@ -97,8 +97,8 @@ view messages =
     , onSelectSort = messages.selectSort
     , onExportCsv = messages.exportCsv
     , onExportXlsx = messages.exportXlsx
-    , onDeleteExpense = messages.deleteExpense
-    , onEditExpense = messages.editExpense
+    , onDeleteMovement = messages.deleteMovement
+    , onEditMovement = messages.editMovement
     , onSelectLedger = messages.selectLedger
     , onLedgerName = messages.ledgerName
     , onSaveLedgerName = messages.saveLedgerName
@@ -146,8 +146,8 @@ authUpdate tutorialConfig ports =
     }
 
 
-expenses : Tutorial.Config msg -> Ports msg -> Expenses.Config msg
-expenses tutorialConfig ports =
+movements : Tutorial.Config msg -> Ports msg -> Movements.Config msg
+movements tutorialConfig ports =
     { generateExpenseId = ports.generateExpenseId ()
     , appendEvent =
         \ledgerId event ->

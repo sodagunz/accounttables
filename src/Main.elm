@@ -19,7 +19,7 @@ import Time
 import Tutorial
 import Update.Accounts as Accounts
 import Update.Auth as AuthUpdate
-import Update.Expenses as Expenses
+import Update.Movements as Movements
 import Update.LedgerData as LedgerData
 import Update.Ledgers as Ledgers
 import Update.Sorting as Sorting
@@ -47,8 +47,8 @@ type Msg
     | AuthStateChanged Decode.Value
     | LedgerLoaded Decode.Value
     | GotExchangeRate (Result Http.Error OfficialDollar)
-    | AddExpense
-    | ExpenseIdGenerated Decode.Value
+    | AddMovement
+    | MovementIdGenerated Decode.Value
     | UpdateNewAccountName String
     | AddAccount
     | DeleteAccount String
@@ -59,8 +59,8 @@ type Msg
     | InviteGuest
     | RemoveGuest String
     | ToggleAccountFilter String
-    | DeleteExpense String
-    | EditExpense String
+    | DeleteMovement String
+    | EditMovement String
     | CancelEdit
     | EventsLoaded Decode.Value
     | LocalMigrationPrepared Decode.Value
@@ -271,11 +271,11 @@ update msg model =
                 Err _ ->
                     ( { model | exchangeRateStatus = FailedRate }, Cmd.none )
 
-        AddExpense ->
-            Expenses.requestId expensesConfig model
+        AddMovement ->
+            Movements.requestId movementsConfig model
 
-        ExpenseIdGenerated value ->
-            Expenses.handleGeneratedId expensesConfig value model
+        MovementIdGenerated value ->
+            Movements.handleGeneratedId movementsConfig value model
 
         UpdateNewAccountName name ->
             ( { model | newAccountName = name }, Cmd.none )
@@ -362,17 +362,17 @@ update msg model =
             in
             ( { model | hiddenAccountIds = updatedHidden }, Cmd.none )
 
-        DeleteExpense movementId ->
-            Expenses.delete expensesConfig movementId model
+        DeleteMovement movementId ->
+            Movements.delete movementsConfig movementId model
 
-        EditExpense expenseId ->
-            Expenses.edit expenseId model
+        EditMovement movementId ->
+            Movements.edit movementId model
 
         CancelEdit ->
-            Expenses.cancelEdit model
+            Movements.cancelEdit model
 
         EventsLoaded value ->
-            Expenses.handleEventsLoaded value model
+            Movements.handleEventsLoaded value model
 
         LocalMigrationPrepared value ->
             LedgerData.handleLocalMigrationPrepared ledgerDataConfig value model
@@ -446,7 +446,7 @@ update msg model =
                     Tutorial.reopenedStep model
 
                 ( reopenedModel, navigateCmd ) =
-                    Tutorial.tutorialNavigateTo tutorialConfig step { model | tutorialCompletionVisible = False, tutorialExpenseId = Nothing }
+                    Tutorial.tutorialNavigateTo tutorialConfig step { model | tutorialCompletionVisible = False, tutorialMovementId = Nothing }
             in
             ( reopenedModel
             , Cmd.batch
@@ -487,7 +487,7 @@ messages =
     , currency = UpdateCurrency
     , date = UpdateDate
     , movementType = UpdateMovementType
-    , submitExpense = AddExpense
+    , submitMovement = AddMovement
     , cancelEdit = CancelEdit
     , selectFilter = SelectFilter
     , toggleAccountFilter = ToggleAccountFilter
@@ -496,8 +496,8 @@ messages =
     , selectSort = SelectSort
     , exportCsv = ExportCsv
     , exportXlsx = ExportXlsx
-    , deleteExpense = DeleteExpense
-    , editExpense = EditExpense
+    , deleteMovement = DeleteMovement
+    , editMovement = EditMovement
     , selectLedger = SelectLedger
     , ledgerName = UpdateLedgerName
     , saveLedgerName = SaveLedgerName
@@ -544,14 +544,14 @@ authUpdateConfig =
     Config.authUpdate tutorialConfig ports
 
 
-expensesConfig : Expenses.Config Msg
-expensesConfig =
-    Config.expenses tutorialConfig ports
+movementsConfig : Movements.Config Msg
+movementsConfig =
+    Config.movements tutorialConfig ports
 
 
 exportVisibleTable : Export.Format -> Model -> Cmd Msg
 exportVisibleTable format model =
-    exportTable (Export.tablePayload format model.dateDisplay model.today (Model.activeAccounts model) (Model.visibleExpenses model))
+    exportTable (Export.tablePayload format model.dateDisplay model.today (Model.activeAccounts model) (Model.visibleMovements model))
 
 
 subscriptions : Model -> Sub Msg
@@ -559,7 +559,7 @@ subscriptions _ =
     Sub.batch
         [ authStateChanged AuthStateChanged
         , ledgerLoaded LedgerLoaded
-        , expenseIdGenerated ExpenseIdGenerated
+        , expenseIdGenerated MovementIdGenerated
         , eventsLoaded EventsLoaded
         , localMigrationPrepared LocalMigrationPrepared
         , tutorialAction TutorialActionReceived

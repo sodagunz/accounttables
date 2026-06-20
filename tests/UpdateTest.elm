@@ -62,7 +62,7 @@ suite =
                                 { initialModel
                                     | ledgers =
                                         [ { id = "ledger-2", name = "Trabajo", ownerUid = "owner", members = [], invitedEmails = [] } ]
-                                    , expenses = [ sampleExpense ]
+                                    , expenses = [ sampleMovement ]
                                     , accounts = [ sampleAccount ]
                                     , error = "old"
                                     , accountError = "old"
@@ -155,7 +155,7 @@ sampleAccount =
     { id = "cash", name = "Caja", deletedAt = Nothing }
 
 
-sampleExpense =
+sampleMovement =
     { id = "movement-1"
     , movementType = Accounting.ExpenseMovement
     , description = Just "Pago"

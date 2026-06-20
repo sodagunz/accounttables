@@ -24,8 +24,8 @@ type alias Config msg =
     , onSelectSort : SortField -> msg
     , onExportCsv : msg
     , onExportXlsx : msg
-    ,             onDelete : String -> msg
-            , onEdit : String -> msg
+    , onDelete : String -> msg
+    , onEdit : String -> msg
     }
 
 

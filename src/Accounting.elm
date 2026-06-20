@@ -1,28 +1,25 @@
 module Accounting exposing
     ( Account
     , Currency(..)
-    , Movement
     , FilterWindow(..)
     , Form
     , MoneyTotal
+    , Movement
     , MovementType(..)
     , SortDirection(..)
     , SortField(..)
-    , addMoney
     , buildMovement
     , cashflowFor
-    , convert
     , currencyFromString
     , currencyToString
     , descriptionDisplay
     , emptyForm
-    , emptyMoney
-    , movementMatchesFilter
-    , movementsFor
     , fallbackExchangeRate
     , filteredMovements
+    , movementToForm
     , movementTypeFromString
     , movementTypeToString
+    , movementsFor
     , sampleMovements
     , setAccount
     , setAmount
@@ -30,12 +27,10 @@ module Accounting exposing
     , setDate
     , setDescription
     , setMovementType
-    , movementToForm
     , sortMovements
     , summarizeMoney
     )
 
-import String
 import Util.Date as Date
 
 
@@ -152,13 +147,14 @@ setDate : String -> Form -> Form
 setDate date form =
     { form | date = date }
 
+
 setMovementType : MovementType -> Form -> Form
 setMovementType movementType form =
     { form | movementType = movementType }
 
 
 movementToForm : Movement -> Form -> Form
-movementToForm movement form =
+movementToForm movement _ =
     { description = movement.description |> Maybe.withDefault ""
     , amount = String.fromFloat movement.inputAmount
     , accountId = movement.accountId
@@ -172,9 +168,11 @@ movementToForm movement form =
 buildMovement : Float -> String -> List Account -> Form -> Result String Movement
 buildMovement exchangeRate id accounts form =
     let
+        description : String
         description =
             String.trim form.description
 
+        selectedAccount : Maybe Account
         selectedAccount =
             accounts
                 |> List.filter (\account -> account.id == form.accountId && account.deletedAt == Nothing)
@@ -198,6 +196,7 @@ buildMovement exchangeRate id accounts form =
 
                     Just account ->
                         let
+                            converted : { ars : Float, usd : Float }
                             converted =
                                 cashflowFor form.movementType exchangeRate form.currency amount
                         in
@@ -235,9 +234,11 @@ convert exchangeRate currency amount =
 cashflowFor : MovementType -> Float -> Currency -> Float -> { ars : Float, usd : Float }
 cashflowFor movementType exchangeRate currency inputAmount =
     let
+        converted : { ars : Float, usd : Float }
         converted =
             convert exchangeRate currency (abs inputAmount)
 
+        multiplier : Float
         multiplier =
             movementMultiplier movementType
     in
@@ -307,6 +308,7 @@ sampleMovements exchangeRate today accounts =
 sampleMovement : Float -> String -> String -> Account -> Float -> Currency -> String -> Movement
 sampleMovement exchangeRate id description account amount currency date =
     let
+        converted : { ars : Float, usd : Float }
         converted =
             cashflowFor ExpenseMovement exchangeRate currency amount
     in
@@ -362,27 +364,28 @@ movementMatchesFilter model movement =
 
 
 sortMovements : SortField -> SortDirection -> List Movement -> List Movement
-sortMovements sortField sortDirection expenses =
+sortMovements sortField sortDirection movements =
     let
+        sorted : List Movement
         sorted =
             case sortField of
                 SortByDate ->
-                    List.sortWith compareByDate expenses
+                    List.sortWith compareByDate movements
 
                 SortByAccount ->
-                    List.sortWith compareByAccount expenses
+                    List.sortWith compareByAccount movements
 
                 SortByDescription ->
-                    List.sortWith compareByDescription expenses
+                    List.sortWith compareByDescription movements
 
                 SortByExchangeRate ->
-                    List.sortWith compareByExchangeRate expenses
+                    List.sortWith compareByExchangeRate movements
 
                 SortByPesos ->
-                    List.sortWith compareByPesos expenses
+                    List.sortWith compareByPesos movements
 
                 SortByDollars ->
-                    List.sortWith compareByDollars expenses
+                    List.sortWith compareByDollars movements
     in
     case sortDirection of
         Ascending ->

@@ -2,8 +2,8 @@ module Config exposing
     ( Messages
     , Ports
     , authUpdate
-    , movements
     , ledgerData
+    , movements
     , tutorial
     , view
     )
@@ -14,8 +14,8 @@ import Json.Encode as Encode
 import Ledger
 import Tutorial
 import Update.Auth as AuthUpdate
-import Update.Movements as Movements
 import Update.LedgerData as LedgerData
+import Update.Movements as Movements
 import Util.Date exposing (DateDisplay)
 import View.App as AppView
 

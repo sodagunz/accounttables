@@ -1,6 +1,6 @@
 module Export exposing (Format(..), tablePayload)
 
-import Accounting exposing (Account, Currency(..), Movement, MoneyTotal, descriptionDisplay, movementsFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), MoneyTotal, Movement, descriptionDisplay, movementsFor, summarizeMoney)
 import Json.Encode as Encode
 import Util.Date exposing (DateDisplay, formatDate)
 import Util.Format exposing (formatMoney)

@@ -1,6 +1,6 @@
 module View.MovementTable exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Movement, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, movementsFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), FilterWindow(..), MoneyTotal, Movement, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, movementsFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, checked, class, classList, for, id, name, type_)
 import Html.Events exposing (onClick)

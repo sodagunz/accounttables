@@ -3,7 +3,7 @@ module View.MovementForm exposing (Config, view)
 import Accounting exposing (Account, Currency(..), Form, MovementType(..), currencyToString, movementTypeToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Html exposing (Html, button, div, input, label, option, p, section, select, span, strong, text)
-import Html.Attributes exposing (attribute, autofocus, checked, class, classList, for, id, name, step, type_, value)
+import Html.Attributes exposing (attribute, autofocus, checked, class, classList, name, step, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Time
 import Util.Date as Date
@@ -32,6 +32,7 @@ type alias Config msg =
 view : Config msg -> Html msg
 view config =
     let
+        selectedAccountId : String
         selectedAccountId =
             selectedOrDefaultAccountId config.form.accountId config.accounts
     in
@@ -116,6 +117,7 @@ view config =
             , exchangeRateView config
             , p [ class "error" ] [ text config.error ]
             , let
+                buttonText : String
                 buttonText =
                     case config.form.editingId of
                         Just _ ->
@@ -193,6 +195,7 @@ accountOption account =
 exchangeRateView : Config msg -> Html msg
 exchangeRateView config =
     let
+        status : String
         status =
             case config.exchangeRateStatus of
                 LoadingRate ->

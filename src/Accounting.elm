@@ -20,7 +20,6 @@ module Accounting exposing
     , movementTypeFromString
     , movementTypeToString
     , movementsFor
-    , sampleMovements
     , setAccount
     , setAmount
     , setCurrency
@@ -153,8 +152,8 @@ setMovementType movementType form =
     { form | movementType = movementType }
 
 
-movementToForm : Movement -> Form -> Form
-movementToForm movement _ =
+movementToForm : Movement -> Form
+movementToForm movement =
     { description = movement.description |> Maybe.withDefault ""
     , amount = String.fromFloat movement.inputAmount
     , accountId = movement.accountId
@@ -167,17 +166,6 @@ movementToForm movement _ =
 
 buildMovement : Float -> String -> List Account -> Form -> Result String Movement
 buildMovement exchangeRate id accounts form =
-    let
-        description : String
-        description =
-            String.trim form.description
-
-        selectedAccount : Maybe Account
-        selectedAccount =
-            accounts
-                |> List.filter (\account -> account.id == form.accountId && account.deletedAt == Nothing)
-                |> List.head
-    in
     case String.toFloat form.amount of
         Nothing ->
             Err "Ingresa un monto válido."
@@ -190,12 +178,23 @@ buildMovement exchangeRate id accounts form =
                 Err "Ingresa una fecha válida."
 
             else
+                let
+                    selectedAccount : Maybe Account
+                    selectedAccount =
+                        accounts
+                            |> List.filter (\account -> account.id == form.accountId && account.deletedAt == Nothing)
+                            |> List.head
+                in
                 case selectedAccount of
                     Nothing ->
                         Err "Selecciona una cuenta."
 
                     Just account ->
                         let
+                            description : String
+                            description =
+                                String.trim form.description
+
                             converted : { ars : Float, usd : Float }
                             converted =
                                 cashflowFor form.movementType exchangeRate form.currency amount
@@ -263,8 +262,8 @@ emptyMoney =
 
 
 summarizeMoney : List Movement -> MoneyTotal
-summarizeMoney expenses =
-    List.foldl addMoney emptyMoney expenses
+summarizeMoney movements =
+    List.foldl addMoney emptyMoney movements
 
 
 addMoney : Movement -> MoneyTotal -> MoneyTotal
@@ -275,56 +274,8 @@ addMoney movement total =
 
 
 movementsFor : Account -> List Movement -> List Movement
-movementsFor account expenses =
-    List.filter (\expense -> expense.accountId == account.id) expenses
-
-
-sampleMovements : Float -> String -> List Account -> List Movement
-sampleMovements exchangeRate today accounts =
-    let
-        yesterday =
-            Date.addDays -1 today
-
-        lastWeek =
-            Date.addDays -7 today
-    in
-    case accounts of
-        first :: second :: _ ->
-            [ sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
-            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000002" "Nafta" second 42 USD today
-            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
-            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000004" "Librería" second 18500 ARS lastWeek
-            ]
-
-        first :: [] ->
-            [ sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
-            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
-            ]
-
-        [] ->
-            []
-
-
-sampleMovement : Float -> String -> String -> Account -> Float -> Currency -> String -> Movement
-sampleMovement exchangeRate id description account amount currency date =
-    let
-        converted : { ars : Float, usd : Float }
-        converted =
-            cashflowFor ExpenseMovement exchangeRate currency amount
-    in
-    { id = id
-    , movementType = ExpenseMovement
-    , description = Just description
-    , accountId = account.id
-    , accountName = account.name
-    , inputAmount = amount
-    , inputCurrency = currency
-    , exchangeRate = exchangeRate
-    , ars = converted.ars
-    , usd = converted.usd
-    , date = date
-    , deletedAt = Nothing
-    }
+movementsFor account movements =
+    List.filter (\movement -> movement.accountId == account.id) movements
 
 
 filteredMovements :

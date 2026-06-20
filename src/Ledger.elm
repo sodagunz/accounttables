@@ -153,16 +153,6 @@ encodeLedgerName ledgerId name =
         ]
 
 
-encodeMaybeString : Maybe String -> Encode.Value
-encodeMaybeString maybeString =
-    case maybeString of
-        Just value ->
-            Encode.string value
-
-        Nothing ->
-            Encode.null
-
-
 decodeLedger : Decode.Value -> Result String LedgerData
 decodeLedger value =
     Decode.decodeValue ledgerPayloadDecoder value

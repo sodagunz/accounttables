@@ -6,11 +6,10 @@ module Events exposing
     , eventDecoder
     , eventEncoder
     , eventSequence
-    , eventTypeToString
     )
 
-import Accounting exposing (Currency, MovementType(..), currencyFromString, currencyToString, movementTypeFromString, movementTypeToString)
-import Json.Decode as Decode exposing (Decoder, decodeValue, field, float, int, list, map, maybe, string)
+import Accounting exposing (Currency, MovementType, currencyFromString, currencyToString, movementTypeFromString, movementTypeToString)
+import Json.Decode as Decode exposing (Decoder, field, float, int, maybe, string)
 import Json.Decode.Pipeline exposing (required)
 import Json.Encode as Encode
 
@@ -161,6 +160,7 @@ eventDecoder =
 decodeEventByType : String -> Decoder Event
 decodeEventByType eventType =
     let
+        sequenceDecoder : Decoder Int
         sequenceDecoder =
             field "sequence" int
     in

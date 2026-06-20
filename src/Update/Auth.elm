@@ -1,4 +1,4 @@
-module Update.Auth exposing (Config, handleState, localDataExists)
+module Update.Auth exposing (Config, handleState)
 
 import Auth exposing (AuthState(..))
 import Ledger exposing (LoadState(..))
@@ -33,22 +33,6 @@ handleState config authState model =
 
 handleSignedIn : Config msg -> AuthState -> Auth.User -> Model -> ( Model, Cmd msg )
 handleSignedIn config authState user model =
-    let
-        ledgerId =
-            case user.acceptedInviteLedgerId of
-                Just invitedLedgerId ->
-                    invitedLedgerId
-
-                Nothing ->
-                    if model.currentLedgerId == "" || model.currentLedgerId == Ledger.localLedgerId then
-                        user.uid
-
-                    else
-                        model.currentLedgerId
-
-        newTutorialState =
-            tutorialAfterAuth model
-    in
     case user.acceptedInviteLedgerId of
         Just invitedLedgerId ->
             ( { model
@@ -72,8 +56,14 @@ handleSignedIn config authState user model =
             )
 
         Nothing ->
+            let
+                newTutorialState : TutorialState
+                newTutorialState =
+                    tutorialAfterAuth model
+            in
             if localDataExists model then
                 let
+                    updatedModel : Model
                     updatedModel =
                         { model
                             | authState = authState
@@ -97,6 +87,20 @@ handleSignedIn config authState user model =
 
             else
                 let
+                    ledgerId : String
+                    ledgerId =
+                        case user.acceptedInviteLedgerId of
+                            Just invitedLedgerId ->
+                                invitedLedgerId
+
+                            Nothing ->
+                                if model.currentLedgerId == "" || model.currentLedgerId == Ledger.localLedgerId then
+                                    user.uid
+
+                                else
+                                    model.currentLedgerId
+
+                    updatedModel : Model
                     updatedModel =
                         { model
                             | authState = authState
@@ -122,6 +126,7 @@ handleSignedIn config authState user model =
 handleSignedOut : Config msg -> AuthState -> Model -> ( Model, Cmd msg )
 handleSignedOut config authState model =
     let
+        signedOutModel : Model
         signedOutModel =
             { model
                 | authState = authState
@@ -133,6 +138,7 @@ handleSignedOut config authState model =
                 |> Ledger.ensureLocalLedger LocalOnly
                 |> Model.ensureSelectedAccount
 
+        tutorialCmd : Cmd msg
         tutorialCmd =
             case signedOutModel.tutorialState of
                 TutorialOpen SignInStep ->

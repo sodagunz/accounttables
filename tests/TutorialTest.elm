@@ -1,5 +1,6 @@
 module TutorialTest exposing (suite)
 
+import Accounting exposing (Account)
 import Auth exposing (AuthState(..))
 import Expect
 import Json.Decode as Decode
@@ -43,9 +44,11 @@ suite =
         , test "prefills first expense with demo income and selected account" <|
             \_ ->
                 let
+                    form : Accounting.Form
                     form =
                         initialModel.form
 
+                    prepared : Model.Model
                     prepared =
                         Tutorial.prepareStep FirstMovementStep
                             { initialModel
@@ -68,9 +71,11 @@ suite =
         ]
 
 
+initialModel : Model.Model
 initialModel =
     Model.initial
 
 
+activeAccount : Account
 activeAccount =
     { id = "cash", name = "Caja", deletedAt = Nothing }

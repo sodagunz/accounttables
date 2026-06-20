@@ -3,7 +3,6 @@ module Update.Ledgers exposing (inviteGuest, removeGuest, rename, select)
 import Json.Encode as Encode
 import Ledger
 import Model exposing (Model, StorageMode(..), ledgerNameFor, selectedLedgerId)
-import String
 
 
 select : String -> Model -> Model
@@ -23,6 +22,7 @@ select ledgerId model =
 inviteGuest : Model -> ( Model, Maybe Encode.Value )
 inviteGuest model =
     let
+        email : String
         email =
             String.toLower (String.trim model.inviteEmail)
     in
@@ -57,6 +57,7 @@ removeGuest uid model =
 rename : Model -> ( Model, Maybe Encode.Value )
 rename model =
     let
+        name : String
         name =
             String.trim model.ledgerName
     in

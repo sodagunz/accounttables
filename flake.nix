@@ -44,7 +44,7 @@
           exec elm-test
         '')
         (pkgs.writeShellScriptBin "review" ''
-          exec elm-review --config review/
+          exec elm-review --config review/ "$@"
         '')
       ];
     in
@@ -87,7 +87,9 @@
         };
         review = {
           type = "app";
-          program = "${pkgs.writeShellScriptBin "review" "exec ${pkgs.elmPackages.elm-review}/bin/elm-review --config review/"}/bin/review";
+          program = "${pkgs.writeShellScriptBin "review" ''
+            exec ${pkgs.elmPackages.elm-review}/bin/elm-review --config review/ "$@"
+          ''}/bin/review";
         };
       });
 

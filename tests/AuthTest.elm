@@ -12,6 +12,7 @@ suite =
         [ test "decodes signed-in users" <|
             \_ ->
                 let
+                    payload : Encode.Value
                     payload =
                         Encode.object
                             [ ( "status", Encode.string "signed-in" )
@@ -34,6 +35,6 @@ suite =
                             ]
                             user
 
-                    decoded ->
+                    _ ->
                         Expect.fail "Expected SignedIn, got different auth state"
         ]

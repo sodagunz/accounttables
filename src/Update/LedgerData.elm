@@ -24,9 +24,11 @@ handleLedgerLoaded config value model =
     case Ledger.decodeLedger value of
         Ok ledger ->
             let
+                updatedModel : Model
                 updatedModel =
                     apply ledger model
 
+                advanceCmd : Cmd msg
                 advanceCmd =
                     case ( model.tutorialState, updatedModel.tutorialState ) of
                         ( TutorialOpen AccountsStep, TutorialOpen next ) ->
@@ -44,6 +46,7 @@ handleLedgerLoaded config value model =
 handleLocalMigrationPrepared : Config msg -> Decode.Value -> Model -> ( Model, Cmd msg )
 handleLocalMigrationPrepared config value model =
     let
+        status : String
         status =
             Decode.decodeValue (Decode.field "status" Decode.string) value
                 |> Result.withDefault "error"
@@ -70,6 +73,7 @@ handleLocalMigrationPrepared config value model =
 
                     firstLedger :: _ ->
                         let
+                            selectedLedgerId : String
                             selectedLedgerId =
                                 Decode.decodeValue (Decode.field "selectedLedgerId" Decode.string) value
                                     |> Result.withDefault firstLedger.id
@@ -86,6 +90,7 @@ handleLocalMigrationPrepared config value model =
 
     else
         let
+            error : String
             error =
                 Decode.decodeValue (Decode.field "message" Decode.string) value
                     |> Result.withDefault "No se pudo preparar la migración local."
@@ -96,12 +101,15 @@ handleLocalMigrationPrepared config value model =
 apply : Ledger.LedgerData -> Model -> Model
 apply ledger model =
     let
+        accounts : List Accounting.Account
         accounts =
             Model.activeAccountsFromList ledger.accounts
 
+        form : Accounting.Form
         form =
             formWithLoadedAccount ledger.lastAccountId accounts model.form
 
+        expenses : List Accounting.Movement
         expenses =
             if List.isEmpty ledger.events then
                 Model.activeMovements ledger.expenses
@@ -139,6 +147,7 @@ adjustTutorialAfterLedgerLoad model =
         TutorialOpen AccountsStep ->
             if not (List.isEmpty (Model.activeAccounts model)) then
                 let
+                    nextStep : TutorialStep
                     nextStep =
                         Tutorial.stepAfterAccounts model
                 in

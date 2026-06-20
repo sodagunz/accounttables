@@ -1,24 +1,15 @@
 module Tutorial exposing
     ( Config
-    , actionDecoder
-    , advanceTutorialFrom
     , decodeTutorialStateFromFlags
     , encodeStep
-    , focusSelector
     , handleTutorialAction
-    , nextStep
-    , openDisclosureIds
     , prepareState
     , prepareStep
-    , previousStep
     , reopenedStep
-    , skipTutorialFrom
     , stepAfterAccounts
-    , targetSelector
     , tutorialAdvanceCmd
     , tutorialNavigateCmd
     , tutorialNavigateTo
-    , tutorialOpenDisclosureCmd
     )
 
 import Accounting
@@ -152,6 +143,7 @@ tutorialNavigateCmd config model step =
 tutorialNavigateTo : Config msg -> TutorialStep -> Model -> ( Model, Cmd msg )
 tutorialNavigateTo config step model =
     let
+        preparedModel : Model
         preparedModel =
             prepareStep step { model | tutorialState = TutorialOpen step }
     in
@@ -189,7 +181,7 @@ encodeStep model step =
         , ( "showBack", Encode.bool (showBack step) )
         , ( "showNext", Encode.bool (showNext step) )
         , ( "showSkip", Encode.bool (showSkip step) )
-        , ( "done", Encode.bool (doneButton step) )
+        , ( "done", Encode.bool doneButton )
         , ( "allowTargetClick", Encode.bool (allowsTargetClick step) )
         , ( "openDisclosures", Encode.list Encode.string (openDisclosureIds step) )
         ]
@@ -322,6 +314,7 @@ openDisclosureIds step =
 prefillMovementForm : Model -> Model
 prefillMovementForm model =
     let
+        accountId : String
         accountId =
             case model.form.accountId of
                 "" ->
@@ -333,6 +326,7 @@ prefillMovementForm model =
                 selectedAccountId ->
                     selectedAccountId
 
+        form : Accounting.Form
         form =
             model.form
     in
@@ -428,8 +422,8 @@ showSkip step =
             True
 
 
-doneButton : TutorialStep -> Bool
-doneButton _ =
+doneButton : Bool
+doneButton =
     False
 
 

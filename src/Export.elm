@@ -86,6 +86,7 @@ movementRow dateDisplay movement =
 subtotalRows : List Account -> List Movement -> List TableRow
 subtotalRows accounts movements =
     let
+        grandTotal : MoneyTotal
         grandTotal =
             summarizeMoney movements
     in

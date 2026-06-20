@@ -1,4 +1,4 @@
-module Update.Sorting exposing (defaultSortDirection, select, toggleDirection)
+module Update.Sorting exposing (select)
 
 import Accounting exposing (SortDirection(..), SortField(..))
 

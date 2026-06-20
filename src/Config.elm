@@ -12,7 +12,6 @@ import Accounting exposing (FilterWindow, SortField)
 import Events
 import Json.Encode as Encode
 import Ledger
-import Model exposing (Model, TutorialState, TutorialStep)
 import Tutorial
 import Update.Auth as AuthUpdate
 import Update.Movements as Movements

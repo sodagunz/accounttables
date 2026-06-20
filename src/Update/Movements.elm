@@ -42,9 +42,11 @@ handleGeneratedId config value model =
 createOrUpdateMovement : Config msg -> String -> Model -> ( Model, Cmd msg )
 createOrUpdateMovement config movementId model =
     let
+        readyModel : Model
         readyModel =
             Model.ensureSelectedAccount model
 
+        rate : Float
         rate =
             case readyModel.form.editingId of
                 Just editingId ->
@@ -69,10 +71,12 @@ createOrUpdateMovement config movementId model =
 persistMovement : Config msg -> Model -> Accounting.Movement -> ( Model, Cmd msg )
 persistMovement config readyModel movement =
     let
-        ( event, updatedModel ) =
+        eventAndUpdatedModel : ( Events.Event, Model )
+        eventAndUpdatedModel =
             case readyModel.form.editingId of
                 Just editingId ->
                     let
+                        updateEvent : Events.Event
                         updateEvent =
                             Events.MovementUpdatedEvent 0
                                 { movementId = editingId
@@ -88,6 +92,7 @@ persistMovement config readyModel movement =
                                 , date = movement.date
                                 }
 
+                        updatedMovements : List Accounting.Movement
                         updatedMovements =
                             List.map
                                 (\existing ->
@@ -108,6 +113,7 @@ persistMovement config readyModel movement =
 
                 Nothing ->
                     let
+                        createEvent : Events.Event
                         createEvent =
                             Events.MovementCreatedEvent 0
                                 { id = movement.id
@@ -130,10 +136,20 @@ persistMovement config readyModel movement =
                       }
                     )
 
+        event : Events.Event
+        event =
+            Tuple.first eventAndUpdatedModel
+
+        updatedModel : Model
+        updatedModel =
+            Tuple.second eventAndUpdatedModel
+
+        isNewMovement : Bool
         isNewMovement =
             readyModel.form.editingId == Nothing
 
-        ( modelAfterAdvance, advanceCmd ) =
+        advanceResult : ( Model, Cmd msg )
+        advanceResult =
             if isNewMovement then
                 case updatedModel.tutorialState of
                     TutorialOpen FirstMovementStep ->
@@ -144,6 +160,9 @@ persistMovement config readyModel movement =
 
             else
                 ( updatedModel, Cmd.none )
+
+        ( modelAfterAdvance, advanceCmd ) =
+            advanceResult
     in
     ( { modelAfterAdvance
         | form =
@@ -168,6 +187,7 @@ persistMovement config readyModel movement =
 delete : Config msg -> String -> Model -> ( Model, Cmd msg )
 delete config movementId model =
     let
+        isTutorialDelete : Bool
         isTutorialDelete =
             case ( model.tutorialState, model.tutorialMovementId ) of
                 ( TutorialOpen DeleteMovementStep, Just tutorialMovementId ) ->
@@ -176,9 +196,11 @@ delete config movementId model =
                 _ ->
                     False
 
+        event : Events.Event
         event =
             Events.MovementDeletedEvent 0 { movementId = movementId }
 
+        updatedMovements : List Accounting.Movement
         updatedMovements =
             List.map
                 (\movement ->
@@ -190,6 +212,7 @@ delete config movementId model =
                 )
                 model.expenses
 
+        baseModel : Model
         baseModel =
             { model
                 | events = event :: model.events
@@ -217,7 +240,7 @@ edit movementId model =
     case List.head (List.filter (\movement -> movement.id == movementId) model.expenses) of
         Just movement ->
             ( { model
-                | form = Accounting.movementToForm movement model.form
+                | form = Accounting.movementToForm movement
                 , error = ""
               }
             , Cmd.none
@@ -243,6 +266,7 @@ handleEventsLoaded value model =
     case Decode.decodeValue (Decode.list Events.eventDecoder) value of
         Ok events ->
             let
+                projectedMovements : List Accounting.Movement
                 projectedMovements =
                     Projector.projectEvents events
             in

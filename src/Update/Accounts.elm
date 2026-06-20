@@ -4,12 +4,12 @@ import Auth exposing (AuthState(..))
 import Json.Encode as Encode
 import Ledger
 import Model exposing (Model, StorageMode(..), selectedLedgerId)
-import String
 
 
 add : Model -> ( Model, Maybe Encode.Value )
 add model =
     let
+        name : String
         name =
             String.trim model.newAccountName
     in

@@ -1,6 +1,6 @@
 module AccountingTest exposing (suite)
 
-import Accounting exposing (Currency(..), MovementType(..))
+import Accounting exposing (Account, Currency(..), Form, MovementType(..))
 import Expect
 import Test exposing (Test, describe, test)
 
@@ -15,6 +15,7 @@ suite =
         , test "builds an income movement from a valid form" <|
             \_ ->
                 let
+                    form : Form
                     form =
                         { description = "  Venta  "
                         , amount = "1500"
@@ -25,6 +26,7 @@ suite =
                         , editingId = Nothing
                         }
 
+                    accounts : List Account
                     accounts =
                         [ { id = "cash", name = "Caja", deletedAt = Nothing } ]
                 in
@@ -45,6 +47,7 @@ suite =
         , test "rejects a deleted selected account" <|
             \_ ->
                 let
+                    form : Form
                     form =
                         { description = "Pago"
                         , amount = "10"
@@ -55,6 +58,7 @@ suite =
                         , editingId = Nothing
                         }
 
+                    accounts : List Account
                     accounts =
                         [ { id = "deleted", name = "Vieja", deletedAt = Just "deleted" } ]
                 in

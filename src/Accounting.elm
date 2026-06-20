@@ -1,41 +1,35 @@
 module Accounting exposing
     ( Account
     , Currency(..)
-    , Movement
     , FilterWindow(..)
     , Form
     , MoneyTotal
+    , Movement
     , MovementType(..)
     , SortDirection(..)
     , SortField(..)
-    , addMoney
     , buildMovement
     , cashflowFor
-    , convert
     , currencyFromString
     , currencyToString
     , descriptionDisplay
     , emptyForm
-    , emptyMoney
-    , movementMatchesFilter
-    , movementsFor
     , fallbackExchangeRate
     , filteredMovements
+    , movementToForm
     , movementTypeFromString
     , movementTypeToString
-    , sampleMovements
+    , movementsFor
     , setAccount
     , setAmount
     , setCurrency
     , setDate
     , setDescription
     , setMovementType
-    , movementToForm
     , sortMovements
     , summarizeMoney
     )
 
-import String
 import Util.Date as Date
 
 
@@ -152,13 +146,14 @@ setDate : String -> Form -> Form
 setDate date form =
     { form | date = date }
 
+
 setMovementType : MovementType -> Form -> Form
 setMovementType movementType form =
     { form | movementType = movementType }
 
 
-movementToForm : Movement -> Form -> Form
-movementToForm movement form =
+movementToForm : Movement -> Form
+movementToForm movement =
     { description = movement.description |> Maybe.withDefault ""
     , amount = String.fromFloat movement.inputAmount
     , accountId = movement.accountId
@@ -171,15 +166,6 @@ movementToForm movement form =
 
 buildMovement : Float -> String -> List Account -> Form -> Result String Movement
 buildMovement exchangeRate id accounts form =
-    let
-        description =
-            String.trim form.description
-
-        selectedAccount =
-            accounts
-                |> List.filter (\account -> account.id == form.accountId && account.deletedAt == Nothing)
-                |> List.head
-    in
     case String.toFloat form.amount of
         Nothing ->
             Err "Ingresa un monto válido."
@@ -192,12 +178,24 @@ buildMovement exchangeRate id accounts form =
                 Err "Ingresa una fecha válida."
 
             else
+                let
+                    selectedAccount : Maybe Account
+                    selectedAccount =
+                        accounts
+                            |> List.filter (\account -> account.id == form.accountId && account.deletedAt == Nothing)
+                            |> List.head
+                in
                 case selectedAccount of
                     Nothing ->
                         Err "Selecciona una cuenta."
 
                     Just account ->
                         let
+                            description : String
+                            description =
+                                String.trim form.description
+
+                            converted : { ars : Float, usd : Float }
                             converted =
                                 cashflowFor form.movementType exchangeRate form.currency amount
                         in
@@ -235,9 +233,11 @@ convert exchangeRate currency amount =
 cashflowFor : MovementType -> Float -> Currency -> Float -> { ars : Float, usd : Float }
 cashflowFor movementType exchangeRate currency inputAmount =
     let
+        converted : { ars : Float, usd : Float }
         converted =
             convert exchangeRate currency (abs inputAmount)
 
+        multiplier : Float
         multiplier =
             movementMultiplier movementType
     in
@@ -262,8 +262,8 @@ emptyMoney =
 
 
 summarizeMoney : List Movement -> MoneyTotal
-summarizeMoney expenses =
-    List.foldl addMoney emptyMoney expenses
+summarizeMoney movements =
+    List.foldl addMoney emptyMoney movements
 
 
 addMoney : Movement -> MoneyTotal -> MoneyTotal
@@ -274,55 +274,8 @@ addMoney movement total =
 
 
 movementsFor : Account -> List Movement -> List Movement
-movementsFor account expenses =
-    List.filter (\expense -> expense.accountId == account.id) expenses
-
-
-sampleMovements : Float -> String -> List Account -> List Movement
-sampleMovements exchangeRate today accounts =
-    let
-        yesterday =
-            Date.addDays -1 today
-
-        lastWeek =
-            Date.addDays -7 today
-    in
-    case accounts of
-        first :: second :: _ ->
-            [ sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
-            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000002" "Nafta" second 42 USD today
-            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
-            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000004" "Librería" second 18500 ARS lastWeek
-            ]
-
-        first :: [] ->
-            [ sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000001" "Supermercado" first 28500 ARS today
-            , sampleMovement exchangeRate "018f0000-0000-7000-8000-000000000003" "Almuerzo" first 12500 ARS yesterday
-            ]
-
-        [] ->
-            []
-
-
-sampleMovement : Float -> String -> String -> Account -> Float -> Currency -> String -> Movement
-sampleMovement exchangeRate id description account amount currency date =
-    let
-        converted =
-            cashflowFor ExpenseMovement exchangeRate currency amount
-    in
-    { id = id
-    , movementType = ExpenseMovement
-    , description = Just description
-    , accountId = account.id
-    , accountName = account.name
-    , inputAmount = amount
-    , inputCurrency = currency
-    , exchangeRate = exchangeRate
-    , ars = converted.ars
-    , usd = converted.usd
-    , date = date
-    , deletedAt = Nothing
-    }
+movementsFor account movements =
+    List.filter (\movement -> movement.accountId == account.id) movements
 
 
 filteredMovements :
@@ -362,27 +315,28 @@ movementMatchesFilter model movement =
 
 
 sortMovements : SortField -> SortDirection -> List Movement -> List Movement
-sortMovements sortField sortDirection expenses =
+sortMovements sortField sortDirection movements =
     let
+        sorted : List Movement
         sorted =
             case sortField of
                 SortByDate ->
-                    List.sortWith compareByDate expenses
+                    List.sortWith compareByDate movements
 
                 SortByAccount ->
-                    List.sortWith compareByAccount expenses
+                    List.sortWith compareByAccount movements
 
                 SortByDescription ->
-                    List.sortWith compareByDescription expenses
+                    List.sortWith compareByDescription movements
 
                 SortByExchangeRate ->
-                    List.sortWith compareByExchangeRate expenses
+                    List.sortWith compareByExchangeRate movements
 
                 SortByPesos ->
-                    List.sortWith compareByPesos expenses
+                    List.sortWith compareByPesos movements
 
                 SortByDollars ->
-                    List.sortWith compareByDollars expenses
+                    List.sortWith compareByDollars movements
     in
     case sortDirection of
         Ascending ->

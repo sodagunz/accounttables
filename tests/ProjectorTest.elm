@@ -13,6 +13,7 @@ suite =
         [ test "sorts events by sequence, applies updates, then deletions" <|
             \_ ->
                 let
+                    events : List Event
                     events =
                         [ MovementDeletedEvent 3 { movementId = "movement-1" }
                         , MovementUpdatedEvent 2

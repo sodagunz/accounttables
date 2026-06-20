@@ -19,7 +19,8 @@ suite =
             [ test "adds a local account with trimmed name" <|
                 \_ ->
                     let
-                        ( updatedModel, payload ) =
+                        result : ( Model.Model, Maybe Encode.Value )
+                        result =
                             Accounts.add
                                 { initialModel
                                     | authState = SignedOut
@@ -27,6 +28,14 @@ suite =
                                     , currentLedgerId = "local"
                                     , newAccountName = "  Caja  "
                                 }
+
+                        updatedModel : Model.Model
+                        updatedModel =
+                            Tuple.first result
+
+                        payload : Maybe Encode.Value
+                        payload =
+                            Tuple.second result
                     in
                     Expect.all
                         [ \_ -> Expect.equal "" updatedModel.newAccountName
@@ -38,7 +47,8 @@ suite =
             , test "requires sign-in when cloud synced without an auth user" <|
                 \_ ->
                     let
-                        ( updatedModel, payload ) =
+                        result : ( Model.Model, Maybe Encode.Value )
+                        result =
                             Accounts.add
                                 { initialModel
                                     | authState = SignedOut
@@ -46,6 +56,14 @@ suite =
                                     , currentLedgerId = "ledger-1"
                                     , newAccountName = "Caja"
                                 }
+
+                        updatedModel : Model.Model
+                        updatedModel =
+                            Tuple.first result
+
+                        payload : Maybe Encode.Value
+                        payload =
+                            Tuple.second result
                     in
                     Expect.all
                         [ \_ -> Expect.equal Nothing payload
@@ -57,6 +75,7 @@ suite =
             [ test "select clears loaded data and marks the ledger loading" <|
                 \_ ->
                     let
+                        selected : Model.Model
                         selected =
                             Ledgers.select "ledger-2"
                                 { initialModel
@@ -81,13 +100,22 @@ suite =
             , test "invites collaborators with normalized email" <|
                 \_ ->
                     let
-                        ( updatedModel, payload ) =
+                        result : ( Model.Model, Maybe Encode.Value )
+                        result =
                             Ledgers.inviteGuest
                                 { initialModel
                                     | storageMode = CloudSynced
                                     , currentLedgerId = "ledger-1"
                                     , inviteEmail = "  USER@Example.COM  "
                                 }
+
+                        updatedModel : Model.Model
+                        updatedModel =
+                            Tuple.first result
+
+                        payload : Maybe Encode.Value
+                        payload =
+                            Tuple.second result
                     in
                     Expect.all
                         [ \_ -> Expect.equal "" updatedModel.inviteEmail
@@ -100,6 +128,7 @@ suite =
         , test "ensureSelectedAccount ignores deleted accounts" <|
             \_ ->
                 let
+                    updatedModel : Model.Model
                     updatedModel =
                         Model.ensureSelectedAccount
                             { initialModel
@@ -114,6 +143,7 @@ suite =
         , test "ensureLocalLedger activates the browser-local ledger" <|
             \_ ->
                 let
+                    updatedModel : Model.Model
                     updatedModel =
                         Ledger.ensureLocalLedger LocalOnly
                             { initialModel
@@ -143,18 +173,22 @@ expectEncodedString field expected maybePayload =
             Expect.fail ("Expected payload with field " ++ field)
 
 
+initialModel : Model.Model
 initialModel =
     Model.initial
 
 
+modelForm : Accounting.Form
 modelForm =
     Model.initial.form
 
 
+sampleAccount : Accounting.Account
 sampleAccount =
     { id = "cash", name = "Caja", deletedAt = Nothing }
 
 
+sampleMovement : Accounting.Movement
 sampleMovement =
     { id = "movement-1"
     , movementType = Accounting.ExpenseMovement

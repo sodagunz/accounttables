@@ -1,6 +1,6 @@
 module View.App exposing (Config, view)
 
-import Accounting exposing (FilterWindow, SortField)
+import Accounting exposing (FilterWindow, Movement, SortField)
 import Auth exposing (AuthState(..))
 import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
 import Html.Attributes exposing (class, type_, value)
@@ -9,10 +9,10 @@ import Ledger
 import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..))
 import Util.Date exposing (DateDisplay)
 import View.AuthStatus as AuthStatus
-import View.MovementForm as MovementForm
-import View.MovementTable as MovementTable
 import View.LedgerAccess as LedgerAccess
 import View.LedgerAccounts as LedgerAccounts
+import View.MovementForm as MovementForm
+import View.MovementTable as MovementTable
 
 
 type alias Config msg =
@@ -57,9 +57,11 @@ type alias Config msg =
 view : Config msg -> Model -> Html msg
 view config model =
     let
+        rows : List Movement
         rows =
             Model.visibleMovements model
 
+        isTutorialOpen : Bool
         isTutorialOpen =
             case model.tutorialState of
                 TutorialOpen _ ->
@@ -68,6 +70,7 @@ view config model =
                 _ ->
                     False
 
+        mainContent : List (Html msg)
         mainContent =
             [ reopenTutorialButton config model
             , tutorialCompletionBanner config model
@@ -221,6 +224,7 @@ localRiskBanner config model =
         _ ->
             if model.storageMode == LocalOnly then
                 let
+                    hasLocalData : Bool
                     hasLocalData =
                         not (List.isEmpty model.events)
                             || not (List.isEmpty model.accounts)

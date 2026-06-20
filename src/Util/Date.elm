@@ -1,7 +1,6 @@
 module Util.Date exposing
     ( CivilDate
     , DateDisplay(..)
-    , addDays
     , dateFromIso
     , dateToIso
     , formatApiDate
@@ -10,7 +9,7 @@ module Util.Date exposing
     , weekStartIso
     )
 
-import Date as Calendar exposing (Interval(..), Unit(..))
+import Date as Calendar exposing (Interval(..))
 import Time exposing (Month(..), Weekday(..))
 
 
@@ -31,14 +30,6 @@ weekStartIso iso =
     iso
         |> Calendar.fromIsoString
         |> Result.map (Calendar.floor Monday >> Calendar.toIsoString)
-        |> Result.withDefault iso
-
-
-addDays : Int -> String -> String
-addDays offset iso =
-    iso
-        |> Calendar.fromIsoString
-        |> Result.map (Calendar.add Days offset >> Calendar.toIsoString)
         |> Result.withDefault iso
 
 
@@ -94,9 +85,11 @@ formatApiDate zone timestamp =
 parseApiTimestamp : String -> Maybe Time.Posix
 parseApiTimestamp timestamp =
     let
+        datePart : String
         datePart =
             String.left 10 timestamp
 
+        timePart : String
         timePart =
             timestamp
                 |> String.dropLeft 11
@@ -107,6 +100,7 @@ parseApiTimestamp timestamp =
             Maybe.map3
                 (\hour minute second ->
                     let
+                        millis : Int
                         millis =
                             ((Calendar.toRataDie date - unixEpochRataDie) * 24 + hour)
                                 * 60

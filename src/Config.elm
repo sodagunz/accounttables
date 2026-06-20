@@ -2,8 +2,8 @@ module Config exposing
     ( Messages
     , Ports
     , authUpdate
-    , movements
     , ledgerData
+    , movements
     , tutorial
     , view
     )
@@ -12,11 +12,10 @@ import Accounting exposing (FilterWindow, SortField)
 import Events
 import Json.Encode as Encode
 import Ledger
-import Model exposing (Model, TutorialState, TutorialStep)
 import Tutorial
 import Update.Auth as AuthUpdate
-import Update.Movements as Movements
 import Update.LedgerData as LedgerData
+import Update.Movements as Movements
 import Util.Date exposing (DateDisplay)
 import View.App as AppView
 

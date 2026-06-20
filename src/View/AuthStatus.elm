@@ -37,7 +37,7 @@ view config =
                 [ div [ class "auth-user" ]
                     [ syncDot config.ledgerLoadState
                     , span [ class "auth-user__name" ] [ text (userLabel user) ]
-                    , button [ type_ "button", class "auth-button", attribute "aria-label" "Cerrar sesión", onClick config.onSignOut ] [ text "\u{23FB}" ]
+                    , button [ type_ "button", class "auth-button", attribute "aria-label" "Cerrar sesión", onClick config.onSignOut ] [ text "⏻" ]
                     ]
                 , ledgerStatus config.ledgerLoadState
                 ]
@@ -68,7 +68,8 @@ ledgerStatus loadState =
 syncDot : LoadState -> Html msg
 syncDot loadState =
     let
-        ( statusClass, statusLabel ) =
+        status : ( String, String )
+        status =
             case loadState of
                 NotLoaded ->
                     ( "sync-dot--syncing", "Sincronizando" )
@@ -81,6 +82,14 @@ syncDot loadState =
 
                 LoadError _ ->
                     ( "sync-dot--error", "Error de sincronización" )
+
+        statusClass : String
+        statusClass =
+            Tuple.first status
+
+        statusLabel : String
+        statusLabel =
+            Tuple.second status
     in
     span
         [ class ("sync-dot " ++ statusClass)

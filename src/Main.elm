@@ -1,11 +1,10 @@
-port module Main exposing (main)
+port module Main exposing (Msg, main)
 
-import Accounting exposing (FilterWindow(..), SortField(..))
+import Accounting exposing (FilterWindow, SortField)
 import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
-import Auth exposing (AuthState(..))
+import Auth
 import Browser
 import Config
-import Events exposing (Event)
 import Export
 import Flags
 import Html exposing (Html)
@@ -13,17 +12,17 @@ import Http
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
-import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), TutorialStep(..))
+import Model exposing (MigrationState(..), Model, TutorialState(..), TutorialStep(..))
 import Task
 import Time
 import Tutorial
 import Update.Accounts as Accounts
 import Update.Auth as AuthUpdate
-import Update.Movements as Movements
 import Update.LedgerData as LedgerData
 import Update.Ledgers as Ledgers
+import Update.Movements as Movements
 import Update.Sorting as Sorting
-import Util.Date exposing (DateDisplay(..), dateToIso)
+import Util.Date exposing (DateDisplay, dateToIso)
 import View.App as AppView
 
 
@@ -67,10 +66,6 @@ type Msg
     | SelectMigrationLedger String
     | ConfirmLocalMigration
     | SkipLocalMigration
-    | TutorialNext
-    | TutorialBack
-    | TutorialSkip
-    | TutorialFinish
     | ReopenTutorial
     | DismissTutorialCompletion
     | TutorialActionReceived Decode.Value
@@ -151,9 +146,6 @@ port focusElement : String -> Cmd msg
 port hideTutorial : () -> Cmd msg
 
 
-port refreshTutorial : () -> Cmd msg
-
-
 port tutorialAction : (Decode.Value -> msg) -> Sub msg
 
 
@@ -170,9 +162,11 @@ main =
 init : Decode.Value -> ( Model, Cmd Msg )
 init flags =
     let
+        model : Model
         model =
             Flags.modelFromFlags flags
 
+        baseCmds : List (Cmd Msg)
         baseCmds =
             [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
             , Dolar.fetchOfficialDollar GotExchangeRate
@@ -193,6 +187,7 @@ update msg model =
     case msg of
         GotToday zone posix ->
             let
+                today : String
                 today =
                     dateToIso zone posix
             in
@@ -282,18 +277,29 @@ update msg model =
 
         AddAccount ->
             let
-                ( updatedModel, payload ) =
+                addResult : ( Model, Maybe Encode.Value )
+                addResult =
                     Accounts.add model
 
-                ( finalModel, advanceCmd ) =
+                updatedModel : Model
+                updatedModel =
+                    Tuple.first addResult
+
+                payload : Maybe Encode.Value
+                payload =
+                    Tuple.second addResult
+
+                finalResult : ( Model, Cmd Msg )
+                finalResult =
                     case updatedModel.tutorialState of
                         TutorialOpen AccountsStep ->
                             if not (List.isEmpty (Model.activeAccounts updatedModel)) then
                                 let
+                                    nextAccountsStep : TutorialStep
                                     nextAccountsStep =
                                         Tutorial.stepAfterAccounts updatedModel
-                                in
-                                let
+
+                                    nextModel : Model
                                     nextModel =
                                         Tutorial.prepareStep nextAccountsStep { updatedModel | tutorialState = TutorialOpen nextAccountsStep, accountError = "" }
                                 in
@@ -306,15 +312,24 @@ update msg model =
 
                         _ ->
                             ( updatedModel, Cmd.none )
+
+                finalModel : Model
+                finalModel =
+                    Tuple.first finalResult
+
+                advanceCmd : Cmd Msg
+                advanceCmd =
+                    Tuple.second finalResult
             in
             ( finalModel, Cmd.batch [ payloadCmd saveAccount payload, advanceCmd ] )
 
         DeleteAccount accountId ->
             let
-                ( updatedModel, payload ) =
+                deleteResult : ( Model, Maybe Encode.Value )
+                deleteResult =
                     Accounts.delete accountId model
             in
-            ( updatedModel, payloadCmd deleteAccount payload )
+            ( Tuple.first deleteResult, payloadCmd deleteAccount (Tuple.second deleteResult) )
 
         SelectLedger ledgerId ->
             ( Ledgers.select ledgerId model
@@ -326,33 +341,38 @@ update msg model =
 
         SaveLedgerName ->
             let
-                ( updatedModel, payload ) =
+                renameResult : ( Model, Maybe Encode.Value )
+                renameResult =
                     Ledgers.rename model
             in
-            ( updatedModel, payloadCmd updateLedgerName payload )
+            ( Tuple.first renameResult, payloadCmd updateLedgerName (Tuple.second renameResult) )
 
         UpdateInviteEmail email ->
             ( { model | inviteEmail = email }, Cmd.none )
 
         InviteGuest ->
             let
-                ( updatedModel, payload ) =
+                inviteResult : ( Model, Maybe Encode.Value )
+                inviteResult =
                     Ledgers.inviteGuest model
             in
-            ( updatedModel, payloadCmd inviteLedgerGuest payload )
+            ( Tuple.first inviteResult, payloadCmd inviteLedgerGuest (Tuple.second inviteResult) )
 
         RemoveGuest uid ->
             let
-                ( updatedModel, payload ) =
+                removeResult : ( Model, Maybe Encode.Value )
+                removeResult =
                     Ledgers.removeGuest uid model
             in
-            ( updatedModel, payloadCmd removeLedgerGuest payload )
+            ( Tuple.first removeResult, payloadCmd removeLedgerGuest (Tuple.second removeResult) )
 
         ToggleAccountFilter accountId ->
             let
+                hidden : List String
                 hidden =
                     model.hiddenAccountIds
 
+                updatedHidden : List String
                 updatedHidden =
                     if List.member accountId hidden then
                         List.filter (\id -> id /= accountId) hidden
@@ -413,45 +433,20 @@ update msg model =
                 NoMigration ->
                     ( model, Cmd.none )
 
-        TutorialNext ->
-            case model.tutorialState of
-                TutorialOpen step ->
-                    Tutorial.advanceTutorialFrom tutorialConfig step model
-
-                _ ->
-                    ( model, Cmd.none )
-
-        TutorialBack ->
-            case model.tutorialState of
-                TutorialOpen step ->
-                    Tutorial.tutorialNavigateTo tutorialConfig (Tutorial.previousStep step) model
-
-                _ ->
-                    ( model, Cmd.none )
-
-        TutorialSkip ->
-            case model.tutorialState of
-                TutorialOpen step ->
-                    Tutorial.skipTutorialFrom tutorialConfig step model
-
-                _ ->
-                    ( model, Cmd.none )
-
-        TutorialFinish ->
-            Tutorial.handleTutorialAction tutorialConfig (Encode.object [ ( "action", Encode.string "done" ) ]) model
-
         ReopenTutorial ->
             let
+                step : TutorialStep
                 step =
                     Tutorial.reopenedStep model
 
-                ( reopenedModel, navigateCmd ) =
+                reopenResult : ( Model, Cmd Msg )
+                reopenResult =
                     Tutorial.tutorialNavigateTo tutorialConfig step { model | tutorialCompletionVisible = False, tutorialMovementId = Nothing }
             in
-            ( reopenedModel
+            ( Tuple.first reopenResult
             , Cmd.batch
                 [ saveTutorialState (Encode.string "")
-                , navigateCmd
+                , Tuple.second reopenResult
                 ]
             )
 

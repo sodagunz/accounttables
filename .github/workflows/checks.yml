@@ -1,0 +1,23 @@
+name: checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          github_access_tokens: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: nix run .#build
+
+      - run: nix run .#test
+
+      - run: nix run .#format -- --validate
+
+      - run: nix run .#review

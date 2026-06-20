@@ -7,6 +7,7 @@ import Util.Date exposing (pad2)
 formatMoney : Currency -> Float -> String
 formatMoney currency amount =
     let
+        prefix : String
         prefix =
             case currency of
                 ARS ->
@@ -15,6 +16,7 @@ formatMoney currency amount =
                 USD ->
                     "U$D "
 
+        formatted : String
         formatted =
             prefix ++ formatFloat (abs amount)
     in
@@ -28,6 +30,7 @@ formatMoney currency amount =
 formatNumber : Float -> String
 formatNumber amount =
     let
+        formatted : String
         formatted =
             formatFloat (abs amount)
     in
@@ -41,12 +44,15 @@ formatNumber amount =
 formatFloat : Float -> String
 formatFloat amount =
     let
+        cents : Int
         cents =
             round (abs amount * 100)
 
+        whole : Int
         whole =
             cents // 100
 
+        decimal : Int
         decimal =
             modBy 100 cents
     in
@@ -56,9 +62,11 @@ formatFloat amount =
 formatThousands : Int -> String
 formatThousands number =
     let
+        absolute : Int
         absolute =
             abs number
 
+        formatted : String
         formatted =
             formatPositiveThousands absolute
     in

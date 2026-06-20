@@ -1,9 +1,7 @@
-module Projector exposing
-    ( projectEvents
-    )
+module Projector exposing (projectEvents)
 
 import Accounting exposing (Movement)
-import Events exposing (Event(..), MovementCreatedData, MovementDeletedData, MovementUpdatedData, eventSequence)
+import Events exposing (Event(..), MovementCreatedData, MovementUpdatedData, eventSequence)
 
 
 projectEvents : List Event -> List Movement

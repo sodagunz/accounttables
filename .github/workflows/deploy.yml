@@ -1,0 +1,38 @@
+name: deploy
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to deploy (defaults to latest)
+        required: false
+        default: ""
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: resolve ref
+        run: |
+          ref="${REF:-$(git describe --tags --abbrev=0 2>/dev/null || echo "${{ github.event.repository.default_branch }}")}"
+          git checkout "$ref"
+          echo "deploying $ref"
+        env:
+          REF: ${{ inputs.tag || github.ref_name || '' }}
+
+      - uses: cachix/install-nix-action@v27
+        with:
+          github_access_tokens: ${{ secrets.GITHUB_TOKEN }}
+
+      - run: nix run .#build-release
+
+      - run: nix run .#deploy
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}

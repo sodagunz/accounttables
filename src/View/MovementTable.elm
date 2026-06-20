@@ -1,8 +1,8 @@
 module View.MovementTable exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Movement, FilterWindow(..), MoneyTotal, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, movementsFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), FilterWindow(..), MoneyTotal, Movement, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, movementsFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
-import Html.Attributes exposing (attribute, checked, class, classList, for, id, name, type_, value)
+import Html.Attributes exposing (attribute, checked, class, classList, for, id, name, type_)
 import Html.Events exposing (onClick)
 import Util.Date exposing (DateDisplay(..), formatDate)
 import Util.Format exposing (formatMoney, formatNumber)
@@ -24,8 +24,8 @@ type alias Config msg =
     , onSelectSort : SortField -> msg
     , onExportCsv : msg
     , onExportXlsx : msg
-    ,             onDelete : String -> msg
-            , onEdit : String -> msg
+    , onDelete : String -> msg
+    , onEdit : String -> msg
     }
 
 
@@ -64,6 +64,7 @@ expenseTableBody config =
 
     else
         let
+            visibleAccounts : List Account
             visibleAccounts =
                 List.filter (\a -> not (List.member a.id config.hiddenAccountIds)) config.accounts
         in
@@ -117,8 +118,8 @@ filterControls config =
             ]
         , div [ class "report-options" ]
             [ div [ class "segmented-control" ]
-                ([ span [ class "segmented-control__label" ] [ text "Cuenta" ] ]
-                    ++ List.map (accountSegment config) config.accounts
+                (span [ class "segmented-control__label" ] [ text "Cuenta" ]
+                    :: List.map (accountSegment config) config.accounts
                 )
             ]
         , div [ class "report-options" ]
@@ -199,6 +200,7 @@ radioSegment onChange value isActive labelText =
 accountSegment : Config msg -> Account -> Html msg
 accountSegment config account =
     let
+        hidden : Bool
         hidden =
             List.member account.id config.hiddenAccountIds
     in
@@ -244,6 +246,7 @@ movementRow dateDisplay displayCurrency onEdit onDelete movement =
         , td [ attribute "data-label" "Cuenta" ] [ text movement.accountName ]
         , td [ attribute "data-label" "Descripción" ] [ text (descriptionDisplay movement) ]
         , let
+            displayAmount : Float
             displayAmount =
                 case movement.movementType of
                     ExpenseMovement ->
@@ -288,9 +291,11 @@ valueForCurrency currency record =
 formatTotal : Float -> Currency -> String
 formatTotal value currency =
     let
+        number : String
         number =
             formatNumber value
 
+        prefix : String
         prefix =
             currencyToString currency ++ " "
     in
@@ -304,9 +309,11 @@ formatTotal value currency =
 sortableHeader : Config msg -> SortField -> String -> String -> Html msg
 sortableHeader config sortField alignment labelText =
     let
+        active : Bool
         active =
             config.sortField == sortField
 
+        sortIndicator : String
         sortIndicator =
             if active then
                 case config.sortDirection of
@@ -338,6 +345,7 @@ sortableHeader config sortField alignment labelText =
 subtotalRows : List Account -> List Movement -> Currency -> List (Html msg)
 subtotalRows accounts expenses displayCurrency =
     let
+        grandTotal : MoneyTotal
         grandTotal =
             summarizeMoney expenses
     in
@@ -348,6 +356,7 @@ subtotalRows accounts expenses displayCurrency =
 totalRow : Currency -> String -> String -> MoneyTotal -> Html msg
 totalRow displayCurrency labelText rowClass total =
     let
+        totalValue : Float
         totalValue =
             valueForCurrency displayCurrency total
     in

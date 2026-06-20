@@ -7,16 +7,14 @@ module Model exposing
     , activeAccounts
     , activeAccountsFromList
     , activeMovements
-    , defaultAccounts
     , ensureSelectedAccount
     , initial
     , ledgerNameFor
-    , sampleMovementsForModel
     , selectedLedgerId
     , visibleMovements
     )
 
-import Accounting exposing (Account, Currency(..), Movement, FilterWindow(..), Form, SortDirection(..), SortField(..))
+import Accounting exposing (Account, Currency(..), FilterWindow(..), Form, Movement, SortDirection(..), SortField(..))
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Auth exposing (AuthState(..))
 import Events exposing (Event)
@@ -123,15 +121,6 @@ visibleMovements model =
     Accounting.filteredMovements { model | expenses = activeMovements model.expenses }
         |> List.filter (\e -> not (List.member e.accountId model.hiddenAccountIds))
         |> Accounting.sortMovements model.sortField model.sortDirection
-
-
-sampleMovementsForModel : Model -> List Movement
-sampleMovementsForModel model =
-    if model.today == "" then
-        []
-
-    else
-        Accounting.sampleMovements model.exchangeRate model.today model.accounts
 
 
 defaultAccounts : List Account

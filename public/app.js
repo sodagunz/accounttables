@@ -1424,21 +1424,71 @@ function loadLedgerCache(uid, ledgerId) {
 function loadStartupLedgerCache() {
     try {
         const localLedger = loadLocalLedgerCache();
-        if (localLedger) {
+        if (hasLocalLedgerData(localLedger)) {
             return localLedger;
         }
 
-        const rawSession = localStorage.getItem(LAST_SESSION_KEY);
-        if (!rawSession) {
-            return null;
+        const sessionLedger = loadLastSessionLedgerCache();
+        if (sessionLedger) {
+            return sessionLedger;
         }
 
-        const session = JSON.parse(rawSession);
-        return loadLedgerCache(session?.uid, session?.ledgerId);
+        return loadMostRecentLedgerCache();
     } catch (error) {
         console.warn("Could not load startup ledger cache", error);
         return null;
     }
+}
+
+function loadLastSessionLedgerCache() {
+    const rawSession = localStorage.getItem(LAST_SESSION_KEY);
+    if (!rawSession) {
+        return null;
+    }
+
+    const session = JSON.parse(rawSession);
+    return loadLedgerCache(session?.uid, session?.ledgerId);
+}
+
+function loadMostRecentLedgerCache() {
+    let latest = null;
+    let latestSyncedAt = "";
+    const keyPrefix = "contabilizar:ledger:";
+
+    for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (!key?.startsWith(keyPrefix)) {
+            continue;
+        }
+
+        try {
+            const cache = JSON.parse(localStorage.getItem(key));
+            if (
+                cache?.schemaVersion !== LEDGER_CACHE_SCHEMA_VERSION ||
+                cache?.payload?.status !== "loaded" ||
+                !cache?.payload?.ledgerId
+            ) {
+                continue;
+            }
+
+            const syncedAt = String(cache.syncedAt || "");
+            if (!latest || syncedAt > latestSyncedAt) {
+                latest = cache.payload;
+                latestSyncedAt = syncedAt;
+            }
+        } catch (error) {
+            console.warn("Could not inspect cached ledger", key, error);
+        }
+    }
+
+    if (!latest) {
+        return null;
+    }
+
+    return {
+        ...latest,
+        lastAccountId: loadLastAccountId(latest.ledgerId) || latest.lastAccountId || null,
+    };
 }
 
 function saveLastSession(uid, ledgerId) {

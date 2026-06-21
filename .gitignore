@@ -5,3 +5,4 @@ elm.js
 public/elm*.js
 firebase-debug.log
 .firebase/
+backups/

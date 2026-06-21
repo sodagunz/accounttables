@@ -717,24 +717,24 @@ Avoid:
 
 ## Implementation steps
 
-1. [ ] Add allocation union types and JSON encoders/decoders.
-2. [ ] Extend `Movement`/`Form` with `allocationIntent`.
+1. [x] Add allocation union types and JSON encoders/decoders.
+2. [x] Extend `Movement`/`Form` with `allocationIntent`.
 3. [ ] Add UI state and picker wiring for invoice/credit-note selections.
 4. [ ] Implement save-time auto-target resolution with source/reason audit fields.
 5. [ ] Generate descriptions from selected/resolved documents for related cashflows.
 6. [ ] Add credit-note invoice picker with same-account and same-currency validation.
-7. [ ] Build pure allocation/status module.
-8. [ ] Integrate ledger-wide statuses into invoice table rows.
-9. [ ] Adjust invoice period summaries to aggregate displayed documents only.
+7. [x] Build pure allocation/status module.
+8. [x] Integrate ledger-wide statuses into invoice table rows.
+9. [x] Adjust invoice period summaries to aggregate displayed documents only.
 10. [ ] Add pre-save warning messages for over/under allocation.
-11. [ ] Update export to include statuses and remaining due.
+11. [x] Update export to include statuses and remaining due.
 12. [ ] Add migration helpers/reporting for legacy related cashflows.
-13. [ ] Add tests listed above.
-14. [ ] Validate:
-    - `nix run .#format -- --validate`
-    - `nix run .#test`
-    - `nix run .#review`
-    - `nix run .#build`
+13. [ ] Add tests listed above. (Partial: allocation projector and invoice report tests are in place.)
+14. [ ] Validate after each checkpoint:
+    - [x] `nix run .#format -- --validate` after invoice report/status checkpoint
+    - [x] `nix run .#test` after invoice report/status checkpoint
+    - [x] `nix run .#review` after invoice report/status checkpoint
+    - [x] `nix run .#build` after invoice report/status checkpoint
 
 ## Remaining rough edges
 

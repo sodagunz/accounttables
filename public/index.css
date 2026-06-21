@@ -1062,6 +1062,10 @@ table {
     min-width: 750px;
 }
 
+.invoice-table {
+    min-width: 1050px;
+}
+
 th,
 td {
     padding: 11px 10px;
@@ -1181,6 +1185,36 @@ th.numeric {
 td:first-child,
 th:first-child {
     white-space: nowrap;
+}
+
+.invoice-status {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.76rem;
+    font-weight: 800;
+    line-height: 1.35;
+    white-space: nowrap;
+}
+
+.invoice-status--pending {
+    background: #f1f5f3;
+    color: #46524e;
+}
+
+.invoice-status--partial {
+    background: #fff7ed;
+    color: #9a3412;
+}
+
+.invoice-status--full {
+    background: #e7f2ee;
+    color: #17624f;
+}
+
+.invoice-status--over {
+    background: #fde8e8;
+    color: #b91c1c;
 }
 
 .subtotal td {
@@ -1375,7 +1409,8 @@ td.is-negative,
         order: 1;
     }
 
-    .expense-table {
+    .expense-table,
+    .invoice-table {
         min-width: 0;
         border-collapse: separate;
         border-spacing: 0 10px;

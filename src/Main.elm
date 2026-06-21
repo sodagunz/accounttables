@@ -576,7 +576,7 @@ exportVisibleTable format model =
 
 exportInvoices : Export.Format -> Model -> Cmd Msg
 exportInvoices format model =
-    exportTable (Export.invoiceTablePayload format model.dateDisplay model.today (Model.visibleInvoiceMovements model) (Model.visibleInvoiceRelatedCashflows model))
+    exportTable (Export.invoiceTablePayload format model.dateDisplay model.today (Model.activeMovements model.expenses) (Model.visibleInvoiceMovements model) (Model.visibleInvoiceRelatedCashflows model))
 
 
 subscriptions : Model -> Sub Msg

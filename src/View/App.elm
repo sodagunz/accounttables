@@ -143,7 +143,8 @@ view config model =
                                     Model.visibleInvoiceRelatedCashflows model
                             in
                             InvoiceTable.view
-                                { invoices = invoiceRows
+                                { allMovements = Model.activeMovements model.expenses
+                                , invoices = invoiceRows
                                 , relatedCashflows = relatedCashflows
                                 , dateDisplay = model.dateDisplay
                                 , displayCurrency = model.displayCurrency

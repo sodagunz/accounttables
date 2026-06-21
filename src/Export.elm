@@ -1,6 +1,7 @@
 module Export exposing (Format(..), invoiceTablePayload, tablePayload)
 
-import Accounting exposing (Account, Currency(..), MoneyTotal, Movement, MovementType(..), descriptionDisplay, invoiceTotal, movementsFor, negateMoney, summarizeMoney)
+import Accounting exposing (Account, Currency(..), MoneyTotal, Movement, MovementType(..), descriptionDisplay, movementsFor, summarizeMoney)
+import InvoiceReport
 import Json.Encode as Encode
 import Util.Date exposing (DateDisplay, formatDate)
 import Util.Format exposing (formatMoney)
@@ -109,14 +110,19 @@ totalRow labelText label total =
     }
 
 
-invoiceTablePayload : Format -> DateDisplay -> String -> List Movement -> List Movement -> Encode.Value
-invoiceTablePayload format dateDisplay today invoices relatedCashflows =
+invoiceTablePayload : Format -> DateDisplay -> String -> List Movement -> List Movement -> List Movement -> Encode.Value
+invoiceTablePayload format dateDisplay today allMovements invoices relatedCashflows =
+    let
+        report : InvoiceReport.Report
+        report =
+            InvoiceReport.build allMovements invoices relatedCashflows
+    in
     Encode.object
         [ ( "format", Encode.string (formatToString format) )
         , ( "filename", Encode.string (invoicesFilename format today) )
         , ( "sheetName", Encode.string "Facturas" )
         , ( "headers", Encode.list Encode.string invoiceHeaders )
-        , ( "rows", Encode.list rowEncoder (invoiceRows dateDisplay invoices ++ invoiceSummaryRows invoices relatedCashflows) )
+        , ( "rows", Encode.list rowEncoder (invoiceRows dateDisplay report.rows ++ invoiceSummaryRows report.summary) )
         ]
 
 
@@ -140,21 +146,27 @@ invoiceHeaders =
     , "Cuenta"
     , "Número"
     , "Descripción"
+    , "Estado"
     , "Ingresado"
+    , "Pendiente"
     , "Cotización (USD/ARS)"
     , "Pesos (ARS)"
     , "Dólar (USD)"
     ]
 
 
-invoiceRows : DateDisplay -> List Movement -> List TableRow
-invoiceRows dateDisplay movements =
-    List.map (invoiceRow dateDisplay) movements
+invoiceRows : DateDisplay -> List InvoiceReport.DocumentRow -> List TableRow
+invoiceRows dateDisplay rows =
+    List.map (invoiceRow dateDisplay) rows
 
 
-invoiceRow : DateDisplay -> Movement -> TableRow
-invoiceRow dateDisplay movement =
+invoiceRow : DateDisplay -> InvoiceReport.DocumentRow -> TableRow
+invoiceRow dateDisplay documentRow =
     let
+        movement : Movement
+        movement =
+            documentRow.movement
+
         displayAmount : Float
         displayAmount =
             case movement.movementType of
@@ -186,7 +198,9 @@ invoiceRow dateDisplay movement =
         , movement.accountName
         , movement.documentNumber |> Maybe.withDefault ""
         , descriptionDisplay movement
+        , documentRow.statusLabel
         , formatMoney movement.inputCurrency displayAmount
+        , formatMoney documentRow.settlement.currency documentRow.settlement.remainingDue
         , formatMoney ARS movement.exchangeRate
         , formatMoney ARS movement.ars
         , formatMoney USD movement.usd
@@ -194,38 +208,13 @@ invoiceRow dateDisplay movement =
     }
 
 
-invoiceSummaryRows : List Movement -> List Movement -> List TableRow
-invoiceSummaryRows invoices relatedCashflows =
-    let
-        facturasTotal : MoneyTotal
-        facturasTotal =
-            invoices
-                |> List.filter (\m -> m.movementType == SupplierInvoiceMovement)
-                |> summarizeMoney
-
-        creditNotesTotal : MoneyTotal
-        creditNotesTotal =
-            invoices
-                |> List.filter (\m -> m.movementType == SupplierCreditNoteMovement)
-                |> summarizeMoney
-
-        invoiceSum : MoneyTotal
-        invoiceSum =
-            summarizeMoney invoices
-
-        paymentSum : MoneyTotal
-        paymentSum =
-            summarizeMoney relatedCashflows
-
-        payable : MoneyTotal
-        payable =
-            invoiceTotal invoices relatedCashflows
-    in
-    [ summaryRow "Total facturas" facturasTotal
-    , summaryRow "Total notas de crédito" creditNotesTotal
-    , summaryRow "Total documentos" invoiceSum
-    , summaryRow "Movimientos relacionados" (negateMoney paymentSum)
-    , summaryRow "A pagar" payable
+invoiceSummaryRows : InvoiceReport.Summary -> List TableRow
+invoiceSummaryRows summary =
+    [ summaryRow "Total facturas" summary.facturasTotal
+    , summaryRow "Total notas de crédito" summary.creditNotesTotal
+    , summaryRow "Total documentos" summary.documentsTotal
+    , summaryRow summary.settlementContributionLabel summary.settlementContribution
+    , summaryRow "A pagar" summary.payable
     ]
 
 
@@ -234,6 +223,8 @@ summaryRow labelText total =
     { label = "summary"
     , cells =
         [ labelText
+        , ""
+        , ""
         , ""
         , ""
         , ""

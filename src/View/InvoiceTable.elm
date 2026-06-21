@@ -1,15 +1,18 @@
 module View.InvoiceTable exposing (Config, view)
 
-import Accounting exposing (Currency(..), MoneyTotal, Movement, MovementType(..), SortDirection, SortField, currencyToString, descriptionDisplay, invoiceTotal, negateMoney, summarizeMoney)
+import Accounting exposing (Currency(..), Movement, MovementType(..), SortDirection, SortField, currencyToString, descriptionDisplay)
 import Html exposing (Html, button, div, p, section, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, class, classList, type_)
 import Html.Events exposing (onClick)
+import InvoiceAllocation exposing (DocumentStatus(..))
+import InvoiceReport
 import Util.Date exposing (DateDisplay, formatDate)
 import Util.Format exposing (formatMoney, formatNumber)
 
 
 type alias Config msg =
-    { invoices : List Movement
+    { allMovements : List Movement
+    , invoices : List Movement
     , relatedCashflows : List Movement
     , dateDisplay : DateDisplay
     , displayCurrency : Currency
@@ -46,41 +49,21 @@ view config =
 invoiceTableBody : Config msg -> Html msg
 invoiceTableBody config =
     let
-        sortedInvoices : List Movement
-        sortedInvoices =
-            List.sortBy .date config.invoices
+        report : InvoiceReport.Report
+        report =
+            InvoiceReport.build config.allMovements config.invoices config.relatedCashflows
 
-        invoiceTotal_ : MoneyTotal
-        invoiceTotal_ =
-            summarizeMoney config.invoices
+        sortedRows : List InvoiceReport.DocumentRow
+        sortedRows =
+            List.sortBy (\document -> document.movement.date) report.rows
 
-        relatedTotal : MoneyTotal
-        relatedTotal =
-            summarizeMoney config.relatedCashflows
-
-        relatedContribution : MoneyTotal
-        relatedContribution =
-            negateMoney relatedTotal
-
-        payable : MoneyTotal
-        payable =
-            invoiceTotal config.invoices config.relatedCashflows
-
-        facturasTotal : MoneyTotal
-        facturasTotal =
-            config.invoices
-                |> List.filter (\m -> m.movementType == SupplierInvoiceMovement)
-                |> summarizeMoney
-
-        creditNotesTotal : MoneyTotal
-        creditNotesTotal =
-            config.invoices
-                |> List.filter (\m -> m.movementType == SupplierCreditNoteMovement)
-                |> summarizeMoney
+        summary : InvoiceReport.Summary
+        summary =
+            report.summary
     in
     div []
         [ div [ class "table-wrap" ]
-            [ table [ class "expense-table" ]
+            [ table [ class "expense-table invoice-table" ]
                 [ thead []
                     [ tr []
                         [ th [] [ span [] [ text "Vencimiento" ] ]
@@ -88,28 +71,34 @@ invoiceTableBody config =
                         , th [] [ span [] [ text "Cuenta" ] ]
                         , th [] [ span [] [ text "Número" ] ]
                         , th [] [ span [] [ text "Descripción" ] ]
+                        , th [] [ span [] [ text "Estado" ] ]
                         , th [ class "numeric" ] [ span [] [ text "Ingresado" ] ]
+                        , th [ class "numeric" ] [ span [] [ text "Pendiente" ] ]
                         , th [ class "numeric" ] [ span [] [ text "Cotización" ] ]
                         , th [ class "numeric" ] [ span [] [ text "Total" ] ]
                         , th [ class "actions-header" ] [ span [] [ text "Acciones" ] ]
                         ]
                     ]
                 , tbody []
-                    (List.map (row config.dateDisplay config.displayCurrency config.onEdit config.onDelete) sortedInvoices
-                        ++ summaryRow "Total facturas" (valueForCurrency config.displayCurrency facturasTotal) config.displayCurrency
-                        ++ summaryRow "Total notas de crédito" (valueForCurrency config.displayCurrency creditNotesTotal) config.displayCurrency
-                        ++ summaryRow "Total documentos" (valueForCurrency config.displayCurrency invoiceTotal_) config.displayCurrency
-                        ++ summaryRow "Movimientos relacionados" (valueForCurrency config.displayCurrency relatedContribution) config.displayCurrency
-                        ++ payableRow "A pagar" (valueForCurrency config.displayCurrency payable) config.displayCurrency
+                    (List.map (row config.dateDisplay config.displayCurrency config.onEdit config.onDelete) sortedRows
+                        ++ summaryRow "Total facturas" (valueForCurrency config.displayCurrency summary.facturasTotal) config.displayCurrency
+                        ++ summaryRow "Total notas de crédito" (valueForCurrency config.displayCurrency summary.creditNotesTotal) config.displayCurrency
+                        ++ summaryRow "Total documentos" (valueForCurrency config.displayCurrency summary.documentsTotal) config.displayCurrency
+                        ++ summaryRow summary.settlementContributionLabel (valueForCurrency config.displayCurrency summary.settlementContribution) config.displayCurrency
+                        ++ payableRow "A pagar" (valueForCurrency config.displayCurrency summary.payable) config.displayCurrency
                     )
                 ]
             ]
         ]
 
 
-row : DateDisplay -> Currency -> (String -> msg) -> (String -> msg) -> Movement -> Html msg
-row dateDisplay displayCurrency onEdit onDelete movement =
+row : DateDisplay -> Currency -> (String -> msg) -> (String -> msg) -> InvoiceReport.DocumentRow -> Html msg
+row dateDisplay displayCurrency onEdit onDelete documentRow =
     let
+        movement : Movement
+        movement =
+            documentRow.movement
+
         displayAmount : Float
         displayAmount =
             case movement.movementType of
@@ -140,7 +129,24 @@ row dateDisplay displayCurrency onEdit onDelete movement =
         , td [ attribute "data-label" "Cuenta" ] [ text movement.accountName ]
         , td [ attribute "data-label" "Número" ] [ text (movement.documentNumber |> Maybe.withDefault "-") ]
         , td [ attribute "data-label" "Descripción" ] [ text (descriptionDisplay movement) ]
+        , td [ attribute "data-label" "Estado" ]
+            [ span
+                [ classList
+                    [ ( "invoice-status", True )
+                    , ( statusClass documentRow.settlement.status, True )
+                    ]
+                ]
+                [ text documentRow.statusLabel ]
+            ]
         , td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney movement.inputCurrency displayAmount) ]
+        , td
+            [ attribute "data-label" "Pendiente"
+            , classList
+                [ ( "numeric", True )
+                , ( "is-negative", documentRow.settlement.remainingDue < 0 )
+                ]
+            ]
+            [ text (formatMoney documentRow.settlement.currency documentRow.settlement.remainingDue) ]
         , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber movement.exchangeRate) ]
         , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency movement)) ]
         , td [ class "action-cell", attribute "data-label" "" ]
@@ -160,6 +166,22 @@ row dateDisplay displayCurrency onEdit onDelete movement =
                 ]
             ]
         ]
+
+
+statusClass : DocumentStatus -> String
+statusClass status =
+    case status of
+        Pending ->
+            "invoice-status--pending"
+
+        PartiallySettled ->
+            "invoice-status--partial"
+
+        FullySettled ->
+            "invoice-status--full"
+
+        OverSettled ->
+            "invoice-status--over"
 
 
 valueForCurrency : Currency -> { a | ars : Float, usd : Float } -> Float
@@ -193,7 +215,7 @@ formatTotal value currency =
 summaryRow : String -> Float -> Currency -> List (Html msg)
 summaryRow label value displayCurrency =
     [ tr [ class "subtotal" ]
-        [ td [ attribute "colspan" "7", attribute "data-label" label ] [ text label ]
+        [ td [ attribute "colspan" "9", attribute "data-label" label ] [ text label ]
         , td
             [ attribute "data-label" "Total"
             , classList
@@ -210,7 +232,7 @@ summaryRow label value displayCurrency =
 payableRow : String -> Float -> Currency -> List (Html msg)
 payableRow label value displayCurrency =
     [ tr [ class "grand-total" ]
-        [ td [ attribute "colspan" "7", attribute "data-label" label ] [ text label ]
+        [ td [ attribute "colspan" "9", attribute "data-label" label ] [ text label ]
         , td
             [ attribute "data-label" "Total"
             , classList

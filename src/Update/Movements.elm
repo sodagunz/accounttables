@@ -92,6 +92,7 @@ persistMovement config readyModel movement =
                                 , date = movement.date
                                 , relatedToInvoice = movement.relatedToInvoice
                                 , documentNumber = movement.documentNumber
+                                , allocationIntent = movement.allocationIntent
                                 }
 
                         updatedMovements : List Accounting.Movement
@@ -131,6 +132,7 @@ persistMovement config readyModel movement =
                                 , date = movement.date
                                 , relatedToInvoice = movement.relatedToInvoice
                                 , documentNumber = movement.documentNumber
+                                , allocationIntent = movement.allocationIntent
                                 }
                     in
                     ( createEvent
@@ -179,6 +181,7 @@ persistMovement config readyModel movement =
             , editingId = Nothing
             , relatedToInvoice = False
             , documentNumber = ""
+            , allocationIntent = Nothing
             }
         , error = ""
       }

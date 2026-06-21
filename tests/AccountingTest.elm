@@ -34,6 +34,7 @@ suite =
                         , editingId = Nothing
                         , relatedToInvoice = False
                         , documentNumber = ""
+                        , allocationIntent = Nothing
                         }
 
                     accounts : List Account
@@ -70,6 +71,7 @@ suite =
                         , editingId = Nothing
                         , relatedToInvoice = True
                         , documentNumber = ""
+                        , allocationIntent = Nothing
                         }
 
                     accounts : List Account
@@ -96,6 +98,7 @@ suite =
                         , editingId = Nothing
                         , relatedToInvoice = True
                         , documentNumber = "  ABC-123  "
+                        , allocationIntent = Nothing
                         }
 
                     accounts : List Account
@@ -126,6 +129,7 @@ suite =
                         , editingId = Nothing
                         , relatedToInvoice = False
                         , documentNumber = "should-be-ignored"
+                        , allocationIntent = Nothing
                         }
 
                     accounts : List Account
@@ -152,6 +156,7 @@ suite =
                         , editingId = Nothing
                         , relatedToInvoice = False
                         , documentNumber = "  NC-001  "
+                        , allocationIntent = Nothing
                         }
 
                     accounts : List Account
@@ -178,6 +183,7 @@ suite =
                         , editingId = Nothing
                         , relatedToInvoice = False
                         , documentNumber = "  "
+                        , allocationIntent = Nothing
                         }
 
                     accounts : List Account
@@ -204,6 +210,7 @@ suite =
                         , editingId = Nothing
                         , relatedToInvoice = False
                         , documentNumber = ""
+                        , allocationIntent = Nothing
                         }
 
                     accounts : List Account
@@ -245,6 +252,7 @@ suite =
                         , deletedAt = Nothing
                         , relatedToInvoice = False
                         , documentNumber = Nothing
+                        , allocationIntent = Nothing
                         }
                 in
                 Accounting.isCashflowMovement movement
@@ -268,6 +276,7 @@ suite =
                         , deletedAt = Nothing
                         , relatedToInvoice = False
                         , documentNumber = Nothing
+                        , allocationIntent = Nothing
                         }
                 in
                 Accounting.isInvoiceMovement movement
@@ -291,6 +300,7 @@ suite =
                         , deletedAt = Nothing
                         , relatedToInvoice = True
                         , documentNumber = Nothing
+                        , allocationIntent = Nothing
                         }
                 in
                 Accounting.isInvoiceRelatedCashflow movement
@@ -314,6 +324,7 @@ suite =
                         , deletedAt = Nothing
                         , relatedToInvoice = False
                         , documentNumber = Nothing
+                        , allocationIntent = Nothing
                         }
 
                     payment : Accounting.Movement
@@ -332,6 +343,7 @@ suite =
                         , deletedAt = Nothing
                         , relatedToInvoice = True
                         , documentNumber = Nothing
+                        , allocationIntent = Nothing
                         }
                 in
                 Accounting.invoiceTotal [ invoice ] [ payment ]

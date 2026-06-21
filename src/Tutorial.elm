@@ -339,6 +339,7 @@ prefillMovementForm model =
                 , movementType = Accounting.IncomeMovement
                 , relatedToInvoice = False
                 , documentNumber = ""
+                , allocationIntent = Nothing
                 , editingId = Nothing
             }
     }

@@ -38,6 +38,7 @@ movementCreated data =
     , deletedAt = Nothing
     , relatedToInvoice = data.relatedToInvoice
     , documentNumber = data.documentNumber
+    , allocationIntent = data.allocationIntent
     }
 
 
@@ -67,6 +68,7 @@ applyUpdate data movement =
         , deletedAt = movement.deletedAt
         , relatedToInvoice = data.relatedToInvoice
         , documentNumber = data.documentNumber
+        , allocationIntent = data.allocationIntent
         }
 
     else

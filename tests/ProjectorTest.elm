@@ -30,6 +30,7 @@ suite =
                             , date = "2026-06-16"
                             , relatedToInvoice = False
                             , documentNumber = Nothing
+                            , allocationIntent = Nothing
                             }
                         , MovementCreatedEvent 1
                             { id = "movement-1"
@@ -45,6 +46,7 @@ suite =
                             , date = "2026-06-15"
                             , relatedToInvoice = False
                             , documentNumber = Nothing
+                            , allocationIntent = Nothing
                             }
                         ]
                 in
@@ -83,6 +85,7 @@ suite =
                             , date = "2026-07-01"
                             , relatedToInvoice = False
                             , documentNumber = Just "F001-123"
+                            , allocationIntent = Nothing
                             }
                         ]
                 in

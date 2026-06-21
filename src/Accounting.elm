@@ -37,6 +37,7 @@ module Accounting exposing
     , summarizeMoney
     )
 
+import Allocation exposing (AllocationIntent)
 import Util.Date as Date
 
 
@@ -94,6 +95,7 @@ type alias Movement =
     , deletedAt : Maybe String
     , relatedToInvoice : Bool
     , documentNumber : Maybe String
+    , allocationIntent : Maybe AllocationIntent
     }
 
 
@@ -114,6 +116,7 @@ type alias Form =
     , editingId : Maybe String
     , relatedToInvoice : Bool
     , documentNumber : String
+    , allocationIntent : Maybe AllocationIntent
     }
 
 
@@ -134,6 +137,7 @@ emptyForm =
     , editingId = Nothing
     , relatedToInvoice = False
     , documentNumber = ""
+    , allocationIntent = Nothing
     }
 
 
@@ -188,6 +192,7 @@ movementToForm movement =
     , editingId = Just movement.id
     , relatedToInvoice = movement.relatedToInvoice
     , documentNumber = movement.documentNumber |> Maybe.withDefault ""
+    , allocationIntent = movement.allocationIntent
     }
 
 
@@ -249,6 +254,17 @@ buildMovement exchangeRate id accounts form =
 
                                 else
                                     Nothing
+
+                            resolvedAllocationIntent : Maybe AllocationIntent
+                            resolvedAllocationIntent =
+                                if form.movementType == SupplierInvoiceMovement then
+                                    Nothing
+
+                                else if isInvoiceType || form.relatedToInvoice then
+                                    form.allocationIntent
+
+                                else
+                                    Nothing
                         in
                         Ok
                             { id = id
@@ -275,6 +291,7 @@ buildMovement exchangeRate id accounts form =
                                 else
                                     form.relatedToInvoice
                             , documentNumber = resolvedDocumentNumber
+                            , allocationIntent = resolvedAllocationIntent
                             }
 
 

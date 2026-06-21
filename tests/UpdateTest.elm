@@ -204,4 +204,5 @@ sampleMovement =
     , deletedAt = Nothing
     , relatedToInvoice = False
     , documentNumber = Nothing
+    , allocationIntent = Nothing
     }

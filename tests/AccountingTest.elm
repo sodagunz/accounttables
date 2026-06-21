@@ -1,6 +1,7 @@
 module AccountingTest exposing (suite)
 
 import Accounting exposing (Account, Currency(..), Form, MovementType(..))
+import Allocation exposing (AllocationStrategy(..), TargetSelectionSource(..))
 import Expect
 import Test exposing (Test, describe, test)
 
@@ -219,6 +220,33 @@ suite =
                 in
                 Accounting.buildMovement 1000 "movement-1" accounts form
                     |> Expect.equal (Err "Selecciona una cuenta.")
+        , test "toggleAllocationTarget stores user-selected allocation intent" <|
+            \_ ->
+                let
+                    updatedForm : Form
+                    updatedForm =
+                        Accounting.emptyForm
+                            |> Accounting.toggleAllocationTarget "inv-1" True
+                            |> Accounting.toggleAllocationTarget "inv-2" True
+                in
+                case updatedForm.allocationIntent of
+                    Just intent ->
+                        Expect.all
+                            [ \actual -> Expect.equal [ "inv-1", "inv-2" ] actual.targetIds
+                            , \actual -> Expect.equal UserSelectedTargets actual.targetSelectionSource
+                            , \actual -> Expect.equal OldestDueFirstThenOverpayOldest actual.strategy
+                            ]
+                            intent
+
+                    Nothing ->
+                        Expect.fail "Expected allocation intent"
+        , test "setAccount clears selected allocation targets" <|
+            \_ ->
+                Accounting.emptyForm
+                    |> Accounting.toggleAllocationTarget "inv-1" True
+                    |> Accounting.setAccount "new-account"
+                    |> .allocationIntent
+                    |> Expect.equal Nothing
         , test "movementTypeFromString round-trips SupplierInvoice" <|
             \_ ->
                 Accounting.movementTypeToString SupplierInvoiceMovement

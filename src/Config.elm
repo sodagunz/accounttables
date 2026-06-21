@@ -35,6 +35,7 @@ type alias Messages msg =
     , movementType : Accounting.MovementType -> msg
     , relatedToInvoice : Bool -> msg
     , documentNumber : String -> msg
+    , allocationTarget : String -> Bool -> msg
     , submitMovement : msg
     , cancelEdit : msg
     , selectFilter : FilterWindow -> msg
@@ -95,6 +96,7 @@ view messages =
     , onMovementType = messages.movementType
     , onRelatedToInvoice = messages.relatedToInvoice
     , onDocumentNumber = messages.documentNumber
+    , onToggleAllocationTarget = messages.allocationTarget
     , onSubmitMovement = messages.submitMovement
     , onCancelEdit = messages.cancelEdit
     , onSelectFilter = messages.selectFilter

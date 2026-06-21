@@ -1,10 +1,11 @@
 module View.MovementForm exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), Form, MovementType(..), currencyToString, movementTypeToString)
+import Accounting exposing (Account, Currency(..), Form, Movement, MovementType(..), currencyToString, movementTypeToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Html exposing (Html, button, div, input, label, option, p, section, select, span, strong, text)
 import Html.Attributes exposing (attribute, autofocus, checked, class, classList, name, step, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
+import InvoiceReport
 import Time
 import Util.Date as Date
 import Util.Format exposing (formatMoney)
@@ -13,6 +14,7 @@ import Util.Format exposing (formatMoney)
 type alias Config msg =
     { form : Form
     , accounts : List Account
+    , movements : List Movement
     , exchangeRate : Float
     , exchangeRateStatus : ExchangeRateStatus
     , zone : Time.Zone
@@ -26,6 +28,7 @@ type alias Config msg =
     , onMovementType : MovementType -> msg
     , onRelatedToInvoice : Bool -> msg
     , onDocumentNumber : String -> msg
+    , onToggleAllocationTarget : String -> Bool -> msg
     , onSubmit : msg
     , onCancel : msg
     }
@@ -204,6 +207,7 @@ view config =
 
               else
                 text ""
+            , allocationPicker config selectedAccountId
             , exchangeRateView config
             , p [ class "error" ] [ text config.error ]
             , let
@@ -223,6 +227,221 @@ view config =
                 text ""
             ]
         ]
+
+
+type PickerMode
+    = ExpenseInvoiceTargets
+    | IncomeCreditNoteTargets
+    | CreditNoteInvoiceTargets
+
+
+allocationPicker : Config msg -> String -> Html msg
+allocationPicker config selectedAccountId =
+    case pickerMode config.form of
+        Nothing ->
+            text ""
+
+        Just mode ->
+            let
+                rows : List InvoiceReport.DocumentRow
+                rows =
+                    allocationRows config selectedAccountId mode
+            in
+            div [ class "allocation-picker" ]
+                [ div [ class "allocation-picker__header" ]
+                    [ strong [] [ text (pickerTitle mode) ]
+                    , span [] [ text (pickerHelp mode) ]
+                    ]
+                , if List.isEmpty rows then
+                    p [ class "allocation-picker__empty" ] [ text (pickerEmptyText mode) ]
+
+                  else
+                    div [ class "allocation-picker__list" ]
+                        (List.map (allocationTargetRow config) rows)
+                ]
+
+
+pickerMode : Form -> Maybe PickerMode
+pickerMode form =
+    case form.movementType of
+        ExpenseMovement ->
+            if form.relatedToInvoice then
+                Just ExpenseInvoiceTargets
+
+            else
+                Nothing
+
+        IncomeMovement ->
+            if form.relatedToInvoice then
+                Just IncomeCreditNoteTargets
+
+            else
+                Nothing
+
+        SupplierCreditNoteMovement ->
+            Just CreditNoteInvoiceTargets
+
+        SupplierInvoiceMovement ->
+            Nothing
+
+
+allocationRows : Config msg -> String -> PickerMode -> List InvoiceReport.DocumentRow
+allocationRows config selectedAccountId mode =
+    let
+        candidates : List Movement
+        candidates =
+            config.movements
+                |> List.filter (eligibleAllocationTarget config.form selectedAccountId mode)
+                |> List.sortWith compareByDateThenId
+    in
+    InvoiceReport.build config.movements candidates []
+        |> .rows
+        |> List.sortWith compareDocumentRowsByDateThenId
+
+
+eligibleAllocationTarget : Form -> String -> PickerMode -> Movement -> Bool
+eligibleAllocationTarget form selectedAccountId mode movement =
+    movement.deletedAt
+        == Nothing
+        && movement.accountId
+        == selectedAccountId
+        && movement.movementType
+        == targetMovementType mode
+        && (case mode of
+                CreditNoteInvoiceTargets ->
+                    movement.inputCurrency == form.currency
+
+                _ ->
+                    True
+           )
+
+
+targetMovementType : PickerMode -> MovementType
+targetMovementType mode =
+    case mode of
+        ExpenseInvoiceTargets ->
+            SupplierInvoiceMovement
+
+        IncomeCreditNoteTargets ->
+            SupplierCreditNoteMovement
+
+        CreditNoteInvoiceTargets ->
+            SupplierInvoiceMovement
+
+
+allocationTargetRow : Config msg -> InvoiceReport.DocumentRow -> Html msg
+allocationTargetRow config documentRow =
+    let
+        movement : Movement
+        movement =
+            documentRow.movement
+
+        selected : Bool
+        selected =
+            selectedTargetIds config.form
+                |> List.member movement.id
+    in
+    label
+        [ class "allocation-target-row"
+        , classList [ ( "allocation-target-row--selected", selected ) ]
+        ]
+        [ input
+            [ type_ "checkbox"
+            , checked selected
+            , onClick (config.onToggleAllocationTarget movement.id (not selected))
+            ]
+            []
+        , div [ class "allocation-target-row__body" ]
+            [ span [ class "allocation-target-row__title" ] [ text (documentTitle movement) ]
+            , span [ class "allocation-target-row__meta" ]
+                [ text
+                    ("Vence "
+                        ++ Date.formatDate Date.NumericDate movement.date
+                        ++ " · "
+                        ++ formatMoney movement.inputCurrency movement.inputAmount
+                    )
+                ]
+            , span [ class "allocation-target-row__meta" ]
+                [ text
+                    ("Estado: "
+                        ++ documentRow.statusLabel
+                        ++ " · Pendiente: "
+                        ++ formatMoney documentRow.settlement.currency documentRow.settlement.remainingDue
+                    )
+                ]
+            ]
+        ]
+
+
+selectedTargetIds : Form -> List String
+selectedTargetIds form =
+    form.allocationIntent
+        |> Maybe.map .targetIds
+        |> Maybe.withDefault []
+
+
+documentTitle : Movement -> String
+documentTitle movement =
+    case movement.documentNumber of
+        Just number ->
+            number
+
+        Nothing ->
+            "Sin número"
+
+
+pickerTitle : PickerMode -> String
+pickerTitle mode =
+    case mode of
+        ExpenseInvoiceTargets ->
+            "Facturas a pagar"
+
+        IncomeCreditNoteTargets ->
+            "Notas de crédito a cobrar"
+
+        CreditNoteInvoiceTargets ->
+            "Facturas a compensar"
+
+
+pickerHelp : PickerMode -> String
+pickerHelp mode =
+    case mode of
+        ExpenseInvoiceTargets ->
+            "Selecciona una o más facturas de esta cuenta."
+
+        IncomeCreditNoteTargets ->
+            "Selecciona una o más notas de crédito de esta cuenta."
+
+        CreditNoteInvoiceTargets ->
+            "Selecciona facturas de esta cuenta y divisa para aplicar la nota."
+
+
+pickerEmptyText : PickerMode -> String
+pickerEmptyText mode =
+    case mode of
+        ExpenseInvoiceTargets ->
+            "No hay facturas en esta cuenta para seleccionar."
+
+        IncomeCreditNoteTargets ->
+            "No hay notas de crédito en esta cuenta para seleccionar."
+
+        CreditNoteInvoiceTargets ->
+            "No hay facturas de esta cuenta y divisa para compensar."
+
+
+compareDocumentRowsByDateThenId : InvoiceReport.DocumentRow -> InvoiceReport.DocumentRow -> Order
+compareDocumentRowsByDateThenId left right =
+    compareByDateThenId left.movement right.movement
+
+
+compareByDateThenId : Movement -> Movement -> Order
+compareByDateThenId left right =
+    case compare left.date right.date of
+        EQ ->
+            compare left.id right.id
+
+        order ->
+            order
 
 
 selectedOrDefaultAccountId : String -> List Account -> String

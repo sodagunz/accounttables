@@ -35,9 +35,10 @@ module Accounting exposing
     , setRelatedToInvoice
     , sortMovements
     , summarizeMoney
+    , toggleAllocationTarget
     )
 
-import Allocation exposing (AllocationIntent)
+import Allocation exposing (AllocationIntent, AllocationStrategy(..), TargetSelectionSource(..))
 import Util.Date as Date
 
 
@@ -153,12 +154,12 @@ setAmount amount form =
 
 setAccount : String -> Form -> Form
 setAccount accountId form =
-    { form | accountId = accountId }
+    { form | accountId = accountId, allocationIntent = Nothing }
 
 
 setCurrency : Currency -> Form -> Form
 setCurrency currency form =
-    { form | currency = currency }
+    { form | currency = currency, allocationIntent = Nothing }
 
 
 setDate : String -> Form -> Form
@@ -168,17 +169,74 @@ setDate date form =
 
 setMovementType : MovementType -> Form -> Form
 setMovementType movementType form =
-    { form | movementType = movementType }
+    { form
+        | movementType = movementType
+        , relatedToInvoice =
+            if movementType == ExpenseMovement || movementType == IncomeMovement then
+                form.relatedToInvoice
+
+            else
+                False
+        , allocationIntent = Nothing
+    }
 
 
 setRelatedToInvoice : Bool -> Form -> Form
 setRelatedToInvoice relatedToInvoice form =
-    { form | relatedToInvoice = relatedToInvoice }
+    { form
+        | relatedToInvoice = relatedToInvoice
+        , allocationIntent =
+            if relatedToInvoice then
+                form.allocationIntent
+
+            else
+                Nothing
+    }
 
 
 setDocumentNumber : String -> Form -> Form
 setDocumentNumber documentNumber form =
     { form | documentNumber = documentNumber }
+
+
+toggleAllocationTarget : String -> Bool -> Form -> Form
+toggleAllocationTarget targetId selected form =
+    let
+        currentTargetIds : List String
+        currentTargetIds =
+            form.allocationIntent
+                |> Maybe.map .targetIds
+                |> Maybe.withDefault []
+
+        updatedTargetIds : List String
+        updatedTargetIds =
+            if selected then
+                appendUnique targetId currentTargetIds
+
+            else
+                List.filter ((/=) targetId) currentTargetIds
+    in
+    { form
+        | allocationIntent =
+            if List.isEmpty updatedTargetIds then
+                Nothing
+
+            else
+                Just
+                    { targetIds = updatedTargetIds
+                    , targetSelectionSource = UserSelectedTargets
+                    , strategy = OldestDueFirstThenOverpayOldest
+                    }
+    }
+
+
+appendUnique : String -> List String -> List String
+appendUnique value values =
+    if List.member value values then
+        values
+
+    else
+        values ++ [ value ]
 
 
 movementToForm : Movement -> Form

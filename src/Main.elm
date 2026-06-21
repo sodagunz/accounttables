@@ -36,6 +36,7 @@ type Msg
     | UpdateMovementType Accounting.MovementType
     | UpdateRelatedToInvoice Bool
     | UpdateDocumentNumber String
+    | ToggleAllocationTarget String Bool
     | OpenAccountTool
     | SelectFilter FilterWindow
     | SelectDateDisplay DateDisplay
@@ -230,6 +231,9 @@ update msg model =
 
         UpdateDocumentNumber documentNumber ->
             ( { model | form = Accounting.setDocumentNumber documentNumber model.form }, Cmd.none )
+
+        ToggleAllocationTarget targetId selected ->
+            ( { model | form = Accounting.toggleAllocationTarget targetId selected model.form }, Cmd.none )
 
         OpenAccountTool ->
             ( { model | accountError = "" }, focusAccountTool () )
@@ -504,6 +508,7 @@ messages =
     , movementType = UpdateMovementType
     , relatedToInvoice = UpdateRelatedToInvoice
     , documentNumber = UpdateDocumentNumber
+    , allocationTarget = ToggleAllocationTarget
     , submitMovement = AddMovement
     , cancelEdit = CancelEdit
     , selectFilter = SelectFilter

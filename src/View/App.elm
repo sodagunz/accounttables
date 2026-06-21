@@ -31,6 +31,7 @@ type alias Config msg =
     , onMovementType : Accounting.MovementType -> msg
     , onRelatedToInvoice : Bool -> msg
     , onDocumentNumber : String -> msg
+    , onToggleAllocationTarget : String -> Bool -> msg
     , onSubmitMovement : msg
     , onCancelEdit : msg
     , onSelectFilter : FilterWindow -> msg
@@ -83,6 +84,7 @@ view config model =
                     [ MovementForm.view
                         { form = model.form
                         , accounts = Model.activeAccounts model
+                        , movements = Model.activeMovements model.expenses
                         , exchangeRate = model.exchangeRate
                         , exchangeRateStatus = model.exchangeRateStatus
                         , zone = model.zone
@@ -96,6 +98,7 @@ view config model =
                         , onMovementType = config.onMovementType
                         , onRelatedToInvoice = config.onRelatedToInvoice
                         , onDocumentNumber = config.onDocumentNumber
+                        , onToggleAllocationTarget = config.onToggleAllocationTarget
                         , onSubmit = config.onSubmitMovement
                         , onCancel = config.onCancelEdit
                         }

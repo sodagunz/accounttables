@@ -18,14 +18,14 @@ type alias TableRow =
     }
 
 
-tablePayload : Format -> DateDisplay -> String -> List Account -> List Movement -> Encode.Value
-tablePayload format dateDisplay today accounts movements =
+tablePayload : Format -> DateDisplay -> String -> List Account -> List Movement -> MoneyTotal -> Encode.Value
+tablePayload format dateDisplay today accounts movements payable =
     Encode.object
         [ ( "format", Encode.string (formatToString format) )
         , ( "filename", Encode.string (filename format today) )
         , ( "sheetName", Encode.string "Gastos" )
         , ( "headers", Encode.list Encode.string headers )
-        , ( "rows", Encode.list rowEncoder (movementRows dateDisplay movements ++ subtotalRows accounts movements) )
+        , ( "rows", Encode.list rowEncoder (movementRows dateDisplay movements ++ subtotalRows accounts movements payable) )
         ]
 
 
@@ -84,15 +84,23 @@ movementRow dateDisplay movement =
     }
 
 
-subtotalRows : List Account -> List Movement -> List TableRow
-subtotalRows accounts movements =
+subtotalRows : List Account -> List Movement -> MoneyTotal -> List TableRow
+subtotalRows accounts movements payable =
     let
-        grandTotal : MoneyTotal
-        grandTotal =
+        cashOnHand : MoneyTotal
+        cashOnHand =
             summarizeMoney movements
+
+        total : MoneyTotal
+        total =
+            { ars = cashOnHand.ars + payable.ars
+            , usd = cashOnHand.usd + payable.usd
+            }
     in
     List.map (\account -> totalRow ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (movementsFor account movements))) accounts
-        ++ [ totalRow "Total" "total" grandTotal ]
+        ++ [ totalRow "Saldo de caja" "subtotal" cashOnHand
+           , totalRow "Posición neta" "total" total
+           ]
 
 
 totalRow : String -> String -> MoneyTotal -> TableRow
@@ -212,7 +220,7 @@ invoiceSummaryRows summary =
     , summaryRow "Total notas de crédito" summary.creditNotesTotal
     , summaryRow "Total documentos" summary.documentsTotal
     , summaryRow summary.settlementContributionLabel summary.settlementContribution
-    , summaryRow "A pagar" summary.payable
+    , summaryRow "Saldo pendiente" summary.payable
     ]
 
 

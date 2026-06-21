@@ -1,12 +1,12 @@
 module View.InvoiceTable exposing (Config, view)
 
-import Accounting exposing (Currency(..), Movement, MovementType(..), SortDirection, SortField, currencyToString, descriptionDisplay)
-import Html exposing (Html, button, div, p, section, span, table, tbody, td, text, th, thead, tr)
-import Html.Attributes exposing (attribute, class, classList, type_)
+import Accounting exposing (Account, Currency(..), FilterWindow(..), MoneyTotal, Movement, MovementType(..), SortDirection, SortField, currencyToString, descriptionDisplay, summarizeMoney)
+import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
+import Html.Attributes exposing (attribute, checked, class, classList, for, id, name, type_)
 import Html.Events exposing (onClick)
 import InvoiceAllocation exposing (DocumentStatus(..))
 import InvoiceReport
-import Util.Date exposing (DateDisplay, formatDate)
+import Util.Date exposing (DateDisplay(..), formatDate)
 import Util.Format exposing (formatMoney, formatNumber)
 
 
@@ -14,81 +14,106 @@ type alias Config msg =
     { allMovements : List Movement
     , invoices : List Movement
     , relatedCashflows : List Movement
+    , cashflowMovements : List Movement
+    , accounts : List Account
+    , filterWindow : FilterWindow
+    , hiddenAccountIds : List String
     , dateDisplay : DateDisplay
     , displayCurrency : Currency
     , sortField : SortField
     , sortDirection : SortDirection
+    , onSelectFilter : FilterWindow -> msg
+    , onToggleAccount : String -> msg
+    , onSelectDateDisplay : DateDisplay -> msg
+    , onSelectDisplayCurrency : Currency -> msg
     , onSelectSort : SortField -> msg
     , onExportCsv : msg
     , onExportXlsx : msg
     , onDelete : String -> msg
     , onEdit : String -> msg
+    , onSelectMovementsView : msg
     }
 
 
 view : Config msg -> Html msg
 view config =
-    let
-        hasContent : Bool
-        hasContent =
-            not (List.isEmpty config.invoices) || not (List.isEmpty config.relatedCashflows)
-    in
     section [ class "panel" ]
-        [ Html.h2 [ class "section-title" ] [ text "Facturas y notas de crédito" ]
-        , if hasContent then
-            div [ class "expense-table-layout" ]
-                [ invoiceTableBody config
-                , exportControls config
+        [ Html.h2 [ class "section-title" ] [ text "Facturas" ]
+        , div [ class "expense-table-layout" ]
+            [ div [ class "filters-toggle" ]
+                [ input
+                    [ type_ "checkbox"
+                    , id "filters-toggle-input"
+                    , class "filters-toggle__input"
+                    ]
+                    []
+                , label
+                    [ class "filters-toggle__button"
+                    , for "filters-toggle-input"
+                    ]
+                    [ span [] [ text "Filtros" ]
+                    , span [ class "filters-toggle__arrow" ] [ text "▼" ]
+                    ]
+                , div [ class "filters-toggle__content" ]
+                    [ filterControls config ]
                 ]
-
-          else
-            p [ class "empty" ] [ text "Todavía no hay facturas ni notas de crédito para este período." ]
+            , invoiceTableBody config
+            ]
         ]
 
 
 invoiceTableBody : Config msg -> Html msg
 invoiceTableBody config =
     let
-        report : InvoiceReport.Report
-        report =
-            InvoiceReport.build config.allMovements config.invoices config.relatedCashflows
-
-        sortedRows : List InvoiceReport.DocumentRow
-        sortedRows =
-            List.sortBy (\document -> document.movement.date) report.rows
-
-        summary : InvoiceReport.Summary
-        summary =
-            report.summary
+        hasContent : Bool
+        hasContent =
+            not (List.isEmpty config.invoices) || not (List.isEmpty config.relatedCashflows)
     in
-    div []
-        [ div [ class "table-wrap" ]
-            [ table [ class "expense-table invoice-table" ]
-                [ thead []
-                    [ tr []
-                        [ th [] [ span [] [ text "Vencimiento" ] ]
-                        , th [] [ span [] [ text "Tipo" ] ]
-                        , th [] [ span [] [ text "Cuenta" ] ]
-                        , th [] [ span [] [ text "Número" ] ]
-                        , th [] [ span [] [ text "Descripción" ] ]
-                        , th [] [ span [] [ text "Estado" ] ]
-                        , th [ class "numeric" ] [ span [] [ text "Ingresado" ] ]
-                        , th [ class "numeric" ] [ span [] [ text "Pendiente" ] ]
-                        , th [ class "numeric" ] [ span [] [ text "Total" ] ]
-                        , th [ class "actions-header" ] [ span [] [ text "Acciones" ] ]
+    if hasContent then
+        let
+            report : InvoiceReport.Report
+            report =
+                InvoiceReport.build config.allMovements config.invoices config.relatedCashflows
+
+            sortedRows : List InvoiceReport.DocumentRow
+            sortedRows =
+                List.sortBy (\document -> document.movement.date) report.rows
+
+            summary : InvoiceReport.Summary
+            summary =
+                report.summary
+        in
+        div []
+            [ div [ class "table-wrap" ]
+                [ table [ class "expense-table invoice-table" ]
+                    [ thead []
+                        [ tr []
+                            [ th [] [ span [] [ text "Vencimiento" ] ]
+                            , th [] [ span [] [ text "Tipo" ] ]
+                            , th [] [ span [] [ text "Cuenta" ] ]
+                            , th [] [ span [] [ text "Número" ] ]
+                            , th [] [ span [] [ text "Descripción" ] ]
+                            , th [] [ span [] [ text "Estado" ] ]
+                            , th [ class "numeric" ] [ span [] [ text "Ingresado" ] ]
+                            , th [ class "numeric" ] [ span [] [ text "Pendiente" ] ]
+                            , th [ class "numeric" ] [ span [] [ text "Total" ] ]
+                            , th [ class "actions-header" ] [ span [] [ text "Acciones" ] ]
+                            ]
                         ]
+                    , tbody []
+                        (List.map (row config.dateDisplay config.displayCurrency config.onEdit config.onDelete) sortedRows
+                            ++ summaryRow "Total facturas" (text "Total facturas") "subtotal" Nothing (valueForCurrency config.displayCurrency summary.facturasTotal) config.displayCurrency
+                            ++ summaryRow "Total notas de crédito" (text "Total notas de crédito") "subtotal" Nothing (valueForCurrency config.displayCurrency summary.creditNotesTotal) config.displayCurrency
+                            ++ summaryRow "Total documentos" (text "Total documentos") "subtotal" Nothing (valueForCurrency config.displayCurrency summary.documentsTotal) config.displayCurrency
+                            ++ summaryRow summary.settlementContributionLabel (text summary.settlementContributionLabel) "subtotal" Nothing (valueForCurrency config.displayCurrency summary.settlementContribution) config.displayCurrency
+                            ++ sharedSummaryRows config summary.payable
+                        )
                     ]
-                , tbody []
-                    (List.map (row config.dateDisplay config.displayCurrency config.onEdit config.onDelete) sortedRows
-                        ++ summaryRow "Total facturas" (valueForCurrency config.displayCurrency summary.facturasTotal) config.displayCurrency
-                        ++ summaryRow "Total notas de crédito" (valueForCurrency config.displayCurrency summary.creditNotesTotal) config.displayCurrency
-                        ++ summaryRow "Total documentos" (valueForCurrency config.displayCurrency summary.documentsTotal) config.displayCurrency
-                        ++ summaryRow summary.settlementContributionLabel (valueForCurrency config.displayCurrency summary.settlementContribution) config.displayCurrency
-                        ++ payableRow "A pagar" (valueForCurrency config.displayCurrency summary.payable) config.displayCurrency
-                    )
                 ]
             ]
-        ]
+
+    else
+        p [ class "empty" ] [ text "Todavía no hay facturas para este período." ]
 
 
 row : DateDisplay -> Currency -> (String -> msg) -> (String -> msg) -> InvoiceReport.DocumentRow -> Html msg
@@ -210,10 +235,19 @@ formatTotal value currency =
         prefix ++ number
 
 
-summaryRow : String -> Float -> Currency -> List (Html msg)
-summaryRow label value displayCurrency =
-    [ tr [ class "subtotal" ]
-        [ td [ attribute "colspan" "8", attribute "data-label" label ] [ text label ]
+summaryRow : String -> Html msg -> String -> Maybe msg -> Float -> Currency -> List (Html msg)
+summaryRow dataLabel labelContent rowClass onSelect value displayCurrency =
+    [ tr
+        (class rowClass
+            :: (case onSelect of
+                    Just msg ->
+                        [ onClick msg ]
+
+                    Nothing ->
+                        []
+               )
+        )
+        [ td [ attribute "colspan" "8", attribute "data-label" dataLabel ] [ labelContent ]
         , td
             [ attribute "data-label" "Total"
             , classList
@@ -227,21 +261,163 @@ summaryRow label value displayCurrency =
     ]
 
 
-payableRow : String -> Float -> Currency -> List (Html msg)
-payableRow label value displayCurrency =
-    [ tr [ class "grand-total" ]
-        [ td [ attribute "colspan" "8", attribute "data-label" label ] [ text label ]
-        , td
-            [ attribute "data-label" "Total"
-            , classList
-                [ ( "numeric", True )
-                , ( "is-negative", value < 0 )
+sharedSummaryRows : Config msg -> MoneyTotal -> List (Html msg)
+sharedSummaryRows config payable =
+    let
+        cashOnHand : MoneyTotal
+        cashOnHand =
+            summarizeMoney config.cashflowMovements
+
+        total : MoneyTotal
+        total =
+            { ars = cashOnHand.ars + payable.ars
+            , usd = cashOnHand.usd + payable.usd
+            }
+    in
+    summaryRow
+        "Saldo pendiente (facturas)"
+        (text "Saldo pendiente (facturas)")
+        "summary-divider subtotal"
+        Nothing
+        (valueForCurrency config.displayCurrency payable)
+        config.displayCurrency
+        ++ summaryRow
+            "Saldo de caja (movimientos)"
+            (text "Saldo de caja (movimientos)")
+            "subtotal clickable-summary-row"
+            (Just config.onSelectMovementsView)
+            (valueForCurrency config.displayCurrency cashOnHand)
+            config.displayCurrency
+        ++ [ tr [ class "grand-total" ]
+                [ td [ attribute "colspan" "8", attribute "data-label" "Posición neta" ] [ text "Posición neta" ]
+                , td
+                    [ attribute "data-label" "Posición neta"
+                    , classList
+                        [ ( "numeric", True )
+                        , ( "is-negative", valueForCurrency config.displayCurrency total < 0 )
+                        ]
+                    ]
+                    [ text (formatTotal (valueForCurrency config.displayCurrency total) config.displayCurrency) ]
+                , td [] []
+                ]
+           ]
+
+
+filterControls : Config msg -> Html msg
+filterControls config =
+    div [ class "filters" ]
+        [ div [ class "report-options" ]
+            [ div [ class "segmented-control" ]
+                [ span [ class "segmented-control__label" ] [ text "Filtros" ]
+                , filterSegment config AllTime "Completo"
+                , filterSegment config ThisYear "Año"
+                , filterSegment config ThisMonth "Mes"
+                , filterSegment config ThisWeek "Semana"
+                , filterSegment config Today "Día"
                 ]
             ]
-            [ text (formatTotal value displayCurrency) ]
-        , td [] []
+        , div [ class "report-options" ]
+            [ div [ class "segmented-control" ]
+                (span [ class "segmented-control__label" ] [ text "Cuenta" ]
+                    :: List.map (accountSegment config) config.accounts
+                )
+            ]
+        , div [ class "report-options" ]
+            [ div [ class "segmented-control" ]
+                [ span [ class "segmented-control__label" ] [ text "Fecha" ]
+                , dateSegment config NumericDate "DD/MM/AAAA"
+                , dateSegment config LongDate "Texto"
+                ]
+            ]
+        , div [ class "report-options" ]
+            [ div [ class "segmented-control" ]
+                [ span [ class "segmented-control__label" ] [ text "Divisa" ]
+                , radioSegment config.onSelectDisplayCurrency ARS (config.displayCurrency == ARS) "ARS"
+                , radioSegment config.onSelectDisplayCurrency USD (config.displayCurrency == USD) "USD"
+                ]
+            ]
+        , exportControls config
         ]
-    ]
+
+
+filterSegment : Config msg -> FilterWindow -> String -> Html msg
+filterSegment config filterWindow labelText =
+    label
+        [ classList
+            [ ( "segmented-control__option", True )
+            , ( "segmented-control__option--active", config.filterWindow == filterWindow )
+            ]
+        ]
+        [ input
+            [ type_ "radio"
+            , name "filter-window"
+            , checked (config.filterWindow == filterWindow)
+            , onClick (config.onSelectFilter filterWindow)
+            ]
+            []
+        , span [] [ text labelText ]
+        ]
+
+
+dateSegment : Config msg -> DateDisplay -> String -> Html msg
+dateSegment config dateDisplay labelText =
+    label
+        [ classList
+            [ ( "segmented-control__option", True )
+            , ( "segmented-control__option--active", config.dateDisplay == dateDisplay )
+            ]
+        ]
+        [ input
+            [ type_ "radio"
+            , name "date-display"
+            , checked (config.dateDisplay == dateDisplay)
+            , onClick (config.onSelectDateDisplay dateDisplay)
+            ]
+            []
+        , span [] [ text labelText ]
+        ]
+
+
+radioSegment : (a -> msg) -> a -> Bool -> String -> Html msg
+radioSegment onChange value isActive labelText =
+    label
+        [ classList
+            [ ( "segmented-control__option", True )
+            , ( "segmented-control__option--active", isActive )
+            ]
+        ]
+        [ input
+            [ type_ "radio"
+            , name "segmented-radio"
+            , checked isActive
+            , onClick (onChange value)
+            ]
+            []
+        , span [] [ text labelText ]
+        ]
+
+
+accountSegment : Config msg -> Account -> Html msg
+accountSegment config account =
+    let
+        hidden : Bool
+        hidden =
+            List.member account.id config.hiddenAccountIds
+    in
+    label
+        [ classList
+            [ ( "segmented-control__option", True )
+            , ( "segmented-control__option--active", not hidden )
+            ]
+        ]
+        [ input
+            [ type_ "checkbox"
+            , checked (not hidden)
+            , onClick (config.onToggleAccount account.id)
+            ]
+            []
+        , span [] [ text account.name ]
+        ]
 
 
 exportControls : Config msg -> Html msg

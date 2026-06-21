@@ -5,6 +5,7 @@ import Auth exposing (AuthState(..))
 import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
 import Html.Attributes exposing (class, classList, type_, value)
 import Html.Events exposing (onClick, onInput)
+import InvoiceReport
 import Ledger
 import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), ViewMode(..))
 import Util.Date exposing (DateDisplay)
@@ -114,6 +115,20 @@ view config model =
                                 rows : List Movement
                                 rows =
                                     Model.visibleCashflowMovements model
+
+                                invoiceRows : List Movement
+                                invoiceRows =
+                                    Model.visibleInvoiceMovements model
+
+                                relatedCashflows : List Movement
+                                relatedCashflows =
+                                    Model.visibleInvoiceRelatedCashflows model
+
+                                payable : Accounting.MoneyTotal
+                                payable =
+                                    InvoiceReport.build (Model.activeMovements model.expenses) invoiceRows relatedCashflows
+                                        |> .summary
+                                        |> .payable
                             in
                             MovementTable.view
                                 { expenses = rows
@@ -122,6 +137,7 @@ view config model =
                                 , hiddenAccountIds = model.hiddenAccountIds
                                 , dateDisplay = model.dateDisplay
                                 , displayCurrency = model.displayCurrency
+                                , payable = payable
                                 , sortField = model.sortField
                                 , sortDirection = model.sortDirection
                                 , onSelectFilter = config.onSelectFilter
@@ -133,6 +149,7 @@ view config model =
                                 , onExportXlsx = config.onExportXlsx
                                 , onDelete = config.onDeleteMovement
                                 , onEdit = config.onEditMovement
+                                , onSelectInvoiceView = config.onSelectViewMode InvoiceView
                                 }
 
                         InvoiceView ->
@@ -149,15 +166,24 @@ view config model =
                                 { allMovements = Model.activeMovements model.expenses
                                 , invoices = invoiceRows
                                 , relatedCashflows = relatedCashflows
+                                , cashflowMovements = Model.visibleCashflowMovements model
+                                , accounts = Model.activeAccounts model
+                                , filterWindow = model.filterWindow
+                                , hiddenAccountIds = model.hiddenAccountIds
                                 , dateDisplay = model.dateDisplay
                                 , displayCurrency = model.displayCurrency
                                 , sortField = model.sortField
                                 , sortDirection = model.sortDirection
+                                , onSelectFilter = config.onSelectFilter
+                                , onToggleAccount = config.onToggleAccountFilter
+                                , onSelectDateDisplay = config.onSelectDateDisplay
+                                , onSelectDisplayCurrency = config.onSelectDisplayCurrency
                                 , onSelectSort = config.onSelectSort
                                 , onExportCsv = config.onExportInvoicesCsv
                                 , onExportXlsx = config.onExportInvoicesXlsx
                                 , onDelete = config.onDeleteMovement
                                 , onEdit = config.onEditMovement
+                                , onSelectMovementsView = config.onSelectViewMode CashflowView
                                 }
                     ]
                 ]
@@ -335,7 +361,7 @@ viewModeToggle config model =
             , type_ "button"
             , onClick (config.onSelectViewMode CashflowView)
             ]
-            [ text "Movimientos de caja" ]
+            [ text "Movimientos" ]
         , button
             [ classList
                 [ ( "view-mode-toggle__btn", True )
@@ -344,5 +370,5 @@ viewModeToggle config model =
             , type_ "button"
             , onClick (config.onSelectViewMode InvoiceView)
             ]
-            [ text "Facturación" ]
+            [ text "Facturas" ]
         ]

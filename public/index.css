@@ -423,34 +423,46 @@ main {
     border-right-color: #ffffff;
 }
 
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-start.driver-popover-arrow-side-top,
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-start.driver-popover-arrow-side-bottom {
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-start.driver-popover-arrow-side-top,
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-start.driver-popover-arrow-side-bottom {
     left: 18px;
 }
 
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-end.driver-popover-arrow-side-top,
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-end.driver-popover-arrow-side-bottom {
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-end.driver-popover-arrow-side-top,
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-end.driver-popover-arrow-side-bottom {
     right: 18px;
 }
 
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-center.driver-popover-arrow-side-top,
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-center.driver-popover-arrow-side-bottom {
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-center.driver-popover-arrow-side-top,
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-center.driver-popover-arrow-side-bottom {
     left: 50%;
     transform: translateX(-50%);
 }
 
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-start.driver-popover-arrow-side-left,
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-start.driver-popover-arrow-side-right {
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-start.driver-popover-arrow-side-left,
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-start.driver-popover-arrow-side-right {
     top: 18px;
 }
 
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-end.driver-popover-arrow-side-left,
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-end.driver-popover-arrow-side-right {
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-end.driver-popover-arrow-side-left,
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-end.driver-popover-arrow-side-right {
     bottom: 18px;
 }
 
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-center.driver-popover-arrow-side-left,
-.driver-popover.driverjs-theme-accounttables .driver-popover-arrow-align-center.driver-popover-arrow-side-right {
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-center.driver-popover-arrow-side-left,
+.driver-popover.driverjs-theme-accounttables
+    .driver-popover-arrow-align-center.driver-popover-arrow-side-right {
     top: 50%;
     transform: translateY(-50%);
 }
@@ -1005,7 +1017,9 @@ select:focus {
     color: #46524e;
     font-size: 0.9rem;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s;
+    transition:
+        background 0.15s,
+        color 0.15s;
 }
 
 .view-mode-toggle__btn:first-child {
@@ -1230,10 +1244,27 @@ th:first-child {
     font-weight: 800;
 }
 
+.summary-divider td {
+    border-top: 2px solid #2f806c;
+}
+
 td.is-negative,
 .subtotal td.is-negative,
 .grand-total td.is-negative {
     color: #b91c1c;
+}
+
+.clickable-summary-row {
+    cursor: pointer;
+}
+
+.clickable-summary-row td:first-child {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.clickable-summary-row:hover td {
+    color: #2f806c;
 }
 
 .empty {

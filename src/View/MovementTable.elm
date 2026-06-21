@@ -33,7 +33,7 @@ type alias Config msg =
 view : Config msg -> Html msg
 view config =
     section [ class "panel" ]
-        [ Html.h2 [ class "section-title" ] [ text "Movimientos de caja" ]
+        [ Html.h2 [ class "section-title" ] [ text "Movimientos" ]
         , div [ class "expense-table-layout" ]
             [ div [ class "filters-toggle" ]
                 [ input
@@ -61,7 +61,7 @@ view config =
 expenseTableBody : Config msg -> Html msg
 expenseTableBody config =
     if List.isEmpty config.expenses then
-        p [ class "empty" ] [ text "Todavía no hay movimientos de caja." ]
+        p [ class "empty" ] [ text "Todavía no hay movimientos para este período." ]
 
     else
         let

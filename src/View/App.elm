@@ -165,10 +165,17 @@ view config model =
                                 { allMovements = Model.activeMovements model.expenses
                                 , invoices = invoiceRows
                                 , relatedCashflows = relatedCashflows
+                                , accounts = Model.activeAccounts model
+                                , filterWindow = model.filterWindow
+                                , hiddenAccountIds = model.hiddenAccountIds
                                 , dateDisplay = model.dateDisplay
                                 , displayCurrency = model.displayCurrency
                                 , sortField = model.sortField
                                 , sortDirection = model.sortDirection
+                                , onSelectFilter = config.onSelectFilter
+                                , onToggleAccount = config.onToggleAccountFilter
+                                , onSelectDateDisplay = config.onSelectDateDisplay
+                                , onSelectDisplayCurrency = config.onSelectDisplayCurrency
                                 , onSelectSort = config.onSelectSort
                                 , onExportCsv = config.onExportInvoicesCsv
                                 , onExportXlsx = config.onExportInvoicesXlsx
@@ -351,7 +358,7 @@ viewModeToggle config model =
             , type_ "button"
             , onClick (config.onSelectViewMode CashflowView)
             ]
-            [ text "Movimientos de caja" ]
+            [ text "Movimientos" ]
         , button
             [ classList
                 [ ( "view-mode-toggle__btn", True )
@@ -360,5 +367,5 @@ viewModeToggle config model =
             , type_ "button"
             , onClick (config.onSelectViewMode InvoiceView)
             ]
-            [ text "Facturación" ]
+            [ text "Facturas" ]
         ]

@@ -10,6 +10,7 @@ import Model exposing (StorageMode(..))
 import Test exposing (Test, describe, test)
 import Update.Accounts as Accounts
 import Update.Ledgers as Ledgers
+import Update.Movements as Movements
 
 
 suite : Test
@@ -140,6 +141,123 @@ suite =
                             }
                 in
                 Expect.equal "active" updatedModel.form.accountId
+        , test "saving related payment auto-selects invoice and generates description" <|
+            \_ ->
+                let
+                    result : ( Model.Model, Cmd Never )
+                    result =
+                        Movements.handleGeneratedId movementsConfig
+                            (Encode.string "pay-1")
+                            { initialModel
+                                | accounts = [ sampleAccount ]
+                                , expenses = [ sampleInvoice ]
+                                , exchangeRate = 1000
+                                , form =
+                                    { modelForm
+                                        | amount = "100"
+                                        , accountId = sampleAccount.id
+                                        , currency = Accounting.USD
+                                        , date = "2026-06-20"
+                                        , movementType = Accounting.ExpenseMovement
+                                        , relatedToInvoice = True
+                                        , description = "Usuario escribió algo"
+                                    }
+                            }
+
+                    updatedModel : Model.Model
+                    updatedModel =
+                        Tuple.first result
+                in
+                case List.filter (\movement -> movement.id == "pay-1") updatedModel.expenses of
+                    [ payment ] ->
+                        Expect.all
+                            [ \movement -> Expect.equal (Just "Pago factura F-001") movement.description
+                            , \movement -> Expect.equal (Just [ "inv-1" ]) (Maybe.map .targetIds movement.allocationIntent)
+                            ]
+                            payment
+
+                    _ ->
+                        Expect.fail "Expected generated payment movement"
+        , test "saving credit note without eligible invoice is blocked" <|
+            \_ ->
+                let
+                    result : ( Model.Model, Cmd Never )
+                    result =
+                        Movements.handleGeneratedId movementsConfig
+                            (Encode.string "cn-1")
+                            { initialModel
+                                | accounts = [ sampleAccount ]
+                                , expenses = []
+                                , exchangeRate = 1000
+                                , form = creditNoteForm
+                            }
+
+                    updatedModel : Model.Model
+                    updatedModel =
+                        Tuple.first result
+                in
+                Expect.all
+                    [ \model ->
+                        Expect.equal
+                            "No hay facturas de esta cuenta y divisa para compensar con la nota de crédito. Crea o importa la factura primero."
+                            model.error
+                    , \model -> Expect.equal [] (List.filter (\movement -> movement.id == "cn-1") model.expenses)
+                    ]
+                    updatedModel
+        , test "saving credit note requires selected eligible invoice" <|
+            \_ ->
+                let
+                    result : ( Model.Model, Cmd Never )
+                    result =
+                        Movements.handleGeneratedId movementsConfig
+                            (Encode.string "cn-1")
+                            { initialModel
+                                | accounts = [ sampleAccount ]
+                                , expenses = [ sampleInvoice ]
+                                , exchangeRate = 1000
+                                , form = creditNoteForm
+                            }
+
+                    updatedModel : Model.Model
+                    updatedModel =
+                        Tuple.first result
+                in
+                Expect.all
+                    [ \model ->
+                        Expect.equal
+                            "Selecciona al menos una factura de esta cuenta y divisa para compensar la nota de crédito."
+                            model.error
+                    , \model -> Expect.equal [ sampleInvoice ] model.expenses
+                    ]
+                    updatedModel
+        , test "saving credit note with selected eligible invoice stores allocation intent" <|
+            \_ ->
+                let
+                    result : ( Model.Model, Cmd Never )
+                    result =
+                        Movements.handleGeneratedId movementsConfig
+                            (Encode.string "cn-1")
+                            { initialModel
+                                | accounts = [ sampleAccount ]
+                                , expenses = [ sampleInvoice ]
+                                , exchangeRate = 1000
+                                , form = Accounting.toggleAllocationTarget "inv-1" True creditNoteForm
+                            }
+
+                    updatedModel : Model.Model
+                    updatedModel =
+                        Tuple.first result
+                in
+                case List.filter (\movement -> movement.id == "cn-1") updatedModel.expenses of
+                    [ creditNote ] ->
+                        Expect.all
+                            [ \movement -> Expect.equal (Just [ "inv-1" ]) (Maybe.map .targetIds movement.allocationIntent)
+                            , \_ -> Expect.equal "" updatedModel.error
+                            ]
+                            creditNote
+
+                    _ ->
+                        Expect.fail "Expected generated credit note movement"
         , test "ensureLocalLedger activates the browser-local ledger" <|
             \_ ->
                 let
@@ -183,9 +301,51 @@ modelForm =
     Model.initial.form
 
 
+creditNoteForm : Accounting.Form
+creditNoteForm =
+    { modelForm
+        | amount = "40"
+        , accountId = sampleAccount.id
+        , currency = Accounting.USD
+        , date = "2026-06-20"
+        , movementType = Accounting.SupplierCreditNoteMovement
+        , documentNumber = "NC-001"
+    }
+
+
 sampleAccount : Accounting.Account
 sampleAccount =
     { id = "cash", name = "Caja", deletedAt = Nothing }
+
+
+movementsConfig : Movements.Config Never
+movementsConfig =
+    { generateExpenseId = Cmd.none
+    , appendEvent = \_ _ -> Cmd.none
+    , saveLastAccount = \_ _ -> Cmd.none
+    , navigateTutorial = \_ model -> ( model, Cmd.none )
+    , completeTutorial = Cmd.none
+    }
+
+
+sampleInvoice : Accounting.Movement
+sampleInvoice =
+    { id = "inv-1"
+    , movementType = Accounting.SupplierInvoiceMovement
+    , description = Nothing
+    , accountId = "cash"
+    , accountName = "Caja"
+    , inputAmount = 100
+    , inputCurrency = Accounting.USD
+    , exchangeRate = 1000
+    , ars = -100000
+    , usd = -100
+    , date = "2026-06-16"
+    , deletedAt = Nothing
+    , relatedToInvoice = False
+    , documentNumber = Just "F-001"
+    , allocationIntent = Nothing
+    }
 
 
 sampleMovement : Accounting.Movement
@@ -202,4 +362,7 @@ sampleMovement =
     , usd = -0.001
     , date = "2026-06-16"
     , deletedAt = Nothing
+    , relatedToInvoice = False
+    , documentNumber = Nothing
+    , allocationIntent = Nothing
     }

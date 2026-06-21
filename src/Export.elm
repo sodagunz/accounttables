@@ -1,6 +1,7 @@
-module Export exposing (Format(..), tablePayload)
+module Export exposing (Format(..), invoiceTablePayload, tablePayload)
 
-import Accounting exposing (Account, Currency(..), MoneyTotal, Movement, descriptionDisplay, movementsFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), MoneyTotal, Movement, MovementType(..), descriptionDisplay, movementsFor, summarizeMoney)
+import InvoiceReport
 import Json.Encode as Encode
 import Util.Date exposing (DateDisplay, formatDate)
 import Util.Format exposing (formatMoney)
@@ -99,6 +100,130 @@ totalRow labelText label total =
     { label = label
     , cells =
         [ labelText
+        , ""
+        , ""
+        , ""
+        , ""
+        , formatMoney ARS total.ars
+        , formatMoney USD total.usd
+        ]
+    }
+
+
+invoiceTablePayload : Format -> DateDisplay -> String -> List Movement -> List Movement -> List Movement -> Encode.Value
+invoiceTablePayload format dateDisplay today allMovements invoices relatedCashflows =
+    let
+        report : InvoiceReport.Report
+        report =
+            InvoiceReport.build allMovements invoices relatedCashflows
+    in
+    Encode.object
+        [ ( "format", Encode.string (formatToString format) )
+        , ( "filename", Encode.string (invoicesFilename format today) )
+        , ( "sheetName", Encode.string "Facturas" )
+        , ( "headers", Encode.list Encode.string invoiceHeaders )
+        , ( "rows", Encode.list rowEncoder (invoiceRows dateDisplay report.rows ++ invoiceSummaryRows report.summary) )
+        ]
+
+
+invoicesFilename : Format -> String -> String
+invoicesFilename format today =
+    "accounttables-facturas-"
+        ++ today
+        ++ (case format of
+                Csv ->
+                    ".csv"
+
+                Xlsx ->
+                    ".xlsx"
+           )
+
+
+invoiceHeaders : List String
+invoiceHeaders =
+    [ "Vencimiento"
+    , "Tipo"
+    , "Cuenta"
+    , "Número"
+    , "Descripción"
+    , "Estado"
+    , "Ingresado"
+    , "Pendiente"
+    , "Pesos (ARS)"
+    , "Dólar (USD)"
+    ]
+
+
+invoiceRows : DateDisplay -> List InvoiceReport.DocumentRow -> List TableRow
+invoiceRows dateDisplay rows =
+    List.map (invoiceRow dateDisplay) rows
+
+
+invoiceRow : DateDisplay -> InvoiceReport.DocumentRow -> TableRow
+invoiceRow dateDisplay documentRow =
+    let
+        movement : Movement
+        movement =
+            documentRow.movement
+
+        displayAmount : Float
+        displayAmount =
+            case movement.movementType of
+                SupplierInvoiceMovement ->
+                    -movement.inputAmount
+
+                SupplierCreditNoteMovement ->
+                    movement.inputAmount
+
+                _ ->
+                    movement.inputAmount
+
+        typeLabel : String
+        typeLabel =
+            case movement.movementType of
+                SupplierInvoiceMovement ->
+                    "Factura"
+
+                SupplierCreditNoteMovement ->
+                    "Nota de crédito"
+
+                _ ->
+                    ""
+    in
+    { label = "invoice"
+    , cells =
+        [ formatDate dateDisplay movement.date
+        , typeLabel
+        , movement.accountName
+        , movement.documentNumber |> Maybe.withDefault ""
+        , descriptionDisplay movement
+        , documentRow.statusLabel
+        , formatMoney movement.inputCurrency displayAmount
+        , formatMoney documentRow.settlement.currency documentRow.settlement.remainingDue
+        , formatMoney ARS movement.ars
+        , formatMoney USD movement.usd
+        ]
+    }
+
+
+invoiceSummaryRows : InvoiceReport.Summary -> List TableRow
+invoiceSummaryRows summary =
+    [ summaryRow "Total facturas" summary.facturasTotal
+    , summaryRow "Total notas de crédito" summary.creditNotesTotal
+    , summaryRow "Total documentos" summary.documentsTotal
+    , summaryRow summary.settlementContributionLabel summary.settlementContribution
+    , summaryRow "A pagar" summary.payable
+    ]
+
+
+summaryRow : String -> MoneyTotal -> TableRow
+summaryRow labelText total =
+    { label = "summary"
+    , cells =
+        [ labelText
+        , ""
+        , ""
+        , ""
         , ""
         , ""
         , ""

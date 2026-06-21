@@ -36,6 +36,9 @@ movementCreated data =
     , usd = data.usd
     , date = data.date
     , deletedAt = Nothing
+    , relatedToInvoice = data.relatedToInvoice
+    , documentNumber = data.documentNumber
+    , allocationIntent = data.allocationIntent
     }
 
 
@@ -63,6 +66,9 @@ applyUpdate data movement =
         , usd = data.usd
         , date = data.date
         , deletedAt = movement.deletedAt
+        , relatedToInvoice = data.relatedToInvoice
+        , documentNumber = data.documentNumber
+        , allocationIntent = data.allocationIntent
         }
 
     else

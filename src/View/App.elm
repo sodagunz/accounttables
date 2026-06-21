@@ -3,12 +3,13 @@ module View.App exposing (Config, view)
 import Accounting exposing (FilterWindow, Movement, SortField)
 import Auth exposing (AuthState(..))
 import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
-import Html.Attributes exposing (class, type_, value)
+import Html.Attributes exposing (class, classList, type_, value)
 import Html.Events exposing (onClick, onInput)
 import Ledger
-import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..))
+import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), ViewMode(..))
 import Util.Date exposing (DateDisplay)
 import View.AuthStatus as AuthStatus
+import View.InvoiceTable as InvoiceTable
 import View.LedgerAccess as LedgerAccess
 import View.LedgerAccounts as LedgerAccounts
 import View.MovementForm as MovementForm
@@ -28,6 +29,9 @@ type alias Config msg =
     , onCurrency : String -> msg
     , onDate : String -> msg
     , onMovementType : Accounting.MovementType -> msg
+    , onRelatedToInvoice : Bool -> msg
+    , onDocumentNumber : String -> msg
+    , onToggleAllocationTarget : String -> Bool -> msg
     , onSubmitMovement : msg
     , onCancelEdit : msg
     , onSelectFilter : FilterWindow -> msg
@@ -51,16 +55,15 @@ type alias Config msg =
     , onSelectMigrationLedger : String -> msg
     , onConfirmLocalMigration : msg
     , onSkipLocalMigration : msg
+    , onExportInvoicesCsv : msg
+    , onExportInvoicesXlsx : msg
+    , onSelectViewMode : ViewMode -> msg
     }
 
 
 view : Config msg -> Model -> Html msg
 view config model =
     let
-        rows : List Movement
-        rows =
-            Model.visibleMovements model
-
         isTutorialOpen : Bool
         isTutorialOpen =
             case model.tutorialState of
@@ -81,6 +84,7 @@ view config model =
                     [ MovementForm.view
                         { form = model.form
                         , accounts = Model.activeAccounts model
+                        , movements = Model.activeMovements model.expenses
                         , exchangeRate = model.exchangeRate
                         , exchangeRateStatus = model.exchangeRateStatus
                         , zone = model.zone
@@ -92,6 +96,9 @@ view config model =
                         , onCurrency = config.onCurrency
                         , onDate = config.onDate
                         , onMovementType = config.onMovementType
+                        , onRelatedToInvoice = config.onRelatedToInvoice
+                        , onDocumentNumber = config.onDocumentNumber
+                        , onToggleAllocationTarget = config.onToggleAllocationTarget
                         , onSubmit = config.onSubmitMovement
                         , onCancel = config.onCancelEdit
                         }
@@ -100,25 +107,58 @@ view config model =
                     [ adminArea config model
                     ]
                 , div [ class "content-stack" ]
-                    [ MovementTable.view
-                        { expenses = rows
-                        , accounts = Model.activeAccounts model
-                        , filterWindow = model.filterWindow
-                        , hiddenAccountIds = model.hiddenAccountIds
-                        , dateDisplay = model.dateDisplay
-                        , displayCurrency = model.displayCurrency
-                        , sortField = model.sortField
-                        , sortDirection = model.sortDirection
-                        , onSelectFilter = config.onSelectFilter
-                        , onToggleAccount = config.onToggleAccountFilter
-                        , onSelectDateDisplay = config.onSelectDateDisplay
-                        , onSelectDisplayCurrency = config.onSelectDisplayCurrency
-                        , onSelectSort = config.onSelectSort
-                        , onExportCsv = config.onExportCsv
-                        , onExportXlsx = config.onExportXlsx
-                        , onDelete = config.onDeleteMovement
-                        , onEdit = config.onEditMovement
-                        }
+                    [ viewModeToggle config model
+                    , case model.viewMode of
+                        CashflowView ->
+                            let
+                                rows : List Movement
+                                rows =
+                                    Model.visibleCashflowMovements model
+                            in
+                            MovementTable.view
+                                { expenses = rows
+                                , accounts = Model.activeAccounts model
+                                , filterWindow = model.filterWindow
+                                , hiddenAccountIds = model.hiddenAccountIds
+                                , dateDisplay = model.dateDisplay
+                                , displayCurrency = model.displayCurrency
+                                , sortField = model.sortField
+                                , sortDirection = model.sortDirection
+                                , onSelectFilter = config.onSelectFilter
+                                , onToggleAccount = config.onToggleAccountFilter
+                                , onSelectDateDisplay = config.onSelectDateDisplay
+                                , onSelectDisplayCurrency = config.onSelectDisplayCurrency
+                                , onSelectSort = config.onSelectSort
+                                , onExportCsv = config.onExportCsv
+                                , onExportXlsx = config.onExportXlsx
+                                , onDelete = config.onDeleteMovement
+                                , onEdit = config.onEditMovement
+                                }
+
+                        InvoiceView ->
+                            let
+                                invoiceRows : List Movement
+                                invoiceRows =
+                                    Model.visibleInvoiceMovements model
+
+                                relatedCashflows : List Movement
+                                relatedCashflows =
+                                    Model.visibleInvoiceRelatedCashflows model
+                            in
+                            InvoiceTable.view
+                                { allMovements = Model.activeMovements model.expenses
+                                , invoices = invoiceRows
+                                , relatedCashflows = relatedCashflows
+                                , dateDisplay = model.dateDisplay
+                                , displayCurrency = model.displayCurrency
+                                , sortField = model.sortField
+                                , sortDirection = model.sortDirection
+                                , onSelectSort = config.onSelectSort
+                                , onExportCsv = config.onExportInvoicesCsv
+                                , onExportXlsx = config.onExportInvoicesXlsx
+                                , onDelete = config.onDeleteMovement
+                                , onEdit = config.onEditMovement
+                                }
                     ]
                 ]
             ]
@@ -281,4 +321,28 @@ adminArea config model =
                     }
                 ]
             ]
+        ]
+
+
+viewModeToggle : Config msg -> Model -> Html msg
+viewModeToggle config model =
+    div [ class "view-mode-toggle" ]
+        [ button
+            [ classList
+                [ ( "view-mode-toggle__btn", True )
+                , ( "view-mode-toggle__btn--active", model.viewMode == CashflowView )
+                ]
+            , type_ "button"
+            , onClick (config.onSelectViewMode CashflowView)
+            ]
+            [ text "Movimientos de caja" ]
+        , button
+            [ classList
+                [ ( "view-mode-toggle__btn", True )
+                , ( "view-mode-toggle__btn--active", model.viewMode == InvoiceView )
+                ]
+            , type_ "button"
+            , onClick (config.onSelectViewMode InvoiceView)
+            ]
+            [ text "Facturación" ]
         ]

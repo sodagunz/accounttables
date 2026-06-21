@@ -34,6 +34,9 @@ type Msg
     | UpdateCurrency String
     | UpdateDate String
     | UpdateMovementType Accounting.MovementType
+    | UpdateRelatedToInvoice Bool
+    | UpdateDocumentNumber String
+    | ToggleAllocationTarget String Bool
     | OpenAccountTool
     | SelectFilter FilterWindow
     | SelectDateDisplay DateDisplay
@@ -41,6 +44,8 @@ type Msg
     | SelectSort SortField
     | ExportCsv
     | ExportXlsx
+    | ExportInvoicesCsv
+    | ExportInvoicesXlsx
     | SignInWithGoogle
     | SignOut
     | AuthStateChanged Decode.Value
@@ -67,6 +72,7 @@ type Msg
     | ConfirmLocalMigration
     | SkipLocalMigration
     | ReopenTutorial
+    | SelectViewMode Model.ViewMode
     | DismissTutorialCompletion
     | TutorialActionReceived Decode.Value
 
@@ -220,6 +226,15 @@ update msg model =
         UpdateMovementType movementType ->
             ( { model | form = Accounting.setMovementType movementType model.form }, Cmd.none )
 
+        UpdateRelatedToInvoice relatedToInvoice ->
+            ( { model | form = Accounting.setRelatedToInvoice relatedToInvoice model.form }, Cmd.none )
+
+        UpdateDocumentNumber documentNumber ->
+            ( { model | form = Accounting.setDocumentNumber documentNumber model.form }, Cmd.none )
+
+        ToggleAllocationTarget targetId selected ->
+            ( { model | form = Accounting.toggleAllocationTarget targetId selected model.form }, Cmd.none )
+
         OpenAccountTool ->
             ( { model | accountError = "" }, focusAccountTool () )
 
@@ -240,6 +255,12 @@ update msg model =
 
         ExportXlsx ->
             ( model, exportVisibleTable Export.Xlsx model )
+
+        ExportInvoicesCsv ->
+            ( model, exportInvoices Export.Csv model )
+
+        ExportInvoicesXlsx ->
+            ( model, exportInvoices Export.Xlsx model )
 
         SignInWithGoogle ->
             ( model, signInWithGoogle () )
@@ -453,6 +474,9 @@ update msg model =
         DismissTutorialCompletion ->
             ( { model | tutorialCompletionVisible = False }, Cmd.none )
 
+        SelectViewMode viewMode ->
+            ( { model | viewMode = viewMode }, Cmd.none )
+
         TutorialActionReceived value ->
             Tutorial.handleTutorialAction tutorialConfig value model
 
@@ -482,6 +506,9 @@ messages =
     , currency = UpdateCurrency
     , date = UpdateDate
     , movementType = UpdateMovementType
+    , relatedToInvoice = UpdateRelatedToInvoice
+    , documentNumber = UpdateDocumentNumber
+    , allocationTarget = ToggleAllocationTarget
     , submitMovement = AddMovement
     , cancelEdit = CancelEdit
     , selectFilter = SelectFilter
@@ -491,6 +518,9 @@ messages =
     , selectSort = SelectSort
     , exportCsv = ExportCsv
     , exportXlsx = ExportXlsx
+    , exportInvoicesCsv = ExportInvoicesCsv
+    , exportInvoicesXlsx = ExportInvoicesXlsx
+    , selectViewMode = SelectViewMode
     , deleteMovement = DeleteMovement
     , editMovement = EditMovement
     , selectLedger = SelectLedger
@@ -546,7 +576,12 @@ movementsConfig =
 
 exportVisibleTable : Export.Format -> Model -> Cmd Msg
 exportVisibleTable format model =
-    exportTable (Export.tablePayload format model.dateDisplay model.today (Model.activeAccounts model) (Model.visibleMovements model))
+    exportTable (Export.tablePayload format model.dateDisplay model.today (Model.activeAccounts model) (Model.visibleCashflowMovements model))
+
+
+exportInvoices : Export.Format -> Model -> Cmd Msg
+exportInvoices format model =
+    exportTable (Export.invoiceTablePayload format model.dateDisplay model.today (Model.activeMovements model.expenses) (Model.visibleInvoiceMovements model) (Model.visibleInvoiceRelatedCashflows model))
 
 
 subscriptions : Model -> Sub Msg

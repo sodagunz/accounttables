@@ -10,6 +10,7 @@ module Update.Movements exposing
 
 import Accounting
 import Events
+import InvoiceAllocation
 import Json.Decode as Decode
 import Model exposing (Model, TutorialState(..), TutorialStep(..))
 import Projector
@@ -62,10 +63,149 @@ createOrUpdateMovement config movementId model =
     in
     case Accounting.buildMovement rate movementId (Model.activeAccounts readyModel) readyModel.form of
         Ok movement ->
-            persistMovement config readyModel movement
+            case validateMovementForSave readyModel movement of
+                Ok () ->
+                    persistMovement config readyModel (prepareMovementForSave readyModel movement)
+
+                Err error ->
+                    ( { readyModel | error = error }, Cmd.none )
 
         Err error ->
             ( { readyModel | error = error }, Cmd.none )
+
+
+validateMovementForSave : Model -> Accounting.Movement -> Result String ()
+validateMovementForSave model movement =
+    if model.form.editingId == Nothing && movement.movementType == Accounting.SupplierCreditNoteMovement then
+        validateCreditNoteTargets model movement
+
+    else
+        Ok ()
+
+
+validateCreditNoteTargets : Model -> Accounting.Movement -> Result String ()
+validateCreditNoteTargets model creditNote =
+    let
+        eligibleTargetIds : List String
+        eligibleTargetIds =
+            Model.activeMovements model.expenses
+                |> List.filter (eligibleCreditNoteTarget creditNote)
+                |> List.map .id
+    in
+    if List.isEmpty eligibleTargetIds then
+        Err "No hay facturas de esta cuenta y divisa para compensar con la nota de crédito. Crea o importa la factura primero."
+
+    else if targetIdsFor creditNote |> List.any (\targetId -> List.member targetId eligibleTargetIds) then
+        Ok ()
+
+    else
+        Err "Selecciona al menos una factura de esta cuenta y divisa para compensar la nota de crédito."
+
+
+eligibleCreditNoteTarget : Accounting.Movement -> Accounting.Movement -> Bool
+eligibleCreditNoteTarget creditNote target =
+    target.deletedAt
+        == Nothing
+        && target.accountId
+        == creditNote.accountId
+        && target.movementType
+        == Accounting.SupplierInvoiceMovement
+        && target.inputCurrency
+        == creditNote.inputCurrency
+
+
+prepareMovementForSave : Model -> Accounting.Movement -> Accounting.Movement
+prepareMovementForSave model movement =
+    movement
+        |> resolveAutoAllocation model
+        |> withGeneratedRelatedDescription model
+
+
+resolveAutoAllocation : Model -> Accounting.Movement -> Accounting.Movement
+resolveAutoAllocation model movement =
+    if model.form.editingId == Nothing && movement.relatedToInvoice && movement.allocationIntent == Nothing then
+        { movement | allocationIntent = InvoiceAllocation.resolveAutoTargets (Model.activeMovements model.expenses) movement }
+
+    else
+        movement
+
+
+withGeneratedRelatedDescription : Model -> Accounting.Movement -> Accounting.Movement
+withGeneratedRelatedDescription model movement =
+    if movement.relatedToInvoice then
+        case movement.movementType of
+            Accounting.ExpenseMovement ->
+                { movement | description = Just (generatedExpenseDescription (targetDocuments model movement)) }
+
+            Accounting.IncomeMovement ->
+                { movement | description = Just (generatedIncomeDescription (targetDocuments model movement)) }
+
+            _ ->
+                movement
+
+    else
+        movement
+
+
+targetDocuments : Model -> Accounting.Movement -> List Accounting.Movement
+targetDocuments model movement =
+    targetIdsFor movement
+        |> List.filterMap (findMovementById (Model.activeMovements model.expenses))
+
+
+targetIdsFor : Accounting.Movement -> List String
+targetIdsFor movement =
+    movement.allocationIntent
+        |> Maybe.map .targetIds
+        |> Maybe.withDefault []
+
+
+findMovementById : List Accounting.Movement -> String -> Maybe Accounting.Movement
+findMovementById movements movementId =
+    movements
+        |> List.filter (\movement -> movement.id == movementId)
+        |> List.head
+
+
+generatedExpenseDescription : List Accounting.Movement -> String
+generatedExpenseDescription documents =
+    generatedDescription
+        { singular = "Pago factura"
+        , plural = "Pago facturas"
+        , fallback = "Pago facturas"
+        }
+        documents
+
+
+generatedIncomeDescription : List Accounting.Movement -> String
+generatedIncomeDescription documents =
+    generatedDescription
+        { singular = "Cobro nota de crédito"
+        , plural = "Cobro notas de crédito"
+        , fallback = "Cobro notas"
+        }
+        documents
+
+
+generatedDescription : { singular : String, plural : String, fallback : String } -> List Accounting.Movement -> String
+generatedDescription labels documents =
+    let
+        numbers : List String
+        numbers =
+            documents
+                |> List.filterMap .documentNumber
+                |> List.map String.trim
+                |> List.filter ((/=) "")
+    in
+    case ( documents, numbers ) of
+        ( [ _ ], [ number ] ) ->
+            labels.singular ++ " " ++ number
+
+        ( _ :: _ :: _, _ :: _ ) ->
+            labels.plural ++ " " ++ String.join ", " numbers
+
+        _ ->
+            labels.fallback
 
 
 persistMovement : Config msg -> Model -> Accounting.Movement -> ( Model, Cmd msg )
@@ -90,6 +230,9 @@ persistMovement config readyModel movement =
                                 , ars = movement.ars
                                 , usd = movement.usd
                                 , date = movement.date
+                                , relatedToInvoice = movement.relatedToInvoice
+                                , documentNumber = movement.documentNumber
+                                , allocationIntent = movement.allocationIntent
                                 }
 
                         updatedMovements : List Accounting.Movement
@@ -127,6 +270,9 @@ persistMovement config readyModel movement =
                                 , ars = movement.ars
                                 , usd = movement.usd
                                 , date = movement.date
+                                , relatedToInvoice = movement.relatedToInvoice
+                                , documentNumber = movement.documentNumber
+                                , allocationIntent = movement.allocationIntent
                                 }
                     in
                     ( createEvent
@@ -173,6 +319,9 @@ persistMovement config readyModel movement =
             , date = readyModel.form.date
             , movementType = readyModel.form.movementType
             , editingId = Nothing
+            , relatedToInvoice = False
+            , documentNumber = ""
+            , allocationIntent = Nothing
             }
         , error = ""
       }

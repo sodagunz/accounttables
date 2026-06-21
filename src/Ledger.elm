@@ -17,6 +17,7 @@ module Ledger exposing
     )
 
 import Accounting exposing (Account, Movement, currencyFromString, movementTypeFromString)
+import Allocation
 import Events exposing (Event)
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -230,7 +231,7 @@ movementDecoder : Decode.Decoder Movement
 movementDecoder =
     Decode.map8
         (\id movementType description accountId accountName inputAmount inputCurrency exchangeRate ->
-            \ars usd date deletedAt ->
+            \ars usd date deletedAt relatedToInvoice documentNumber allocationIntent ->
                 { id = id
                 , movementType = movementType
                 , description = description
@@ -243,6 +244,9 @@ movementDecoder =
                 , usd = usd
                 , date = date
                 , deletedAt = deletedAt
+                , relatedToInvoice = relatedToInvoice
+                , documentNumber = documentNumber
+                , allocationIntent = allocationIntent
                 }
         )
         (Decode.field "id" Decode.string)
@@ -255,9 +259,18 @@ movementDecoder =
         (Decode.field "exchangeRate" Decode.float)
         |> Decode.andThen
             (\buildMovement ->
-                Decode.map4 buildMovement
+                Decode.map7 buildMovement
                     (Decode.field "ars" Decode.float)
                     (Decode.field "usd" Decode.float)
                     (Decode.field "date" Decode.string)
                     (Decode.maybe (Decode.field "deletedAt" Decode.string))
+                    (Decode.maybe (Decode.field "relatedToInvoice" Decode.bool)
+                        |> Decode.map (Maybe.withDefault False)
+                    )
+                    (Decode.maybe (Decode.field "documentNumber" (Decode.nullable Decode.string))
+                        |> Decode.map (Maybe.andThen identity)
+                    )
+                    (Decode.maybe (Decode.field "allocationIntent" (Decode.nullable Allocation.allocationIntentDecoder))
+                        |> Decode.map (Maybe.andThen identity)
+                    )
             )

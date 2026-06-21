@@ -9,8 +9,9 @@ module Events exposing
     )
 
 import Accounting exposing (Currency, MovementType, currencyFromString, currencyToString, movementTypeFromString, movementTypeToString)
+import Allocation exposing (AllocationIntent)
 import Json.Decode as Decode exposing (Decoder, field, float, int, maybe, string)
-import Json.Decode.Pipeline exposing (required)
+import Json.Decode.Pipeline exposing (custom, required)
 import Json.Encode as Encode
 
 
@@ -37,6 +38,9 @@ type alias MovementCreatedData =
     , ars : Float
     , usd : Float
     , date : String
+    , relatedToInvoice : Bool
+    , documentNumber : Maybe String
+    , allocationIntent : Maybe AllocationIntent
     }
 
 
@@ -56,6 +60,9 @@ type alias MovementUpdatedData =
     , ars : Float
     , usd : Float
     , date : String
+    , relatedToInvoice : Bool
+    , documentNumber : Maybe String
+    , allocationIntent : Maybe AllocationIntent
     }
 
 
@@ -113,6 +120,9 @@ dataEncoder event =
                         , ( "ars", Encode.float data.ars )
                         , ( "usd", Encode.float data.usd )
                         , ( "date", Encode.string data.date )
+                        , ( "relatedToInvoice", Encode.bool data.relatedToInvoice )
+                        , ( "documentNumber", encodeMaybeString data.documentNumber )
+                        , ( "allocationIntent", Allocation.encodeMaybeAllocationIntent data.allocationIntent )
                         ]
                   )
                 ]
@@ -134,6 +144,9 @@ dataEncoder event =
                 , ( "ars", Encode.float data.ars )
                 , ( "usd", Encode.float data.usd )
                 , ( "date", Encode.string data.date )
+                , ( "relatedToInvoice", Encode.bool data.relatedToInvoice )
+                , ( "documentNumber", encodeMaybeString data.documentNumber )
+                , ( "allocationIntent", Allocation.encodeMaybeAllocationIntent data.allocationIntent )
                 ]
 
 
@@ -189,6 +202,24 @@ movementCreatedDecoder =
     field "data" (field "movement" movementDataDecoder)
 
 
+relatedToInvoiceDecoder : Decoder Bool
+relatedToInvoiceDecoder =
+    Decode.maybe (Decode.field "relatedToInvoice" Decode.bool)
+        |> Decode.map (Maybe.withDefault False)
+
+
+documentNumberDecoder : Decoder (Maybe String)
+documentNumberDecoder =
+    Decode.maybe (Decode.field "documentNumber" (Decode.maybe Decode.string))
+        |> Decode.map (Maybe.andThen identity)
+
+
+allocationIntentDecoder : Decoder (Maybe AllocationIntent)
+allocationIntentDecoder =
+    Decode.maybe (Decode.field "allocationIntent" (Decode.nullable Allocation.allocationIntentDecoder))
+        |> Decode.map (Maybe.andThen identity)
+
+
 movementDataDecoder : Decoder MovementCreatedData
 movementDataDecoder =
     Decode.succeed MovementCreatedData
@@ -203,6 +234,9 @@ movementDataDecoder =
         |> required "ars" float
         |> required "usd" float
         |> required "date" string
+        |> custom relatedToInvoiceDecoder
+        |> custom documentNumberDecoder
+        |> custom allocationIntentDecoder
 
 
 movementDeletedDecoder : Decoder MovementDeletedData
@@ -227,4 +261,7 @@ movementUpdatedDecoder =
             |> required "ars" float
             |> required "usd" float
             |> required "date" string
+            |> custom relatedToInvoiceDecoder
+            |> custom documentNumberDecoder
+            |> custom allocationIntentDecoder
         )

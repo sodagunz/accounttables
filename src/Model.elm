@@ -4,6 +4,7 @@ module Model exposing
     , StorageMode(..)
     , TutorialState(..)
     , TutorialStep(..)
+    , ViewMode(..)
     , activeAccounts
     , activeAccountsFromList
     , activeMovements
@@ -11,10 +12,12 @@ module Model exposing
     , initial
     , ledgerNameFor
     , selectedLedgerId
-    , visibleMovements
+    , visibleCashflowMovements
+    , visibleInvoiceMovements
+    , visibleInvoiceRelatedCashflows
     )
 
-import Accounting exposing (Account, Currency(..), FilterWindow(..), Form, Movement, SortDirection(..), SortField(..))
+import Accounting exposing (Account, Currency(..), FilterWindow(..), Form, Movement, SortDirection(..), SortField(..), isCashflowMovement, isInvoiceMovement, isInvoiceRelatedCashflow)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Auth exposing (AuthState(..))
 import Events exposing (Event)
@@ -53,6 +56,7 @@ type alias Model =
     , tutorialState : TutorialState
     , tutorialCompletionVisible : Bool
     , tutorialMovementId : Maybe String
+    , viewMode : ViewMode
     }
 
 
@@ -80,6 +84,11 @@ type TutorialState
     = TutorialOpen TutorialStep
     | TutorialDismissed
     | TutorialCompleted
+
+
+type ViewMode
+    = CashflowView
+    | InvoiceView
 
 
 initial : Model
@@ -113,6 +122,7 @@ initial =
     , tutorialState = TutorialOpen SignInStep
     , tutorialCompletionVisible = False
     , tutorialMovementId = Nothing
+    , viewMode = CashflowView
     }
 
 
@@ -121,6 +131,24 @@ visibleMovements model =
     Accounting.filteredMovements { model | expenses = activeMovements model.expenses }
         |> List.filter (\e -> not (List.member e.accountId model.hiddenAccountIds))
         |> Accounting.sortMovements model.sortField model.sortDirection
+
+
+visibleCashflowMovements : Model -> List Movement
+visibleCashflowMovements model =
+    visibleMovements model
+        |> List.filter isCashflowMovement
+
+
+visibleInvoiceMovements : Model -> List Movement
+visibleInvoiceMovements model =
+    visibleMovements model
+        |> List.filter isInvoiceMovement
+
+
+visibleInvoiceRelatedCashflows : Model -> List Movement
+visibleInvoiceRelatedCashflows model =
+    visibleMovements model
+        |> List.filter isInvoiceRelatedCashflow
 
 
 defaultAccounts : List Account

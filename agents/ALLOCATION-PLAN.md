@@ -722,32 +722,26 @@ Avoid:
 3. [x] Add UI state and picker wiring for invoice/credit-note selections.
 4. [x] Implement save-time auto-target resolution with source/reason audit fields.
 5. [x] Generate descriptions from selected/resolved documents for related cashflows.
-6. [ ] Add credit-note invoice picker with same-account and same-currency validation. (Partial: picker filters by same account/currency; save blocking remains.)
+6. [x] Add credit-note invoice picker with same-account and same-currency validation.
 7. [x] Build pure allocation/status module.
 8. [x] Integrate ledger-wide statuses into invoice table rows.
 9. [x] Adjust invoice period summaries to aggregate displayed documents only.
-10. [ ] Add pre-save warning messages for over/under allocation.
+10. [x] Add pre-save warning messages for over/under allocation.
 11. [x] Update export to include statuses and remaining due.
 12. [ ] Add migration helpers/reporting for legacy related cashflows.
-13. [ ] Add tests listed above. (Partial: allocation projector, auto-target, generated description, invoice report, and form allocation intent tests are in place.)
-14. [ ] Validate after each checkpoint:
-    - [x] `nix run .#format -- --validate` after invoice report/status checkpoint
-    - [x] `nix run .#test` after invoice report/status checkpoint
-    - [x] `nix run .#review` after invoice report/status checkpoint
-    - [x] `nix run .#build` after invoice report/status checkpoint
-    - [x] `nix run .#format -- --validate` after picker wiring checkpoint
-    - [x] `nix run .#test` after picker wiring checkpoint
-    - [x] `nix run .#review` after picker wiring checkpoint
-    - [x] `nix run .#build` after picker wiring checkpoint
-    - [x] `nix run .#format -- --validate` after auto-target checkpoint
-    - [x] `nix run .#test` after auto-target checkpoint
-    - [x] `nix run .#review` after auto-target checkpoint
-    - [x] `nix run .#build` after auto-target checkpoint
-    - [x] `nix run .#format -- --validate` after generated-description checkpoint
-    - [x] `nix run .#test` after generated-description checkpoint
-    - [x] `nix run .#review` after generated-description checkpoint
-    - [x] `nix run .#build` after generated-description checkpoint
+13. [ ] Add tests listed above. (Partial: allocation projector, auto-target, generated description, invoice report, form allocation intent, credit-note validation, and form warning/visibility tests are in place.)
+14. [x] Remove exchange-rate display in the input form when invoice or credit-note is selected.
 
+Validate after each checkpoint:
+    - [x] `nix run .#format -- --validate` after warning-and-form-visibility checkpoint
+    - [x] `nix run .#test` after warning-and-form-visibility checkpoint
+    - [x] `nix run .#review` after warning-and-form-visibility checkpoint
+    - [x] `nix run .#build` after warning-and-form-visibility checkpoint
+    - `nix run .#format -- --validate`
+    - `nix run .#test`
+    - `nix run .#review`
+    - `nix run .#build`
+    
 ## Remaining rough edges
 
 No blocking product questions remain. Credit notes are still the highest-risk part of this plan, so implementation should lean on small pure functions and example-heavy tests rather than clever UI assumptions.

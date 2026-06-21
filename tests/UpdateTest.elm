@@ -178,6 +178,86 @@ suite =
 
                     _ ->
                         Expect.fail "Expected generated payment movement"
+        , test "saving credit note without eligible invoice is blocked" <|
+            \_ ->
+                let
+                    result : ( Model.Model, Cmd Never )
+                    result =
+                        Movements.handleGeneratedId movementsConfig
+                            (Encode.string "cn-1")
+                            { initialModel
+                                | accounts = [ sampleAccount ]
+                                , expenses = []
+                                , exchangeRate = 1000
+                                , form = creditNoteForm
+                            }
+
+                    updatedModel : Model.Model
+                    updatedModel =
+                        Tuple.first result
+                in
+                Expect.all
+                    [ \model ->
+                        Expect.equal
+                            "No hay facturas de esta cuenta y divisa para compensar con la nota de crédito. Crea o importa la factura primero."
+                            model.error
+                    , \model -> Expect.equal [] (List.filter (\movement -> movement.id == "cn-1") model.expenses)
+                    ]
+                    updatedModel
+        , test "saving credit note requires selected eligible invoice" <|
+            \_ ->
+                let
+                    result : ( Model.Model, Cmd Never )
+                    result =
+                        Movements.handleGeneratedId movementsConfig
+                            (Encode.string "cn-1")
+                            { initialModel
+                                | accounts = [ sampleAccount ]
+                                , expenses = [ sampleInvoice ]
+                                , exchangeRate = 1000
+                                , form = creditNoteForm
+                            }
+
+                    updatedModel : Model.Model
+                    updatedModel =
+                        Tuple.first result
+                in
+                Expect.all
+                    [ \model ->
+                        Expect.equal
+                            "Selecciona al menos una factura de esta cuenta y divisa para compensar la nota de crédito."
+                            model.error
+                    , \model -> Expect.equal [ sampleInvoice ] model.expenses
+                    ]
+                    updatedModel
+        , test "saving credit note with selected eligible invoice stores allocation intent" <|
+            \_ ->
+                let
+                    result : ( Model.Model, Cmd Never )
+                    result =
+                        Movements.handleGeneratedId movementsConfig
+                            (Encode.string "cn-1")
+                            { initialModel
+                                | accounts = [ sampleAccount ]
+                                , expenses = [ sampleInvoice ]
+                                , exchangeRate = 1000
+                                , form = Accounting.toggleAllocationTarget "inv-1" True creditNoteForm
+                            }
+
+                    updatedModel : Model.Model
+                    updatedModel =
+                        Tuple.first result
+                in
+                case List.filter (\movement -> movement.id == "cn-1") updatedModel.expenses of
+                    [ creditNote ] ->
+                        Expect.all
+                            [ \movement -> Expect.equal (Just [ "inv-1" ]) (Maybe.map .targetIds movement.allocationIntent)
+                            , \_ -> Expect.equal "" updatedModel.error
+                            ]
+                            creditNote
+
+                    _ ->
+                        Expect.fail "Expected generated credit note movement"
         , test "ensureLocalLedger activates the browser-local ledger" <|
             \_ ->
                 let
@@ -219,6 +299,18 @@ initialModel =
 modelForm : Accounting.Form
 modelForm =
     Model.initial.form
+
+
+creditNoteForm : Accounting.Form
+creditNoteForm =
+    { modelForm
+        | amount = "40"
+        , accountId = sampleAccount.id
+        , currency = Accounting.USD
+        , date = "2026-06-20"
+        , movementType = Accounting.SupplierCreditNoteMovement
+        , documentNumber = "NC-001"
+    }
 
 
 sampleAccount : Accounting.Account

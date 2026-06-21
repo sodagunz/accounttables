@@ -63,10 +63,55 @@ createOrUpdateMovement config movementId model =
     in
     case Accounting.buildMovement rate movementId (Model.activeAccounts readyModel) readyModel.form of
         Ok movement ->
-            persistMovement config readyModel (prepareMovementForSave readyModel movement)
+            case validateMovementForSave readyModel movement of
+                Ok () ->
+                    persistMovement config readyModel (prepareMovementForSave readyModel movement)
+
+                Err error ->
+                    ( { readyModel | error = error }, Cmd.none )
 
         Err error ->
             ( { readyModel | error = error }, Cmd.none )
+
+
+validateMovementForSave : Model -> Accounting.Movement -> Result String ()
+validateMovementForSave model movement =
+    if model.form.editingId == Nothing && movement.movementType == Accounting.SupplierCreditNoteMovement then
+        validateCreditNoteTargets model movement
+
+    else
+        Ok ()
+
+
+validateCreditNoteTargets : Model -> Accounting.Movement -> Result String ()
+validateCreditNoteTargets model creditNote =
+    let
+        eligibleTargetIds : List String
+        eligibleTargetIds =
+            Model.activeMovements model.expenses
+                |> List.filter (eligibleCreditNoteTarget creditNote)
+                |> List.map .id
+    in
+    if List.isEmpty eligibleTargetIds then
+        Err "No hay facturas de esta cuenta y divisa para compensar con la nota de crédito. Crea o importa la factura primero."
+
+    else if targetIdsFor creditNote |> List.any (\targetId -> List.member targetId eligibleTargetIds) then
+        Ok ()
+
+    else
+        Err "Selecciona al menos una factura de esta cuenta y divisa para compensar la nota de crédito."
+
+
+eligibleCreditNoteTarget : Accounting.Movement -> Accounting.Movement -> Bool
+eligibleCreditNoteTarget creditNote target =
+    target.deletedAt
+        == Nothing
+        && target.accountId
+        == creditNote.accountId
+        && target.movementType
+        == Accounting.SupplierInvoiceMovement
+        && target.inputCurrency
+        == creditNote.inputCurrency
 
 
 prepareMovementForSave : Model -> Accounting.Movement -> Accounting.Movement

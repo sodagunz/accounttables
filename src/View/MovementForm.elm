@@ -1,10 +1,11 @@
-module View.MovementForm exposing (Config, view)
+module View.MovementForm exposing (Config, preSaveWarning, showsExchangeRate, view)
 
 import Accounting exposing (Account, Currency(..), Form, Movement, MovementType(..), currencyToString, movementTypeToString)
 import Api.Dolar exposing (ExchangeRateStatus(..))
 import Html exposing (Html, button, div, input, label, option, p, section, select, span, strong, text)
 import Html.Attributes exposing (attribute, autofocus, checked, class, classList, name, step, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
+import InvoiceAllocation
 import InvoiceReport
 import Time
 import Util.Date as Date
@@ -74,6 +75,247 @@ submitButtonLabel form =
             "Registrar nota de crédito"
 
 
+showsExchangeRate : Form -> Bool
+showsExchangeRate form =
+    not (isInvoiceType form.movementType)
+
+
+preSaveWarning : Float -> List Account -> List Movement -> Form -> Maybe String
+preSaveWarning exchangeRate accounts movements form =
+    case Accounting.buildMovement exchangeRate "preview-warning" accounts form of
+        Ok movement ->
+            warningForMovement movements (resolvePreviewMovement movements movement)
+
+        Err _ ->
+            Nothing
+
+
+resolvePreviewMovement : List Movement -> Movement -> Movement
+resolvePreviewMovement movements movement =
+    if movement.relatedToInvoice && movement.allocationIntent == Nothing then
+        { movement | allocationIntent = InvoiceAllocation.resolveAutoTargets movements movement }
+
+    else
+        movement
+
+
+warningForMovement : List Movement -> Movement -> Maybe String
+warningForMovement movements movement =
+    case movement.movementType of
+        ExpenseMovement ->
+            if movement.relatedToInvoice then
+                relatedCashflowWarning
+                    { targetType = SupplierInvoiceMovement
+                    , noCandidates = "Este pago está marcado para aplicarse a facturas, pero no hay facturas elegibles en esta cuenta. Puedes guardarlo, pero no quedará aplicado a ninguna factura."
+                    , overAllocated = "Estás pagando más de lo pendiente en las facturas seleccionadas. El sobrante quedará como sobrepago en la factura más antigua seleccionada."
+                    , underAllocated = "El pago no alcanza para cubrir todas las facturas seleccionadas. Se aplicará primero a las más antiguas y quedará saldo pendiente."
+                    }
+                    movements
+                    movement
+
+            else
+                Nothing
+
+        IncomeMovement ->
+            if movement.relatedToInvoice then
+                relatedCashflowWarning
+                    { targetType = SupplierCreditNoteMovement
+                    , noCandidates = "Este cobro está marcado para aplicarse a notas de crédito, pero no hay notas de crédito elegibles en esta cuenta. Puedes guardarlo, pero no quedará aplicado a ninguna nota de crédito."
+                    , overAllocated = "Estás cobrando más de lo pendiente en las notas de crédito seleccionadas. El sobrante quedará como cobro en exceso en la nota de crédito más antigua seleccionada."
+                    , underAllocated = "El cobro no alcanza para cubrir todas las notas de crédito seleccionadas. Se aplicará primero a las más antiguas y quedará saldo pendiente."
+                    }
+                    movements
+                    movement
+
+            else
+                Nothing
+
+        SupplierCreditNoteMovement ->
+            creditNoteWarning movements movement
+
+        SupplierInvoiceMovement ->
+            Nothing
+
+
+relatedCashflowWarning :
+    { targetType : MovementType
+    , noCandidates : String
+    , overAllocated : String
+    , underAllocated : String
+    }
+    -> List Movement
+    -> Movement
+    -> Maybe String
+relatedCashflowWarning labels movements movement =
+    let
+        eligibleTargets : List Movement
+        eligibleTargets =
+            movements
+                |> List.filter (eligibleRelatedCashflowTarget labels.targetType movement)
+
+        selectedTargets : List Movement
+        selectedTargets =
+            selectedTargetMovements eligibleTargets movement
+    in
+    if List.isEmpty selectedTargets then
+        if List.isEmpty eligibleTargets then
+            Just labels.noCandidates
+
+        else
+            Nothing
+
+    else
+        amountComparisonWarning labels.overAllocated labels.underAllocated movements movement selectedTargets
+
+
+creditNoteWarning : List Movement -> Movement -> Maybe String
+creditNoteWarning movements movement =
+    let
+        eligibleTargets : List Movement
+        eligibleTargets =
+            movements
+                |> List.filter (eligibleCreditNoteTarget movement)
+
+        selectedTargets : List Movement
+        selectedTargets =
+            selectedTargetMovements eligibleTargets movement
+    in
+    if List.isEmpty selectedTargets then
+        Nothing
+
+    else
+        amountComparisonWarning
+            "La nota de crédito supera lo pendiente en las facturas seleccionadas. El sobrante quedará como crédito en exceso en la factura más antigua seleccionada."
+            "La nota de crédito no alcanza para compensar todas las facturas seleccionadas. Se aplicará primero a las más antiguas y quedará saldo pendiente."
+            movements
+            movement
+            selectedTargets
+
+
+amountComparisonWarning : String -> String -> List Movement -> Movement -> List Movement -> Maybe String
+amountComparisonWarning overAllocated underAllocated movements movement selectedTargets =
+    let
+        activeMovements : List Movement
+        activeMovements =
+            List.filter (\item -> item.deletedAt == Nothing && item.id /= movement.id) movements
+
+        existingAllocations : List InvoiceAllocation.Allocation
+        existingAllocations =
+            InvoiceAllocation.allocate activeMovements
+
+        remainingSelectedInSourceCurrency : Float
+        remainingSelectedInSourceCurrency =
+            selectedTargets
+                |> List.map (remainingDueInSourceCurrency existingAllocations movement)
+                |> List.sum
+
+        sourceAmount : Float
+        sourceAmount =
+            abs movement.inputAmount
+
+        tolerance : Float
+        tolerance =
+            toleranceFor movement.inputCurrency movement.exchangeRate
+    in
+    if sourceAmount > remainingSelectedInSourceCurrency + tolerance then
+        Just overAllocated
+
+    else if remainingSelectedInSourceCurrency > sourceAmount + tolerance then
+        Just underAllocated
+
+    else
+        Nothing
+
+
+remainingDueInSourceCurrency : List InvoiceAllocation.Allocation -> Movement -> Movement -> Float
+remainingDueInSourceCurrency allocations source target =
+    let
+        remainingDue : Float
+        remainingDue =
+            targetSettlement allocations target
+                |> .remainingDue
+    in
+    convertAmount source.exchangeRate target.inputCurrency source.inputCurrency remainingDue
+
+
+targetSettlement : List InvoiceAllocation.Allocation -> Movement -> InvoiceAllocation.DocumentSettlement
+targetSettlement allocations target =
+    case target.movementType of
+        SupplierCreditNoteMovement ->
+            InvoiceAllocation.creditNoteSettlementFor allocations target
+
+        _ ->
+            InvoiceAllocation.invoiceSettlementFor allocations target
+
+
+eligibleRelatedCashflowTarget : MovementType -> Movement -> Movement -> Bool
+eligibleRelatedCashflowTarget targetType source target =
+    target.deletedAt
+        == Nothing
+        && target.accountId
+        == source.accountId
+        && target.movementType
+        == targetType
+
+
+eligibleCreditNoteTarget : Movement -> Movement -> Bool
+eligibleCreditNoteTarget source target =
+    target.deletedAt
+        == Nothing
+        && target.accountId
+        == source.accountId
+        && target.movementType
+        == SupplierInvoiceMovement
+        && target.inputCurrency
+        == source.inputCurrency
+
+
+selectedTargetMovements : List Movement -> Movement -> List Movement
+selectedTargetMovements eligibleTargets movement =
+    targetIds movement
+        |> List.filterMap (findMovementById eligibleTargets)
+
+
+targetIds : Movement -> List String
+targetIds movement =
+    movement.allocationIntent
+        |> Maybe.map .targetIds
+        |> Maybe.withDefault []
+
+
+findMovementById : List Movement -> String -> Maybe Movement
+findMovementById movements movementId =
+    movements
+        |> List.filter (\movement -> movement.id == movementId)
+        |> List.head
+
+
+convertAmount : Float -> Currency -> Currency -> Float -> Float
+convertAmount exchangeRate fromCurrency toCurrency amount =
+    case ( fromCurrency, toCurrency ) of
+        ( ARS, ARS ) ->
+            amount
+
+        ( USD, USD ) ->
+            amount
+
+        ( ARS, USD ) ->
+            amount / exchangeRate
+
+        ( USD, ARS ) ->
+            amount * exchangeRate
+
+
+toleranceFor : Currency -> Float -> Float
+toleranceFor currency exchangeRate =
+    case currency of
+        USD ->
+            1
+
+        ARS ->
+            exchangeRate
+
+
 view : Config msg -> Html msg
 view config =
     let
@@ -84,6 +326,10 @@ view config =
         editing : Bool
         editing =
             config.form.editingId /= Nothing
+
+        warningText : Maybe String
+        warningText =
+            preSaveWarning config.exchangeRate config.accounts config.movements config.form
     in
     section [ class "panel movement-panel" ]
         [ Html.h2 [ class "section-title movement-title" ] [ text "Registrar movimiento" ]
@@ -217,7 +463,17 @@ view config =
               else
                 text ""
             , allocationPicker config selectedAccountId
-            , exchangeRateView config
+            , if showsExchangeRate config.form then
+                exchangeRateView config
+
+              else
+                text ""
+            , case warningText of
+                Just warning ->
+                    p [ class "movement-warning" ] [ text warning ]
+
+                Nothing ->
+                    text ""
             , p [ class "error" ] [ text config.error ]
             , let
                 buttonText : String

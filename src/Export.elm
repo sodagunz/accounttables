@@ -99,7 +99,7 @@ subtotalRows accounts movements payable =
     in
     List.map (\account -> totalRow ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (movementsFor account movements))) accounts
         ++ [ totalRow "Saldo de caja" "subtotal" cashOnHand
-           , totalRow "Total" "total" total
+           , totalRow "Posición neta" "total" total
            ]
 
 

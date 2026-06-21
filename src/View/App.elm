@@ -149,6 +149,7 @@ view config model =
                                 , onExportXlsx = config.onExportXlsx
                                 , onDelete = config.onDeleteMovement
                                 , onEdit = config.onEditMovement
+                                , onSelectInvoiceView = config.onSelectViewMode InvoiceView
                                 }
 
                         InvoiceView ->
@@ -165,6 +166,7 @@ view config model =
                                 { allMovements = Model.activeMovements model.expenses
                                 , invoices = invoiceRows
                                 , relatedCashflows = relatedCashflows
+                                , cashflowMovements = Model.visibleCashflowMovements model
                                 , accounts = Model.activeAccounts model
                                 , filterWindow = model.filterWindow
                                 , hiddenAccountIds = model.hiddenAccountIds
@@ -181,6 +183,7 @@ view config model =
                                 , onExportXlsx = config.onExportInvoicesXlsx
                                 , onDelete = config.onDeleteMovement
                                 , onEdit = config.onEditMovement
+                                , onSelectMovementsView = config.onSelectViewMode CashflowView
                                 }
                     ]
                 ]

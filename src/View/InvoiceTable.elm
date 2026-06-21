@@ -1,6 +1,6 @@
 module View.InvoiceTable exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), FilterWindow(..), Movement, MovementType(..), SortDirection, SortField, currencyToString, descriptionDisplay)
+import Accounting exposing (Account, Currency(..), FilterWindow(..), MoneyTotal, Movement, MovementType(..), SortDirection, SortField, currencyToString, descriptionDisplay, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, checked, class, classList, for, id, name, type_)
 import Html.Events exposing (onClick)
@@ -14,6 +14,7 @@ type alias Config msg =
     { allMovements : List Movement
     , invoices : List Movement
     , relatedCashflows : List Movement
+    , cashflowMovements : List Movement
     , accounts : List Account
     , filterWindow : FilterWindow
     , hiddenAccountIds : List String
@@ -30,6 +31,7 @@ type alias Config msg =
     , onExportXlsx : msg
     , onDelete : String -> msg
     , onEdit : String -> msg
+    , onSelectMovementsView : msg
     }
 
 
@@ -100,11 +102,11 @@ invoiceTableBody config =
                         ]
                     , tbody []
                         (List.map (row config.dateDisplay config.displayCurrency config.onEdit config.onDelete) sortedRows
-                            ++ summaryRow "Total facturas" (valueForCurrency config.displayCurrency summary.facturasTotal) config.displayCurrency
-                            ++ summaryRow "Total notas de crédito" (valueForCurrency config.displayCurrency summary.creditNotesTotal) config.displayCurrency
-                            ++ summaryRow "Total documentos" (valueForCurrency config.displayCurrency summary.documentsTotal) config.displayCurrency
-                            ++ summaryRow summary.settlementContributionLabel (valueForCurrency config.displayCurrency summary.settlementContribution) config.displayCurrency
-                            ++ payableRow "Saldo pendiente" (valueForCurrency config.displayCurrency summary.payable) config.displayCurrency
+                            ++ summaryRow "Total facturas" (text "Total facturas") "subtotal" Nothing (valueForCurrency config.displayCurrency summary.facturasTotal) config.displayCurrency
+                            ++ summaryRow "Total notas de crédito" (text "Total notas de crédito") "subtotal" Nothing (valueForCurrency config.displayCurrency summary.creditNotesTotal) config.displayCurrency
+                            ++ summaryRow "Total documentos" (text "Total documentos") "subtotal" Nothing (valueForCurrency config.displayCurrency summary.documentsTotal) config.displayCurrency
+                            ++ summaryRow summary.settlementContributionLabel (text summary.settlementContributionLabel) "subtotal" Nothing (valueForCurrency config.displayCurrency summary.settlementContribution) config.displayCurrency
+                            ++ sharedSummaryRows config summary.payable
                         )
                     ]
                 ]
@@ -233,10 +235,19 @@ formatTotal value currency =
         prefix ++ number
 
 
-summaryRow : String -> Float -> Currency -> List (Html msg)
-summaryRow label value displayCurrency =
-    [ tr [ class "subtotal" ]
-        [ td [ attribute "colspan" "8", attribute "data-label" label ] [ text label ]
+summaryRow : String -> Html msg -> String -> Maybe msg -> Float -> Currency -> List (Html msg)
+summaryRow dataLabel labelContent rowClass onSelect value displayCurrency =
+    [ tr
+        (class rowClass
+            :: (case onSelect of
+                    Just msg ->
+                        [ onClick msg ]
+
+                    Nothing ->
+                        []
+               )
+        )
+        [ td [ attribute "colspan" "8", attribute "data-label" dataLabel ] [ labelContent ]
         , td
             [ attribute "data-label" "Total"
             , classList
@@ -250,21 +261,46 @@ summaryRow label value displayCurrency =
     ]
 
 
-payableRow : String -> Float -> Currency -> List (Html msg)
-payableRow label value displayCurrency =
-    [ tr [ class "grand-total" ]
-        [ td [ attribute "colspan" "8", attribute "data-label" label ] [ text label ]
-        , td
-            [ attribute "data-label" "Total"
-            , classList
-                [ ( "numeric", True )
-                , ( "is-negative", value < 0 )
+sharedSummaryRows : Config msg -> MoneyTotal -> List (Html msg)
+sharedSummaryRows config payable =
+    let
+        cashOnHand : MoneyTotal
+        cashOnHand =
+            summarizeMoney config.cashflowMovements
+
+        total : MoneyTotal
+        total =
+            { ars = cashOnHand.ars + payable.ars
+            , usd = cashOnHand.usd + payable.usd
+            }
+    in
+    summaryRow
+        "Saldo pendiente (facturas)"
+        (text "Saldo pendiente (facturas)")
+        "summary-divider subtotal"
+        Nothing
+        (valueForCurrency config.displayCurrency payable)
+        config.displayCurrency
+        ++ summaryRow
+            "Saldo de caja (movimientos)"
+            (text "Saldo de caja (movimientos)")
+            "subtotal clickable-summary-row"
+            (Just config.onSelectMovementsView)
+            (valueForCurrency config.displayCurrency cashOnHand)
+            config.displayCurrency
+        ++ [ tr [ class "grand-total" ]
+                [ td [ attribute "colspan" "8", attribute "data-label" "Posición neta" ] [ text "Posición neta" ]
+                , td
+                    [ attribute "data-label" "Posición neta"
+                    , classList
+                        [ ( "numeric", True )
+                        , ( "is-negative", valueForCurrency config.displayCurrency total < 0 )
+                        ]
+                    ]
+                    [ text (formatTotal (valueForCurrency config.displayCurrency total) config.displayCurrency) ]
+                , td [] []
                 ]
-            ]
-            [ text (formatTotal value displayCurrency) ]
-        , td [] []
-        ]
-    ]
+           ]
 
 
 filterControls : Config msg -> Html msg

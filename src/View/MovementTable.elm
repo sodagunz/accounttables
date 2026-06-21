@@ -27,6 +27,7 @@ type alias Config msg =
     , onExportXlsx : msg
     , onDelete : String -> msg
     , onEdit : String -> msg
+    , onSelectInvoiceView : msg
     }
 
 
@@ -98,7 +99,7 @@ expenseTableBody config =
                             , th [ class "actions-header" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Acciones" ] ]
                             ]
                         ]
-                    , tbody [] (List.map (movementRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows visibleAccounts config.expenses config.payable config.displayCurrency)
+                    , tbody [] (List.map (movementRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows config visibleAccounts)
                     ]
                 ]
             ]
@@ -356,34 +357,48 @@ sortableHeader config sortField alignment labelText =
         ]
 
 
-subtotalRows : List Account -> List Movement -> MoneyTotal -> Currency -> List (Html msg)
-subtotalRows accounts expenses payable displayCurrency =
+subtotalRows : Config msg -> List Account -> List (Html msg)
+subtotalRows config accounts =
     let
         cashOnHand : MoneyTotal
         cashOnHand =
-            summarizeMoney expenses
+            summarizeMoney config.expenses
 
         total : MoneyTotal
         total =
-            { ars = cashOnHand.ars + payable.ars
-            , usd = cashOnHand.usd + payable.usd
+            { ars = cashOnHand.ars + config.payable.ars
+            , usd = cashOnHand.usd + config.payable.usd
             }
     in
-    List.map (\account -> totalRow displayCurrency ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (movementsFor account expenses))) accounts
-        ++ [ totalRow displayCurrency "Saldo de caja" "subtotal" cashOnHand
-           , totalRow displayCurrency "Total" "grand-total" total
+    List.map (\account -> totalRow config.displayCurrency (text ("Subtotal " ++ account.name)) "subtotal" Nothing (summarizeMoney (movementsFor account config.expenses))) accounts
+        ++ [ totalRow config.displayCurrency
+                (text "Saldo pendiente (facturas)")
+                "summary-divider subtotal clickable-summary-row"
+                (Just config.onSelectInvoiceView)
+                config.payable
+           , totalRow config.displayCurrency (text "Saldo de caja (movimientos)") "subtotal" Nothing cashOnHand
+           , totalRow config.displayCurrency (text "Posición neta") "grand-total" Nothing total
            ]
 
 
-totalRow : Currency -> String -> String -> MoneyTotal -> Html msg
-totalRow displayCurrency labelText rowClass total =
+totalRow : Currency -> Html msg -> String -> Maybe msg -> MoneyTotal -> Html msg
+totalRow displayCurrency labelContent rowClass onSelect total =
     let
         totalValue : Float
         totalValue =
             valueForCurrency displayCurrency total
     in
-    tr [ class rowClass ]
-        [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ text labelText ]
+    tr
+        (class rowClass
+            :: (case onSelect of
+                    Just msg ->
+                        [ onClick msg ]
+
+                    Nothing ->
+                        []
+               )
+        )
+        [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ labelContent ]
         , td
             [ attribute "data-label" "Total"
             , classList

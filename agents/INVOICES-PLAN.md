@@ -442,6 +442,40 @@ Placement:
 - Use the same period/account/date/currency state as the cashflow table so both tables stay aligned.
 - If there are no invoice-like movements and no invoice-related cashflows in the selected period, show an empty state such as `Todavía no hay facturas ni notas de crédito para este período.`
 
+## Future allocation and status design
+
+A later pass should replace the boolean-only `relatedToInvoice` behavior with explicit cashflow-to-document allocation. This is not part of the first implementation, but the first-pass schema and UI should avoid choices that make it harder.
+
+Planned status vocabulary:
+
+- `Pending`: no cashflow movement has been allocated.
+- `Partially Paid/Collected`: allocated cashflow exists, but some amount remains due.
+- `Fully Paid/Collected`: no amount remains due.
+- `Overpaid`: allocated amount exceeds the document amount.
+
+Known allocation rules under discussion:
+
+- Expenses can only allocate to supplier invoices.
+- Incomes can only allocate to supplier credit notes.
+- A cashflow movement may select zero, one, or many invoice-like documents.
+- Do not prevent saving when the selected documents cannot exactly absorb the cashflow amount.
+- The UI should give clear Spanish feedback before saving:
+  - If cashflow exceeds selected remaining due: `Estás pagando más de lo pendiente en las facturas seleccionadas. El sobrante quedará como sobrepago en la factura más antigua seleccionada.`
+  - If selected remaining due exceeds the cashflow: `El pago no alcanza para cubrir todas las facturas seleccionadas. Se aplicará primero a las más antiguas y quedará saldo pendiente.`
+  - For credit notes/income, use `cobrando`, `notas de crédito`, and `cobro` instead of `pagando`, `facturas`, and `pago`.
+- The warning is informational/confirmational, not a hard validation error.
+
+Open allocation questions before implementing this later pass:
+
+1. Should auto-selection only consider invoice/CN documents with the same `accountId` as the cashflow movement?
+2. Should cross-currency allocation be supported immediately, using the cashflow movement exchange rate to compute status in the document's original currency?
+3. For new cashflows with no selected documents, should we resolve and store target document IDs at save time to avoid future documents retroactively changing old allocations?
+4. Should related cashflows be processed by movement date ascending, then ID?
+5. Should invoice/CN status be computed ledger-wide/current-known state, regardless of the selected reporting period?
+6. Should exact match mean exact remaining due in original currency, or exact converted amount using the cashflow rate?
+7. Should description remain optional even when invoice/CN documents are selected?
+8. Should credit notes only be settled by `Ingreso` movements for now, without direct credit-note-to-invoice offsetting?
+
 ## Export
 
 Include invoice export in this first pass.

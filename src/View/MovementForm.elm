@@ -153,7 +153,7 @@ view config =
                         , onClick (config.onMovementType SupplierCreditNoteMovement)
                         ]
                         []
-                    , span [] [ text "Nota de crédito" ]
+                    , span [] [ text "N. cred." ]
                     ]
                 ]
             , if isInvoiceType config.form.movementType then

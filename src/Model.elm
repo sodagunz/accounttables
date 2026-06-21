@@ -4,6 +4,7 @@ module Model exposing
     , StorageMode(..)
     , TutorialState(..)
     , TutorialStep(..)
+    , ViewMode(..)
     , activeAccounts
     , activeAccountsFromList
     , activeMovements
@@ -55,6 +56,7 @@ type alias Model =
     , tutorialState : TutorialState
     , tutorialCompletionVisible : Bool
     , tutorialMovementId : Maybe String
+    , viewMode : ViewMode
     }
 
 
@@ -82,6 +84,11 @@ type TutorialState
     = TutorialOpen TutorialStep
     | TutorialDismissed
     | TutorialCompleted
+
+
+type ViewMode
+    = CashflowView
+    | InvoiceView
 
 
 initial : Model
@@ -115,6 +122,7 @@ initial =
     , tutorialState = TutorialOpen SignInStep
     , tutorialCompletionVisible = False
     , tutorialMovementId = Nothing
+    , viewMode = CashflowView
     }
 
 

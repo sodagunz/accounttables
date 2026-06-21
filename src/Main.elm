@@ -71,6 +71,7 @@ type Msg
     | ConfirmLocalMigration
     | SkipLocalMigration
     | ReopenTutorial
+    | SelectViewMode Model.ViewMode
     | DismissTutorialCompletion
     | TutorialActionReceived Decode.Value
 
@@ -469,6 +470,9 @@ update msg model =
         DismissTutorialCompletion ->
             ( { model | tutorialCompletionVisible = False }, Cmd.none )
 
+        SelectViewMode viewMode ->
+            ( { model | viewMode = viewMode }, Cmd.none )
+
         TutorialActionReceived value ->
             Tutorial.handleTutorialAction tutorialConfig value model
 
@@ -511,6 +515,7 @@ messages =
     , exportXlsx = ExportXlsx
     , exportInvoicesCsv = ExportInvoicesCsv
     , exportInvoicesXlsx = ExportInvoicesXlsx
+    , selectViewMode = SelectViewMode
     , deleteMovement = DeleteMovement
     , editMovement = EditMovement
     , selectLedger = SelectLedger

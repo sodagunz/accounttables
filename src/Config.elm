@@ -12,6 +12,7 @@ import Accounting exposing (FilterWindow, SortField)
 import Events
 import Json.Encode as Encode
 import Ledger
+import Model exposing (ViewMode)
 import Tutorial
 import Update.Auth as AuthUpdate
 import Update.LedgerData as LedgerData
@@ -45,6 +46,7 @@ type alias Messages msg =
     , exportXlsx : msg
     , exportInvoicesCsv : msg
     , exportInvoicesXlsx : msg
+    , selectViewMode : ViewMode -> msg
     , deleteMovement : String -> msg
     , editMovement : String -> msg
     , selectLedger : String -> msg
@@ -104,6 +106,7 @@ view messages =
     , onExportXlsx = messages.exportXlsx
     , onExportInvoicesCsv = messages.exportInvoicesCsv
     , onExportInvoicesXlsx = messages.exportInvoicesXlsx
+    , onSelectViewMode = messages.selectViewMode
     , onDeleteMovement = messages.deleteMovement
     , onEditMovement = messages.editMovement
     , onSelectLedger = messages.selectLedger

@@ -48,4 +48,4 @@ If you are not familiar with Nix, you can still use the project without it; you 
 ## Auth/DB
 
 The app uses Firebase Auth and Firestore. Configuration is done via `firebase-config.js`.
-I will probably migrate away from Firebase in the future, but for now it's fast, easy and free; and it doesn't require a roundtrip through the Atlantic the same way deploying a server to my homelab would.
+I will probably migrate away from Firebase in the future, but for now it's fast, easy and free; and it doesn't require a roundtrip through the Atlantic the same way deploying a server to my homelab would. If anyone knows a free and reliable VPS provider in latam, please let me know in an issue or something. I really need very, very small compute resources for this project, but I'd like to avoid the dynamic pricing that comes from cloud.

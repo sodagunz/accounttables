@@ -720,7 +720,7 @@ Avoid:
 1. [x] Add allocation union types and JSON encoders/decoders.
 2. [x] Extend `Movement`/`Form` with `allocationIntent`.
 3. [x] Add UI state and picker wiring for invoice/credit-note selections.
-4. [ ] Implement save-time auto-target resolution with source/reason audit fields.
+4. [x] Implement save-time auto-target resolution with source/reason audit fields.
 5. [ ] Generate descriptions from selected/resolved documents for related cashflows.
 6. [ ] Add credit-note invoice picker with same-account and same-currency validation. (Partial: picker filters by same account/currency; save blocking remains.)
 7. [x] Build pure allocation/status module.
@@ -729,7 +729,7 @@ Avoid:
 10. [ ] Add pre-save warning messages for over/under allocation.
 11. [x] Update export to include statuses and remaining due.
 12. [ ] Add migration helpers/reporting for legacy related cashflows.
-13. [ ] Add tests listed above. (Partial: allocation projector, invoice report, and form allocation intent tests are in place.)
+13. [ ] Add tests listed above. (Partial: allocation projector, auto-target, invoice report, and form allocation intent tests are in place.)
 14. [ ] Validate after each checkpoint:
     - [x] `nix run .#format -- --validate` after invoice report/status checkpoint
     - [x] `nix run .#test` after invoice report/status checkpoint
@@ -739,6 +739,10 @@ Avoid:
     - [x] `nix run .#test` after picker wiring checkpoint
     - [x] `nix run .#review` after picker wiring checkpoint
     - [x] `nix run .#build` after picker wiring checkpoint
+    - [x] `nix run .#format -- --validate` after auto-target checkpoint
+    - [x] `nix run .#test` after auto-target checkpoint
+    - [x] `nix run .#review` after auto-target checkpoint
+    - [x] `nix run .#build` after auto-target checkpoint
 
 ## Remaining rough edges
 

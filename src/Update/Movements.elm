@@ -10,6 +10,7 @@ module Update.Movements exposing
 
 import Accounting
 import Events
+import InvoiceAllocation
 import Json.Decode as Decode
 import Model exposing (Model, TutorialState(..), TutorialStep(..))
 import Projector
@@ -62,10 +63,19 @@ createOrUpdateMovement config movementId model =
     in
     case Accounting.buildMovement rate movementId (Model.activeAccounts readyModel) readyModel.form of
         Ok movement ->
-            persistMovement config readyModel movement
+            persistMovement config readyModel (resolveAutoAllocation readyModel movement)
 
         Err error ->
             ( { readyModel | error = error }, Cmd.none )
+
+
+resolveAutoAllocation : Model -> Accounting.Movement -> Accounting.Movement
+resolveAutoAllocation model movement =
+    if model.form.editingId == Nothing && movement.relatedToInvoice && movement.allocationIntent == Nothing then
+        { movement | allocationIntent = InvoiceAllocation.resolveAutoTargets (Model.activeMovements model.expenses) movement }
+
+    else
+        movement
 
 
 persistMovement : Config msg -> Model -> Accounting.Movement -> ( Model, Cmd msg )

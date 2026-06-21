@@ -6,10 +6,11 @@ module InvoiceAllocation exposing
     , allocate
     , creditNoteSettlementFor
     , invoiceSettlementFor
+    , resolveAutoTargets
     )
 
 import Accounting exposing (Currency(..), Movement, MovementType(..))
-import Allocation exposing (AllocationIntent, AllocationStrategy, TargetSelectionSource)
+import Allocation exposing (AllocationIntent, AllocationStrategy(..), AutoSelectionReason(..), TargetSelectionSource(..))
 
 
 type AllocationKind
@@ -264,6 +265,104 @@ invoiceSettlementFor allocations invoice =
             |> List.filter (\allocation -> allocation.targetMovementId == invoice.id)
             |> List.foldl (\allocation total -> total + allocation.amountInTargetCurrency) 0
         )
+
+
+resolveAutoTargets : List Movement -> Movement -> Maybe AllocationIntent
+resolveAutoTargets movements source =
+    if not source.relatedToInvoice || source.allocationIntent /= Nothing then
+        source.allocationIntent
+
+    else
+        case autoTargetType source.movementType of
+            Nothing ->
+                Nothing
+
+            Just targetType ->
+                let
+                    activeMovements : List Movement
+                    activeMovements =
+                        movements
+                            |> List.filter (\movement -> movement.deletedAt == Nothing && movement.id /= source.id)
+
+                    allocations : List Allocation
+                    allocations =
+                        allocate activeMovements
+
+                    candidates : List Movement
+                    candidates =
+                        activeMovements
+                            |> List.filter (autoEligibleTarget source targetType allocations)
+                            |> sortTargets
+
+                    exactMatch : Maybe Movement
+                    exactMatch =
+                        candidates
+                            |> List.filter (exactRemainingDueMatch source allocations)
+                            |> List.head
+
+                    targetIds : List String
+                    targetIds =
+                        case exactMatch of
+                            Just target ->
+                                [ target.id ]
+
+                            Nothing ->
+                                List.map .id candidates
+
+                    reason : AutoSelectionReason
+                    reason =
+                        case ( exactMatch, candidates ) of
+                            ( Just _, _ ) ->
+                                AutoExactRemainingDueMatch
+
+                            ( Nothing, [] ) ->
+                                AutoNoCandidates
+
+                            ( Nothing, _ ) ->
+                                AutoAllOpenDocuments
+                in
+                Just
+                    { targetIds = targetIds
+                    , targetSelectionSource = AutoSelectedTargets reason
+                    , strategy = OldestDueFirstThenOverpayOldest
+                    }
+
+
+autoTargetType : MovementType -> Maybe MovementType
+autoTargetType movementType =
+    case movementType of
+        ExpenseMovement ->
+            Just SupplierInvoiceMovement
+
+        IncomeMovement ->
+            Just SupplierCreditNoteMovement
+
+        _ ->
+            Nothing
+
+
+autoEligibleTarget : Movement -> MovementType -> List Allocation -> Movement -> Bool
+autoEligibleTarget source targetType allocations target =
+    target.accountId
+        == source.accountId
+        && target.movementType
+        == targetType
+        && remainingDueFor allocations target
+        > toleranceFor target.inputCurrency source.exchangeRate
+
+
+exactRemainingDueMatch : Movement -> List Allocation -> Movement -> Bool
+exactRemainingDueMatch source allocations target =
+    let
+        sourceAmountInTargetCurrency : Float
+        sourceAmountInTargetCurrency =
+            convertAmount source.exchangeRate source.inputCurrency target.inputCurrency (abs source.inputAmount)
+
+        tolerance : Float
+        tolerance =
+            toleranceFor target.inputCurrency source.exchangeRate
+    in
+    abs (remainingDueFor allocations target - sourceAmountInTargetCurrency) <= tolerance
 
 
 creditNoteSettlementFor : List Allocation -> Movement -> DocumentSettlement

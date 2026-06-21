@@ -1,7 +1,7 @@
 module InvoiceAllocationTest exposing (suite)
 
 import Accounting exposing (Currency(..), Movement, MovementType(..))
-import Allocation exposing (AllocationIntent, AllocationStrategy(..), TargetSelectionSource(..))
+import Allocation exposing (AllocationIntent, AllocationStrategy(..), AutoSelectionReason(..), TargetSelectionSource(..))
 import Expect
 import InvoiceAllocation exposing (AllocationKind(..), DocumentStatus(..))
 import Test exposing (Test, describe, test)
@@ -133,6 +133,69 @@ suite =
                     , \_ -> Expect.equal [ IncomeToCreditNote, ExpenseToInvoice ] (List.map .kind allocations)
                     ]
                     ()
+        , test "auto target resolution exact-matches a same-account invoice" <|
+            \_ ->
+                let
+                    invoice : Movement
+                    invoice =
+                        movement "inv-1" SupplierInvoiceMovement "supplier" USD 100 1000 "2026-01-01" Nothing
+
+                    payment : Movement
+                    payment =
+                        relatedCashflow (movement "pay-1" ExpenseMovement "supplier" USD 100 1000 "2026-01-02" Nothing)
+                in
+                case InvoiceAllocation.resolveAutoTargets [ invoice ] payment of
+                    Just resolvedIntent ->
+                        Expect.all
+                            [ \actual -> Expect.equal [ "inv-1" ] actual.targetIds
+                            , \actual -> Expect.equal (AutoSelectedTargets AutoExactRemainingDueMatch) actual.targetSelectionSource
+                            ]
+                            resolvedIntent
+
+                    Nothing ->
+                        Expect.fail "Expected auto-selected allocation intent"
+        , test "auto target resolution selects all open documents when there is no exact match" <|
+            \_ ->
+                let
+                    inv1 : Movement
+                    inv1 =
+                        movement "inv-1" SupplierInvoiceMovement "supplier" USD 100 1000 "2026-01-01" Nothing
+
+                    inv2 : Movement
+                    inv2 =
+                        movement "inv-2" SupplierInvoiceMovement "supplier" USD 100 1000 "2026-02-01" Nothing
+
+                    payment : Movement
+                    payment =
+                        relatedCashflow (movement "pay-1" ExpenseMovement "supplier" USD 150 1000 "2026-03-01" Nothing)
+                in
+                case InvoiceAllocation.resolveAutoTargets [ inv2, inv1 ] payment of
+                    Just resolvedIntent ->
+                        Expect.all
+                            [ \actual -> Expect.equal [ "inv-1", "inv-2" ] actual.targetIds
+                            , \actual -> Expect.equal (AutoSelectedTargets AutoAllOpenDocuments) actual.targetSelectionSource
+                            ]
+                            resolvedIntent
+
+                    Nothing ->
+                        Expect.fail "Expected auto-selected allocation intent"
+        , test "auto target resolution records no candidates" <|
+            \_ ->
+                let
+                    payment : Movement
+                    payment =
+                        relatedCashflow (movement "pay-1" ExpenseMovement "supplier" USD 150 1000 "2026-03-01" Nothing)
+                in
+                case InvoiceAllocation.resolveAutoTargets [] payment of
+                    Just resolvedIntent ->
+                        Expect.all
+                            [ \actual -> Expect.equal [] actual.targetIds
+                            , \actual -> Expect.equal (AutoSelectedTargets AutoNoCandidates) actual.targetSelectionSource
+                            ]
+                            resolvedIntent
+
+                    Nothing ->
+                        Expect.fail "Expected auto-selected allocation intent"
         , test "credit note only offsets same-currency invoices" <|
             \_ ->
                 let
@@ -156,6 +219,11 @@ intent targetIds =
         , targetSelectionSource = UserSelectedTargets
         , strategy = OldestDueFirstThenOverpayOldest
         }
+
+
+relatedCashflow : Movement -> Movement
+relatedCashflow movement_ =
+    { movement_ | relatedToInvoice = True }
 
 
 movement : String -> MovementType -> String -> Currency -> Float -> Float -> String -> Maybe AllocationIntent -> Movement

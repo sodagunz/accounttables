@@ -5,6 +5,7 @@ import Auth exposing (AuthState(..))
 import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
 import Html.Attributes exposing (class, classList, type_, value)
 import Html.Events exposing (onClick, onInput)
+import InvoiceReport
 import Ledger
 import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), ViewMode(..))
 import Util.Date exposing (DateDisplay)
@@ -114,6 +115,20 @@ view config model =
                                 rows : List Movement
                                 rows =
                                     Model.visibleCashflowMovements model
+
+                                invoiceRows : List Movement
+                                invoiceRows =
+                                    Model.visibleInvoiceMovements model
+
+                                relatedCashflows : List Movement
+                                relatedCashflows =
+                                    Model.visibleInvoiceRelatedCashflows model
+
+                                payable : Accounting.MoneyTotal
+                                payable =
+                                    InvoiceReport.build (Model.activeMovements model.expenses) invoiceRows relatedCashflows
+                                        |> .summary
+                                        |> .payable
                             in
                             MovementTable.view
                                 { expenses = rows
@@ -122,6 +137,7 @@ view config model =
                                 , hiddenAccountIds = model.hiddenAccountIds
                                 , dateDisplay = model.dateDisplay
                                 , displayCurrency = model.displayCurrency
+                                , payable = payable
                                 , sortField = model.sortField
                                 , sortDirection = model.sortDirection
                                 , onSelectFilter = config.onSelectFilter

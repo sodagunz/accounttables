@@ -84,7 +84,7 @@ invoiceTableBody config =
                         ++ summaryRow "Total notas de crédito" (valueForCurrency config.displayCurrency summary.creditNotesTotal) config.displayCurrency
                         ++ summaryRow "Total documentos" (valueForCurrency config.displayCurrency summary.documentsTotal) config.displayCurrency
                         ++ summaryRow summary.settlementContributionLabel (valueForCurrency config.displayCurrency summary.settlementContribution) config.displayCurrency
-                        ++ payableRow "A pagar" (valueForCurrency config.displayCurrency summary.payable) config.displayCurrency
+                        ++ payableRow "Saldo pendiente" (valueForCurrency config.displayCurrency summary.payable) config.displayCurrency
                     )
                 ]
             ]

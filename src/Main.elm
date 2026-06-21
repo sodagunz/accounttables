@@ -9,6 +9,7 @@ import Export
 import Flags
 import Html exposing (Html)
 import Http
+import InvoiceReport
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
@@ -114,6 +115,9 @@ port updateLedgerName : Encode.Value -> Cmd msg
 
 
 port saveLastAccountSelection : Encode.Value -> Cmd msg
+
+
+port saveFilterWindowSelection : String -> Cmd msg
 
 
 port appendEvent : Encode.Value -> Cmd msg
@@ -239,7 +243,9 @@ update msg model =
             ( { model | accountError = "" }, focusAccountTool () )
 
         SelectFilter filterWindow ->
-            ( { model | filterWindow = filterWindow }, Cmd.none )
+            ( { model | filterWindow = filterWindow }
+            , saveFilterWindowSelection (Accounting.filterWindowToString filterWindow)
+            )
 
         SelectDateDisplay dateDisplay ->
             ( { model | dateDisplay = dateDisplay }, Cmd.none )
@@ -576,7 +582,22 @@ movementsConfig =
 
 exportVisibleTable : Export.Format -> Model -> Cmd Msg
 exportVisibleTable format model =
-    exportTable (Export.tablePayload format model.dateDisplay model.today (Model.activeAccounts model) (Model.visibleCashflowMovements model))
+    let
+        invoiceRows : List Accounting.Movement
+        invoiceRows =
+            Model.visibleInvoiceMovements model
+
+        relatedCashflows : List Accounting.Movement
+        relatedCashflows =
+            Model.visibleInvoiceRelatedCashflows model
+
+        payable : Accounting.MoneyTotal
+        payable =
+            InvoiceReport.build (Model.activeMovements model.expenses) invoiceRows relatedCashflows
+                |> .summary
+                |> .payable
+    in
+    exportTable (Export.tablePayload format model.dateDisplay model.today (Model.activeAccounts model) (Model.visibleCashflowMovements model) payable)
 
 
 exportInvoices : Export.Format -> Model -> Cmd Msg

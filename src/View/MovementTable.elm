@@ -15,6 +15,7 @@ type alias Config msg =
     , hiddenAccountIds : List String
     , dateDisplay : DateDisplay
     , displayCurrency : Currency
+    , payable : MoneyTotal
     , sortField : SortField
     , sortDirection : SortDirection
     , onSelectFilter : FilterWindow -> msg
@@ -97,7 +98,7 @@ expenseTableBody config =
                             , th [ class "actions-header" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Acciones" ] ]
                             ]
                         ]
-                    , tbody [] (List.map (movementRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows visibleAccounts config.expenses config.displayCurrency)
+                    , tbody [] (List.map (movementRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows visibleAccounts config.expenses config.payable config.displayCurrency)
                     ]
                 ]
             ]
@@ -355,15 +356,23 @@ sortableHeader config sortField alignment labelText =
         ]
 
 
-subtotalRows : List Account -> List Movement -> Currency -> List (Html msg)
-subtotalRows accounts expenses displayCurrency =
+subtotalRows : List Account -> List Movement -> MoneyTotal -> Currency -> List (Html msg)
+subtotalRows accounts expenses payable displayCurrency =
     let
-        grandTotal : MoneyTotal
-        grandTotal =
+        cashOnHand : MoneyTotal
+        cashOnHand =
             summarizeMoney expenses
+
+        total : MoneyTotal
+        total =
+            { ars = cashOnHand.ars + payable.ars
+            , usd = cashOnHand.usd + payable.usd
+            }
     in
     List.map (\account -> totalRow displayCurrency ("Subtotal " ++ account.name) "subtotal" (summarizeMoney (movementsFor account expenses))) accounts
-        ++ [ totalRow displayCurrency "Total" "grand-total" grandTotal ]
+        ++ [ totalRow displayCurrency "Saldo de caja" "subtotal" cashOnHand
+           , totalRow displayCurrency "Total" "grand-total" total
+           ]
 
 
 totalRow : Currency -> String -> String -> MoneyTotal -> Html msg

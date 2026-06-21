@@ -15,6 +15,8 @@ module Accounting exposing
     , descriptionDisplay
     , emptyForm
     , fallbackExchangeRate
+    , filterWindowFromString
+    , filterWindowToString
     , filteredMovements
     , invoiceTotal
     , isCashflowMovement
@@ -601,6 +603,71 @@ currencyToString currency =
 
         USD ->
             "USD"
+
+
+filterWindowFromString : String -> FilterWindow
+filterWindowFromString filterWindow =
+    case filterWindow of
+        "complete" ->
+            AllTime
+
+        "all" ->
+            AllTime
+
+        "all_time" ->
+            AllTime
+
+        "year" ->
+            ThisYear
+
+        "month" ->
+            ThisMonth
+
+        "monthly" ->
+            ThisMonth
+
+        "this_month" ->
+            ThisMonth
+
+        "week" ->
+            ThisWeek
+
+        "weekly" ->
+            ThisWeek
+
+        "this_week" ->
+            ThisWeek
+
+        "day" ->
+            Today
+
+        "daily" ->
+            Today
+
+        "today" ->
+            Today
+
+        _ ->
+            AllTime
+
+
+filterWindowToString : FilterWindow -> String
+filterWindowToString filterWindow =
+    case filterWindow of
+        AllTime ->
+            "complete"
+
+        ThisYear ->
+            "year"
+
+        ThisMonth ->
+            "month"
+
+        ThisWeek ->
+            "week"
+
+        Today ->
+            "day"
 
 
 movementTypeFromString : String -> MovementType

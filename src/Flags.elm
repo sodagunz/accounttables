@@ -1,5 +1,6 @@
 module Flags exposing (modelFromFlags)
 
+import Accounting
 import Json.Decode as Decode
 import Ledger
 import Model exposing (Model)
@@ -18,9 +19,18 @@ modelFromFlags flags =
         initialModel =
             Model.initial
 
+        filterWindow : Accounting.FilterWindow
+        filterWindow =
+            Decode.decodeValue (Decode.field "filterWindow" Decode.string) flags
+                |> Result.map Accounting.filterWindowFromString
+                |> Result.withDefault initialModel.filterWindow
+
         baseModel : Model
         baseModel =
-            { initialModel | tutorialState = tutorialState }
+            { initialModel
+                | tutorialState = tutorialState
+                , filterWindow = filterWindow
+            }
 
         ledgerResult : Result String Ledger.LedgerData
         ledgerResult =

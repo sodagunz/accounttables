@@ -149,7 +149,6 @@ invoiceHeaders =
     , "Estado"
     , "Ingresado"
     , "Pendiente"
-    , "Cotización (USD/ARS)"
     , "Pesos (ARS)"
     , "Dólar (USD)"
     ]
@@ -201,7 +200,6 @@ invoiceRow dateDisplay documentRow =
         , documentRow.statusLabel
         , formatMoney movement.inputCurrency displayAmount
         , formatMoney documentRow.settlement.currency documentRow.settlement.remainingDue
-        , formatMoney ARS movement.exchangeRate
         , formatMoney ARS movement.ars
         , formatMoney USD movement.usd
         ]
@@ -223,7 +221,6 @@ summaryRow labelText total =
     { label = "summary"
     , cells =
         [ labelText
-        , ""
         , ""
         , ""
         , ""

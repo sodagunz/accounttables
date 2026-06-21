@@ -74,7 +74,6 @@ invoiceTableBody config =
                         , th [] [ span [] [ text "Estado" ] ]
                         , th [ class "numeric" ] [ span [] [ text "Ingresado" ] ]
                         , th [ class "numeric" ] [ span [] [ text "Pendiente" ] ]
-                        , th [ class "numeric" ] [ span [] [ text "Cotización" ] ]
                         , th [ class "numeric" ] [ span [] [ text "Total" ] ]
                         , th [ class "actions-header" ] [ span [] [ text "Acciones" ] ]
                         ]
@@ -147,7 +146,6 @@ row dateDisplay displayCurrency onEdit onDelete documentRow =
                 ]
             ]
             [ text (formatMoney documentRow.settlement.currency documentRow.settlement.remainingDue) ]
-        , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber movement.exchangeRate) ]
         , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency movement)) ]
         , td [ class "action-cell", attribute "data-label" "" ]
             [ div [ class "action-buttons" ]
@@ -215,7 +213,7 @@ formatTotal value currency =
 summaryRow : String -> Float -> Currency -> List (Html msg)
 summaryRow label value displayCurrency =
     [ tr [ class "subtotal" ]
-        [ td [ attribute "colspan" "9", attribute "data-label" label ] [ text label ]
+        [ td [ attribute "colspan" "8", attribute "data-label" label ] [ text label ]
         , td
             [ attribute "data-label" "Total"
             , classList
@@ -232,7 +230,7 @@ summaryRow label value displayCurrency =
 payableRow : String -> Float -> Currency -> List (Html msg)
 payableRow label value displayCurrency =
     [ tr [ class "grand-total" ]
-        [ td [ attribute "colspan" "9", attribute "data-label" label ] [ text label ]
+        [ td [ attribute "colspan" "8", attribute "data-label" label ] [ text label ]
         , td
             [ attribute "data-label" "Total"
             , classList

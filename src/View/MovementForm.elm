@@ -44,6 +44,11 @@ isCashflowType movementType =
     movementType == ExpenseMovement || movementType == IncomeMovement
 
 
+relatedCashflowPickerReplacesDescription : Form -> Bool
+relatedCashflowPickerReplacesDescription form =
+    isCashflowType form.movementType && form.relatedToInvoice
+
+
 dateLabel : Form -> String
 dateLabel form =
     if isInvoiceType form.movementType then
@@ -173,10 +178,14 @@ view config =
 
               else
                 text ""
-            , label [ class "description-field" ]
-                [ text "Descripción"
-                , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
-                ]
+            , if relatedCashflowPickerReplacesDescription config.form then
+                text ""
+
+              else
+                label [ class "description-field" ]
+                    [ text "Descripción"
+                    , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
+                    ]
             , label []
                 [ text "Cuenta"
                 , accountControl config selectedAccountId

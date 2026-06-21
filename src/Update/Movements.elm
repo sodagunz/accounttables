@@ -63,10 +63,17 @@ createOrUpdateMovement config movementId model =
     in
     case Accounting.buildMovement rate movementId (Model.activeAccounts readyModel) readyModel.form of
         Ok movement ->
-            persistMovement config readyModel (resolveAutoAllocation readyModel movement)
+            persistMovement config readyModel (prepareMovementForSave readyModel movement)
 
         Err error ->
             ( { readyModel | error = error }, Cmd.none )
+
+
+prepareMovementForSave : Model -> Accounting.Movement -> Accounting.Movement
+prepareMovementForSave model movement =
+    movement
+        |> resolveAutoAllocation model
+        |> withGeneratedRelatedDescription model
 
 
 resolveAutoAllocation : Model -> Accounting.Movement -> Accounting.Movement
@@ -76,6 +83,84 @@ resolveAutoAllocation model movement =
 
     else
         movement
+
+
+withGeneratedRelatedDescription : Model -> Accounting.Movement -> Accounting.Movement
+withGeneratedRelatedDescription model movement =
+    if movement.relatedToInvoice then
+        case movement.movementType of
+            Accounting.ExpenseMovement ->
+                { movement | description = Just (generatedExpenseDescription (targetDocuments model movement)) }
+
+            Accounting.IncomeMovement ->
+                { movement | description = Just (generatedIncomeDescription (targetDocuments model movement)) }
+
+            _ ->
+                movement
+
+    else
+        movement
+
+
+targetDocuments : Model -> Accounting.Movement -> List Accounting.Movement
+targetDocuments model movement =
+    targetIdsFor movement
+        |> List.filterMap (findMovementById (Model.activeMovements model.expenses))
+
+
+targetIdsFor : Accounting.Movement -> List String
+targetIdsFor movement =
+    movement.allocationIntent
+        |> Maybe.map .targetIds
+        |> Maybe.withDefault []
+
+
+findMovementById : List Accounting.Movement -> String -> Maybe Accounting.Movement
+findMovementById movements movementId =
+    movements
+        |> List.filter (\movement -> movement.id == movementId)
+        |> List.head
+
+
+generatedExpenseDescription : List Accounting.Movement -> String
+generatedExpenseDescription documents =
+    generatedDescription
+        { singular = "Pago factura"
+        , plural = "Pago facturas"
+        , fallback = "Pago facturas"
+        }
+        documents
+
+
+generatedIncomeDescription : List Accounting.Movement -> String
+generatedIncomeDescription documents =
+    generatedDescription
+        { singular = "Cobro nota de crédito"
+        , plural = "Cobro notas de crédito"
+        , fallback = "Cobro notas"
+        }
+        documents
+
+
+generatedDescription : { singular : String, plural : String, fallback : String } -> List Accounting.Movement -> String
+generatedDescription labels documents =
+    let
+        numbers : List String
+        numbers =
+            documents
+                |> List.filterMap .documentNumber
+                |> List.map String.trim
+                |> List.filter ((/=) "")
+    in
+    case ( documents, numbers ) of
+        ( [ _ ], [ number ] ) ->
+            labels.singular ++ " " ++ number
+
+        ( _ :: _ :: _, _ :: _ ) ->
+            labels.plural ++ " " ++ String.join ", " numbers
+
+        _ ->
+            labels.fallback
 
 
 persistMovement : Config msg -> Model -> Accounting.Movement -> ( Model, Cmd msg )

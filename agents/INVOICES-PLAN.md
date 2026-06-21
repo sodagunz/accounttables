@@ -174,7 +174,7 @@ First-pass behavior:
 Near-term UI/export requirements:
 
 - In invoice rows, keep showing `Ingresado` as the exact original amount/currency.
-- Label converted invoice columns as estimated, e.g. `Cotización estimada` and `Total estimado`, or add a short note in the invoice table: `Los totales convertidos de facturas son estimaciones hasta que se cubren con movimientos relacionados.`
+- Do not show the invoice document exchange-rate column in the invoice table/export; it is stored for conversion estimates but consumes too much report space, especially on mobile. Keep showing the converted `Total` as an estimate and/or add a short note in the invoice table: `Los totales convertidos de facturas son estimaciones hasta que se cubren con movimientos relacionados.`
 - Prefer displaying exact per-currency subtotals for invoice documents if it remains simple:
   - `Facturas ARS`, `Facturas USD`
   - `Notas de crédito ARS`, `Notas de crédito USD`

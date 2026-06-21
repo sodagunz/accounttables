@@ -273,59 +273,57 @@ resolveAutoTargets movements source =
         source.allocationIntent
 
     else
-        case autoTargetType source.movementType of
-            Nothing ->
-                Nothing
+        autoTargetType source.movementType
+            |> Maybe.map
+                (\targetType ->
+                    let
+                        activeMovements : List Movement
+                        activeMovements =
+                            movements
+                                |> List.filter (\movement -> movement.deletedAt == Nothing && movement.id /= source.id)
 
-            Just targetType ->
-                let
-                    activeMovements : List Movement
-                    activeMovements =
-                        movements
-                            |> List.filter (\movement -> movement.deletedAt == Nothing && movement.id /= source.id)
+                        allocations : List Allocation
+                        allocations =
+                            allocate activeMovements
 
-                    allocations : List Allocation
-                    allocations =
-                        allocate activeMovements
+                        candidates : List Movement
+                        candidates =
+                            activeMovements
+                                |> List.filter (autoEligibleTarget source targetType allocations)
+                                |> sortTargets
 
-                    candidates : List Movement
-                    candidates =
-                        activeMovements
-                            |> List.filter (autoEligibleTarget source targetType allocations)
-                            |> sortTargets
+                        exactMatch : Maybe Movement
+                        exactMatch =
+                            candidates
+                                |> List.filter (exactRemainingDueMatch source allocations)
+                                |> List.head
 
-                    exactMatch : Maybe Movement
-                    exactMatch =
-                        candidates
-                            |> List.filter (exactRemainingDueMatch source allocations)
-                            |> List.head
+                        targetIds : List String
+                        targetIds =
+                            case exactMatch of
+                                Just target ->
+                                    [ target.id ]
 
-                    targetIds : List String
-                    targetIds =
-                        case exactMatch of
-                            Just target ->
-                                [ target.id ]
+                                Nothing ->
+                                    List.map .id candidates
 
-                            Nothing ->
-                                List.map .id candidates
+                        reason : AutoSelectionReason
+                        reason =
+                            case ( exactMatch, candidates ) of
+                                ( Just _, _ ) ->
+                                    AutoExactRemainingDueMatch
 
-                    reason : AutoSelectionReason
-                    reason =
-                        case ( exactMatch, candidates ) of
-                            ( Just _, _ ) ->
-                                AutoExactRemainingDueMatch
+                                ( Nothing, [] ) ->
+                                    AutoNoCandidates
 
-                            ( Nothing, [] ) ->
-                                AutoNoCandidates
-
-                            ( Nothing, _ ) ->
-                                AutoAllOpenDocuments
-                in
-                Just
+                                ( Nothing, _ ) ->
+                                    AutoAllOpenDocuments
+                    in
                     { targetIds = targetIds
                     , targetSelectionSource = AutoSelectedTargets reason
                     , strategy = OldestDueFirstThenOverpayOldest
                     }
+                )
 
 
 autoTargetType : MovementType -> Maybe MovementType

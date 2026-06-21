@@ -10,6 +10,7 @@ import Model exposing (StorageMode(..))
 import Test exposing (Test, describe, test)
 import Update.Accounts as Accounts
 import Update.Ledgers as Ledgers
+import Update.Movements as Movements
 
 
 suite : Test
@@ -140,6 +141,43 @@ suite =
                             }
                 in
                 Expect.equal "active" updatedModel.form.accountId
+        , test "saving related payment auto-selects invoice and generates description" <|
+            \_ ->
+                let
+                    result : ( Model.Model, Cmd Never )
+                    result =
+                        Movements.handleGeneratedId movementsConfig
+                            (Encode.string "pay-1")
+                            { initialModel
+                                | accounts = [ sampleAccount ]
+                                , expenses = [ sampleInvoice ]
+                                , exchangeRate = 1000
+                                , form =
+                                    { modelForm
+                                        | amount = "100"
+                                        , accountId = sampleAccount.id
+                                        , currency = Accounting.USD
+                                        , date = "2026-06-20"
+                                        , movementType = Accounting.ExpenseMovement
+                                        , relatedToInvoice = True
+                                        , description = "Usuario escribió algo"
+                                    }
+                            }
+
+                    updatedModel : Model.Model
+                    updatedModel =
+                        Tuple.first result
+                in
+                case List.filter (\movement -> movement.id == "pay-1") updatedModel.expenses of
+                    [ payment ] ->
+                        Expect.all
+                            [ \movement -> Expect.equal (Just "Pago factura F-001") movement.description
+                            , \movement -> Expect.equal (Just [ "inv-1" ]) (Maybe.map .targetIds movement.allocationIntent)
+                            ]
+                            payment
+
+                    _ ->
+                        Expect.fail "Expected generated payment movement"
         , test "ensureLocalLedger activates the browser-local ledger" <|
             \_ ->
                 let
@@ -186,6 +224,36 @@ modelForm =
 sampleAccount : Accounting.Account
 sampleAccount =
     { id = "cash", name = "Caja", deletedAt = Nothing }
+
+
+movementsConfig : Movements.Config Never
+movementsConfig =
+    { generateExpenseId = Cmd.none
+    , appendEvent = \_ _ -> Cmd.none
+    , saveLastAccount = \_ _ -> Cmd.none
+    , navigateTutorial = \_ model -> ( model, Cmd.none )
+    , completeTutorial = Cmd.none
+    }
+
+
+sampleInvoice : Accounting.Movement
+sampleInvoice =
+    { id = "inv-1"
+    , movementType = Accounting.SupplierInvoiceMovement
+    , description = Nothing
+    , accountId = "cash"
+    , accountName = "Caja"
+    , inputAmount = 100
+    , inputCurrency = Accounting.USD
+    , exchangeRate = 1000
+    , ars = -100000
+    , usd = -100
+    , date = "2026-06-16"
+    , deletedAt = Nothing
+    , relatedToInvoice = False
+    , documentNumber = Just "F-001"
+    , allocationIntent = Nothing
+    }
 
 
 sampleMovement : Accounting.Movement

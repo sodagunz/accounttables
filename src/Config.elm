@@ -32,6 +32,8 @@ type alias Messages msg =
     , currency : String -> msg
     , date : String -> msg
     , movementType : Accounting.MovementType -> msg
+    , relatedToInvoice : Bool -> msg
+    , documentNumber : String -> msg
     , submitMovement : msg
     , cancelEdit : msg
     , selectFilter : FilterWindow -> msg
@@ -41,6 +43,8 @@ type alias Messages msg =
     , selectSort : SortField -> msg
     , exportCsv : msg
     , exportXlsx : msg
+    , exportInvoicesCsv : msg
+    , exportInvoicesXlsx : msg
     , deleteMovement : String -> msg
     , editMovement : String -> msg
     , selectLedger : String -> msg
@@ -87,6 +91,8 @@ view messages =
     , onCurrency = messages.currency
     , onDate = messages.date
     , onMovementType = messages.movementType
+    , onRelatedToInvoice = messages.relatedToInvoice
+    , onDocumentNumber = messages.documentNumber
     , onSubmitMovement = messages.submitMovement
     , onCancelEdit = messages.cancelEdit
     , onSelectFilter = messages.selectFilter
@@ -96,6 +102,8 @@ view messages =
     , onSelectSort = messages.selectSort
     , onExportCsv = messages.exportCsv
     , onExportXlsx = messages.exportXlsx
+    , onExportInvoicesCsv = messages.exportInvoicesCsv
+    , onExportInvoicesXlsx = messages.exportInvoicesXlsx
     , onDeleteMovement = messages.deleteMovement
     , onEditMovement = messages.editMovement
     , onSelectLedger = messages.selectLedger

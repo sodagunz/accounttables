@@ -16,16 +16,23 @@ module Accounting exposing
     , emptyForm
     , fallbackExchangeRate
     , filteredMovements
+    , invoiceTotal
+    , isCashflowMovement
+    , isInvoiceMovement
+    , isInvoiceRelatedCashflow
     , movementToForm
     , movementTypeFromString
     , movementTypeToString
     , movementsFor
+    , negateMoney
     , setAccount
     , setAmount
     , setCurrency
     , setDate
     , setDescription
+    , setDocumentNumber
     , setMovementType
+    , setRelatedToInvoice
     , sortMovements
     , summarizeMoney
     )
@@ -68,6 +75,8 @@ type SortDirection
 type MovementType
     = ExpenseMovement
     | IncomeMovement
+    | SupplierInvoiceMovement
+    | SupplierCreditNoteMovement
 
 
 type alias Movement =
@@ -83,6 +92,8 @@ type alias Movement =
     , usd : Float
     , date : String
     , deletedAt : Maybe String
+    , relatedToInvoice : Bool
+    , documentNumber : Maybe String
     }
 
 
@@ -101,6 +112,8 @@ type alias Form =
     , date : String
     , movementType : MovementType
     , editingId : Maybe String
+    , relatedToInvoice : Bool
+    , documentNumber : String
     }
 
 
@@ -119,6 +132,8 @@ emptyForm =
     , date = ""
     , movementType = ExpenseMovement
     , editingId = Nothing
+    , relatedToInvoice = False
+    , documentNumber = ""
     }
 
 
@@ -152,6 +167,16 @@ setMovementType movementType form =
     { form | movementType = movementType }
 
 
+setRelatedToInvoice : Bool -> Form -> Form
+setRelatedToInvoice relatedToInvoice form =
+    { form | relatedToInvoice = relatedToInvoice }
+
+
+setDocumentNumber : String -> Form -> Form
+setDocumentNumber documentNumber form =
+    { form | documentNumber = documentNumber }
+
+
 movementToForm : Movement -> Form
 movementToForm movement =
     { description = movement.description |> Maybe.withDefault ""
@@ -161,6 +186,8 @@ movementToForm movement =
     , date = movement.date
     , movementType = movement.movementType
     , editingId = Just movement.id
+    , relatedToInvoice = movement.relatedToInvoice
+    , documentNumber = movement.documentNumber |> Maybe.withDefault ""
     }
 
 
@@ -198,6 +225,30 @@ buildMovement exchangeRate id accounts form =
                             converted : { ars : Float, usd : Float }
                             converted =
                                 cashflowFor form.movementType exchangeRate form.currency amount
+
+                            isInvoiceType : Bool
+                            isInvoiceType =
+                                form.movementType
+                                    == SupplierInvoiceMovement
+                                    || form.movementType
+                                    == SupplierCreditNoteMovement
+
+                            resolvedDocumentNumber : Maybe String
+                            resolvedDocumentNumber =
+                                if isInvoiceType then
+                                    let
+                                        trimmed : String
+                                        trimmed =
+                                            String.trim form.documentNumber
+                                    in
+                                    if trimmed == "" then
+                                        Nothing
+
+                                    else
+                                        Just trimmed
+
+                                else
+                                    Nothing
                         in
                         Ok
                             { id = id
@@ -217,6 +268,13 @@ buildMovement exchangeRate id accounts form =
                             , usd = converted.usd
                             , date = form.date
                             , deletedAt = Nothing
+                            , relatedToInvoice =
+                                if isInvoiceType then
+                                    False
+
+                                else
+                                    form.relatedToInvoice
+                            , documentNumber = resolvedDocumentNumber
                             }
 
 
@@ -254,6 +312,50 @@ movementMultiplier movementType =
 
         IncomeMovement ->
             1
+
+        SupplierInvoiceMovement ->
+            -1
+
+        SupplierCreditNoteMovement ->
+            1
+
+
+isCashflowMovement : Movement -> Bool
+isCashflowMovement movement =
+    movement.movementType == ExpenseMovement || movement.movementType == IncomeMovement
+
+
+isInvoiceMovement : Movement -> Bool
+isInvoiceMovement movement =
+    movement.movementType == SupplierInvoiceMovement || movement.movementType == SupplierCreditNoteMovement
+
+
+isInvoiceRelatedCashflow : Movement -> Bool
+isInvoiceRelatedCashflow movement =
+    isCashflowMovement movement && movement.relatedToInvoice
+
+
+invoiceTotal : List Movement -> List Movement -> MoneyTotal
+invoiceTotal invoices relatedCashflows =
+    let
+        invoiceSum : MoneyTotal
+        invoiceSum =
+            summarizeMoney invoices
+
+        paymentSum : MoneyTotal
+        paymentSum =
+            summarizeMoney relatedCashflows
+    in
+    { ars = invoiceSum.ars - paymentSum.ars
+    , usd = invoiceSum.usd - paymentSum.usd
+    }
+
+
+negateMoney : MoneyTotal -> MoneyTotal
+negateMoney total =
+    { ars = -total.ars
+    , usd = -total.usd
+    }
 
 
 emptyMoney : MoneyTotal
@@ -435,6 +537,12 @@ movementTypeFromString movementType =
         "Income" ->
             IncomeMovement
 
+        "SupplierInvoice" ->
+            SupplierInvoiceMovement
+
+        "SupplierCreditNote" ->
+            SupplierCreditNoteMovement
+
         _ ->
             ExpenseMovement
 
@@ -447,3 +555,9 @@ movementTypeToString movementType =
 
         IncomeMovement ->
             "Income"
+
+        SupplierInvoiceMovement ->
+            "SupplierInvoice"
+
+        SupplierCreditNoteMovement ->
+            "SupplierCreditNote"

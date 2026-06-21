@@ -90,6 +90,8 @@ persistMovement config readyModel movement =
                                 , ars = movement.ars
                                 , usd = movement.usd
                                 , date = movement.date
+                                , relatedToInvoice = movement.relatedToInvoice
+                                , documentNumber = movement.documentNumber
                                 }
 
                         updatedMovements : List Accounting.Movement
@@ -127,6 +129,8 @@ persistMovement config readyModel movement =
                                 , ars = movement.ars
                                 , usd = movement.usd
                                 , date = movement.date
+                                , relatedToInvoice = movement.relatedToInvoice
+                                , documentNumber = movement.documentNumber
                                 }
                     in
                     ( createEvent
@@ -173,6 +177,8 @@ persistMovement config readyModel movement =
             , date = readyModel.form.date
             , movementType = readyModel.form.movementType
             , editingId = Nothing
+            , relatedToInvoice = False
+            , documentNumber = ""
             }
         , error = ""
       }

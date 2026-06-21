@@ -1,6 +1,6 @@
 module View.MovementTable exposing (Config, view)
 
-import Accounting exposing (Account, Currency(..), FilterWindow(..), MoneyTotal, Movement, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, movementsFor, summarizeMoney)
+import Accounting exposing (Account, Currency(..), FilterWindow(..), MoneyTotal, Movement, MovementType(..), SortDirection(..), SortField(..), currencyToString, descriptionDisplay, isInvoiceRelatedCashflow, movementsFor, summarizeMoney)
 import Html exposing (Html, button, div, input, label, p, section, span, table, tbody, td, text, th, thead, tr)
 import Html.Attributes exposing (attribute, checked, class, classList, for, id, name, type_)
 import Html.Events exposing (onClick)
@@ -32,7 +32,7 @@ type alias Config msg =
 view : Config msg -> Html msg
 view config =
     section [ class "panel" ]
-        [ Html.h2 [ class "section-title" ] [ text "Gastos" ]
+        [ Html.h2 [ class "section-title" ] [ text "Movimientos de caja" ]
         , div [ class "expense-table-layout" ]
             [ div [ class "filters-toggle" ]
                 [ input
@@ -60,7 +60,7 @@ view config =
 expenseTableBody : Config msg -> Html msg
 expenseTableBody config =
     if List.isEmpty config.expenses then
-        p [ class "empty" ] [ text "Todavía no hay gastos." ]
+        p [ class "empty" ] [ text "Todavía no hay movimientos de caja." ]
 
     else
         let
@@ -244,7 +244,14 @@ movementRow dateDisplay displayCurrency onEdit onDelete movement =
     tr []
         [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay movement.date) ]
         , td [ attribute "data-label" "Cuenta" ] [ text movement.accountName ]
-        , td [ attribute "data-label" "Descripción" ] [ text (descriptionDisplay movement) ]
+        , td [ attribute "data-label" "Descripción" ]
+            [ span [] [ text (descriptionDisplay movement) ]
+            , if isInvoiceRelatedCashflow movement then
+                span [ class "invoice-badge" ] [ text "Factura" ]
+
+              else
+                text ""
+            ]
         , let
             displayAmount : Float
             displayAmount =
@@ -253,6 +260,12 @@ movementRow dateDisplay displayCurrency onEdit onDelete movement =
                         -movement.inputAmount
 
                     IncomeMovement ->
+                        movement.inputAmount
+
+                    SupplierInvoiceMovement ->
+                        -movement.inputAmount
+
+                    SupplierCreditNoteMovement ->
                         movement.inputAmount
           in
           td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney movement.inputCurrency displayAmount) ]

@@ -230,7 +230,7 @@ movementDecoder : Decode.Decoder Movement
 movementDecoder =
     Decode.map8
         (\id movementType description accountId accountName inputAmount inputCurrency exchangeRate ->
-            \ars usd date deletedAt ->
+            \ars usd date deletedAt relatedToInvoice documentNumber ->
                 { id = id
                 , movementType = movementType
                 , description = description
@@ -243,6 +243,8 @@ movementDecoder =
                 , usd = usd
                 , date = date
                 , deletedAt = deletedAt
+                , relatedToInvoice = relatedToInvoice
+                , documentNumber = documentNumber
                 }
         )
         (Decode.field "id" Decode.string)
@@ -255,9 +257,15 @@ movementDecoder =
         (Decode.field "exchangeRate" Decode.float)
         |> Decode.andThen
             (\buildMovement ->
-                Decode.map4 buildMovement
+                Decode.map6 buildMovement
                     (Decode.field "ars" Decode.float)
                     (Decode.field "usd" Decode.float)
                     (Decode.field "date" Decode.string)
                     (Decode.maybe (Decode.field "deletedAt" Decode.string))
+                    (Decode.maybe (Decode.field "relatedToInvoice" Decode.bool)
+                        |> Decode.map (Maybe.withDefault False)
+                    )
+                    (Decode.maybe (Decode.field "documentNumber" (Decode.nullable Decode.string))
+                        |> Decode.map (Maybe.andThen identity)
+                    )
             )

@@ -36,6 +36,8 @@ movementCreated data =
     , usd = data.usd
     , date = data.date
     , deletedAt = Nothing
+    , relatedToInvoice = data.relatedToInvoice
+    , documentNumber = data.documentNumber
     }
 
 
@@ -63,6 +65,8 @@ applyUpdate data movement =
         , usd = data.usd
         , date = data.date
         , deletedAt = movement.deletedAt
+        , relatedToInvoice = data.relatedToInvoice
+        , documentNumber = data.documentNumber
         }
 
     else

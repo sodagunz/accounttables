@@ -337,6 +337,8 @@ prefillMovementForm model =
                 , description = "Venta de prueba"
                 , accountId = accountId
                 , movementType = Accounting.IncomeMovement
+                , relatedToInvoice = False
+                , documentNumber = ""
                 , editingId = Nothing
             }
     }

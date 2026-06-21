@@ -202,4 +202,6 @@ sampleMovement =
     , usd = -0.001
     , date = "2026-06-16"
     , deletedAt = Nothing
+    , relatedToInvoice = False
+    , documentNumber = Nothing
     }

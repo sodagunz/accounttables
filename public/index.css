@@ -1397,3 +1397,46 @@ td.is-negative,
         background: transparent;
     }
 }
+
+.invoice-badge {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: #eef5f2;
+    color: #2f806c;
+    font-size: 0.72rem;
+    font-weight: 700;
+    vertical-align: middle;
+}
+
+.document-number-field {
+    color: #68756f;
+    font-size: 0.84rem;
+}
+
+.document-number-field__input {
+    min-height: 40px;
+    border-color: #d4ddd9;
+    color: #33413c;
+}
+
+.related-to-invoice-field {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    color: #46524e;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.related-to-invoice-field input[type="checkbox"] {
+    width: auto;
+    min-height: auto;
+    cursor: pointer;
+}
+
+.report-options--export {
+    margin-top: 8px;
+}

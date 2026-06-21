@@ -9,6 +9,7 @@ import Ledger
 import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..))
 import Util.Date exposing (DateDisplay)
 import View.AuthStatus as AuthStatus
+import View.InvoiceTable as InvoiceTable
 import View.LedgerAccess as LedgerAccess
 import View.LedgerAccounts as LedgerAccounts
 import View.MovementForm as MovementForm
@@ -28,6 +29,8 @@ type alias Config msg =
     , onCurrency : String -> msg
     , onDate : String -> msg
     , onMovementType : Accounting.MovementType -> msg
+    , onRelatedToInvoice : Bool -> msg
+    , onDocumentNumber : String -> msg
     , onSubmitMovement : msg
     , onCancelEdit : msg
     , onSelectFilter : FilterWindow -> msg
@@ -51,6 +54,8 @@ type alias Config msg =
     , onSelectMigrationLedger : String -> msg
     , onConfirmLocalMigration : msg
     , onSkipLocalMigration : msg
+    , onExportInvoicesCsv : msg
+    , onExportInvoicesXlsx : msg
     }
 
 
@@ -59,7 +64,15 @@ view config model =
     let
         rows : List Movement
         rows =
-            Model.visibleMovements model
+            Model.visibleCashflowMovements model
+
+        invoiceRows : List Movement
+        invoiceRows =
+            Model.visibleInvoiceMovements model
+
+        relatedCashflows : List Movement
+        relatedCashflows =
+            Model.visibleInvoiceRelatedCashflows model
 
         isTutorialOpen : Bool
         isTutorialOpen =
@@ -92,6 +105,8 @@ view config model =
                         , onCurrency = config.onCurrency
                         , onDate = config.onDate
                         , onMovementType = config.onMovementType
+                        , onRelatedToInvoice = config.onRelatedToInvoice
+                        , onDocumentNumber = config.onDocumentNumber
                         , onSubmit = config.onSubmitMovement
                         , onCancel = config.onCancelEdit
                         }
@@ -116,6 +131,19 @@ view config model =
                         , onSelectSort = config.onSelectSort
                         , onExportCsv = config.onExportCsv
                         , onExportXlsx = config.onExportXlsx
+                        , onDelete = config.onDeleteMovement
+                        , onEdit = config.onEditMovement
+                        }
+                    , InvoiceTable.view
+                        { invoices = invoiceRows
+                        , relatedCashflows = relatedCashflows
+                        , dateDisplay = model.dateDisplay
+                        , displayCurrency = model.displayCurrency
+                        , sortField = model.sortField
+                        , sortDirection = model.sortDirection
+                        , onSelectSort = config.onSelectSort
+                        , onExportCsv = config.onExportInvoicesCsv
+                        , onExportXlsx = config.onExportInvoicesXlsx
                         , onDelete = config.onDeleteMovement
                         , onEdit = config.onEditMovement
                         }

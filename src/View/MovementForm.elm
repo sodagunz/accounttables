@@ -24,9 +24,46 @@ type alias Config msg =
     , onCurrency : String -> msg
     , onDate : String -> msg
     , onMovementType : MovementType -> msg
+    , onRelatedToInvoice : Bool -> msg
+    , onDocumentNumber : String -> msg
     , onSubmit : msg
     , onCancel : msg
     }
+
+
+isInvoiceType : MovementType -> Bool
+isInvoiceType movementType =
+    movementType == SupplierInvoiceMovement || movementType == SupplierCreditNoteMovement
+
+
+isCashflowType : MovementType -> Bool
+isCashflowType movementType =
+    movementType == ExpenseMovement || movementType == IncomeMovement
+
+
+dateLabel : Form -> String
+dateLabel form =
+    if isInvoiceType form.movementType then
+        "Vencimiento"
+
+    else
+        "Fecha"
+
+
+submitButtonLabel : Form -> String
+submitButtonLabel form =
+    case form.movementType of
+        ExpenseMovement ->
+            "Registrar gasto"
+
+        IncomeMovement ->
+            "Registrar ingreso"
+
+        SupplierInvoiceMovement ->
+            "Registrar factura"
+
+        SupplierCreditNoteMovement ->
+            "Registrar nota de crédito"
 
 
 view : Config msg -> Html msg
@@ -35,6 +72,10 @@ view config =
         selectedAccountId : String
         selectedAccountId =
             selectedOrDefaultAccountId config.form.accountId config.accounts
+
+        editing : Bool
+        editing =
+            config.form.editingId /= Nothing
     in
     section [ class "panel movement-panel" ]
         [ Html.h2 [ class "section-title movement-title" ] [ text "Registrar movimiento" ]
@@ -55,10 +96,6 @@ view config =
                     , onInput config.onAmount
                     ]
                     []
-                ]
-            , label [ class "description-field" ]
-                [ text "Descripción"
-                , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
                 ]
             , div [ class "movement-type" ]
                 [ span [ class "movement-type__label" ] [ text "Tipo" ]
@@ -90,6 +127,52 @@ view config =
                         []
                     , span [] [ text "Ingreso" ]
                     ]
+                , label
+                    [ class "movement-type__option"
+                    , classList [ ( "movement-type__option--active", config.form.movementType == SupplierInvoiceMovement ) ]
+                    ]
+                    [ input
+                        [ type_ "radio"
+                        , name "movement-type"
+                        , value (movementTypeToString SupplierInvoiceMovement)
+                        , checked (config.form.movementType == SupplierInvoiceMovement)
+                        , onClick (config.onMovementType SupplierInvoiceMovement)
+                        ]
+                        []
+                    , span [] [ text "Factura" ]
+                    ]
+                , label
+                    [ class "movement-type__option"
+                    , classList [ ( "movement-type__option--active", config.form.movementType == SupplierCreditNoteMovement ) ]
+                    ]
+                    [ input
+                        [ type_ "radio"
+                        , name "movement-type"
+                        , value (movementTypeToString SupplierCreditNoteMovement)
+                        , checked (config.form.movementType == SupplierCreditNoteMovement)
+                        , onClick (config.onMovementType SupplierCreditNoteMovement)
+                        ]
+                        []
+                    , span [] [ text "Nota de crédito" ]
+                    ]
+                ]
+            , if isInvoiceType config.form.movementType then
+                label [ class "document-number-field" ]
+                    [ text "Número"
+                    , input
+                        [ class "document-number-field__input"
+                        , type_ "text"
+                        , value config.form.documentNumber
+                        , onInput config.onDocumentNumber
+                        ]
+                        []
+                    ]
+
+              else
+                text ""
+            , label [ class "description-field" ]
+                [ text "Descripción"
+                , input [ class "description-field__input", type_ "text", value config.form.description, onInput config.onDescription ] []
                 ]
             , label []
                 [ text "Cuenta"
@@ -97,7 +180,7 @@ view config =
                 ]
             , div [ class "two-col" ]
                 [ label []
-                    [ text "Fecha"
+                    [ text (dateLabel config.form)
                     , input [ type_ "date", value config.form.date, onInput config.onDate ] []
                     ]
                 , label []
@@ -108,36 +191,36 @@ view config =
                         ]
                     ]
                 ]
-            , case config.form.editingId of
-                Just _ ->
-                    text ""
+            , if isCashflowType config.form.movementType && not editing then
+                label [ class "related-to-invoice-field" ]
+                    [ input
+                        [ type_ "checkbox"
+                        , checked config.form.relatedToInvoice
+                        , onClick (config.onRelatedToInvoice (not config.form.relatedToInvoice))
+                        ]
+                        []
+                    , span [] [ text "Relacionado a factura" ]
+                    ]
 
-                Nothing ->
-                    text ""
+              else
+                text ""
             , exchangeRateView config
             , p [ class "error" ] [ text config.error ]
             , let
                 buttonText : String
                 buttonText =
-                    case config.form.editingId of
-                        Just _ ->
-                            "Guardar cambios"
+                    if editing then
+                        "Guardar cambios"
 
-                        Nothing ->
-                            case config.form.movementType of
-                                ExpenseMovement ->
-                                    "Registrar gasto"
-
-                                IncomeMovement ->
-                                    "Registrar ingreso"
+                    else
+                        submitButtonLabel config.form
               in
               button [ class "primary primary--movement", type_ "submit" ] [ text buttonText ]
-            , case config.form.editingId of
-                Just _ ->
-                    button [ class "cancel-button", type_ "button", onClick config.onCancel ] [ text "Cancelar" ]
+            , if editing then
+                button [ class "cancel-button", type_ "button", onClick config.onCancel ] [ text "Cancelar" ]
 
-                Nothing ->
-                    text ""
+              else
+                text ""
             ]
         ]
 

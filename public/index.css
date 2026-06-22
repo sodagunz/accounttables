@@ -664,23 +664,25 @@ select:focus {
 }
 
 .rate-status {
-    border: 1px solid #d7e4df;
-    border-radius: 6px;
-    background: #f8faf9;
-    color: #46524e;
-    font-size: 0.9rem;
-    line-height: 1.4;
-    padding: 10px 12px;
+    display: grid;
+    gap: 1px;
+    border: 1px solid #edf2f0;
+    border-radius: 5px;
+    background: #fdfefe;
+    color: #7c8883;
+    font-size: 0.72rem;
+    line-height: 1.22;
+    padding: 4px 6px;
 }
 
-.rate-status strong {
-    color: #17352c;
-    font-weight: 800;
+.rate-status__value {
+    color: #6b7772;
+    font-size: 0.74rem;
 }
 
 .rate-status__meta {
-    margin-top: 4px;
-    color: #68756f;
+    color: #9aa6a1;
+    font-size: 0.64rem;
 }
 
 .error {
@@ -1066,6 +1068,26 @@ select:focus {
     font-weight: 700;
 }
 
+.report-options--columns {
+    gap: 8px;
+}
+
+.column-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #46524e;
+    font-size: 0.88rem;
+    cursor: pointer;
+}
+
+.column-toggle input[type="checkbox"] {
+    margin: 0;
+    width: auto;
+    min-height: auto;
+    cursor: pointer;
+}
+
 .table-wrap {
     overflow-x: auto;
 }
@@ -1147,6 +1169,29 @@ th {
 td.action-cell {
     text-align: center;
     vertical-align: middle;
+}
+
+.movement-total {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+}
+
+.movement-total--converted {
+    color: #17352c;
+}
+
+.movement-total__badge {
+    display: inline-flex;
+    align-self: flex-end;
+    padding: 1px 6px;
+    border-radius: 999px;
+    background: #eef5f2;
+    color: #2f806c;
+    font-size: 0.68rem;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 .action-buttons {
@@ -1480,6 +1525,14 @@ td.is-negative,
 
     .expense-table td.numeric {
         text-align: left;
+    }
+
+    .movement-total {
+        align-items: flex-start;
+    }
+
+    .movement-total__badge {
+        align-self: flex-start;
     }
 
     td.action-cell {

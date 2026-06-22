@@ -34,7 +34,11 @@ view config =
             ]
         , ledgerControls config
         , memberControls config
-        , p [ class "error" ] [ text config.error ]
+        , if config.error == "" then
+            text ""
+
+          else
+            p [ class "error" ] [ text config.error ]
         ]
 
 

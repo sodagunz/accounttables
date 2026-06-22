@@ -46,22 +46,8 @@ createOrUpdateMovement config movementId model =
         readyModel : Model
         readyModel =
             Model.ensureSelectedAccount model
-
-        rate : Float
-        rate =
-            case readyModel.form.editingId of
-                Just editingId ->
-                    case List.head (List.filter (\movement -> movement.id == editingId) readyModel.expenses) of
-                        Just movement ->
-                            movement.exchangeRate
-
-                        Nothing ->
-                            readyModel.exchangeRate
-
-                Nothing ->
-                    readyModel.exchangeRate
     in
-    case Accounting.buildMovement rate movementId (Model.activeAccounts readyModel) readyModel.form of
+    case Accounting.buildMovement readyModel.exchangeRate movementId (Model.activeAccounts readyModel) readyModel.form of
         Ok movement ->
             case validateMovementForSave readyModel movement of
                 Ok () ->

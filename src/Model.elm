@@ -47,11 +47,14 @@ type alias Model =
     , sortField : SortField
     , sortDirection : SortDirection
     , exchangeRate : Float
+    , exchangeRateDate : String
     , exchangeRateStatus : ExchangeRateStatus
     , zone : Time.Zone
     , authState : AuthState
     , ledgerLoadState : LoadState
     , hiddenAccountIds : List String
+    , showInputAmountColumn : Bool
+    , showExchangeRateColumn : Bool
     , migrationState : MigrationState
     , tutorialState : TutorialState
     , tutorialCompletionVisible : Bool
@@ -113,11 +116,14 @@ initial =
     , sortField = SortByDate
     , sortDirection = Descending
     , exchangeRate = Accounting.fallbackExchangeRate
+    , exchangeRateDate = ""
     , exchangeRateStatus = LoadingRate
     , zone = Time.utc
     , authState = AuthLoading
     , ledgerLoadState = NotLoaded
     , hiddenAccountIds = []
+    , showInputAmountColumn = False
+    , showExchangeRateColumn = False
     , migrationState = NoMigration
     , tutorialState = TutorialOpen SignInStep
     , tutorialCompletionVisible = False

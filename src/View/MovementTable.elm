@@ -15,6 +15,8 @@ type alias Config msg =
     , hiddenAccountIds : List String
     , dateDisplay : DateDisplay
     , displayCurrency : Currency
+    , showInputAmountColumn : Bool
+    , showExchangeRateColumn : Bool
     , payable : MoneyTotal
     , sortField : SortField
     , sortDirection : SortDirection
@@ -22,6 +24,8 @@ type alias Config msg =
     , onToggleAccount : String -> msg
     , onSelectDateDisplay : DateDisplay -> msg
     , onSelectDisplayCurrency : Currency -> msg
+    , onToggleShowInputAmountColumn : msg
+    , onToggleShowExchangeRateColumn : msg
     , onSelectSort : SortField -> msg
     , onExportCsv : msg
     , onExportXlsx : msg
@@ -75,31 +79,43 @@ expenseTableBody config =
                 [ table [ class "expense-table" ]
                     [ thead []
                         [ tr []
-                            [ sortableHeader config SortByDate "" "Fecha"
-                            , sortableHeader config SortByAccount "" "Cuenta"
-                            , sortableHeader config SortByDescription "" "Descripción"
-                            , th [ class "numeric" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Ingresado" ] ]
-                            , sortableHeader config SortByExchangeRate "numeric" "Cotización (USD/ARS)"
-                            , sortableHeader config
-                                (case config.displayCurrency of
-                                    ARS ->
-                                        SortByPesos
+                            ([ sortableHeader config SortByDate "" "Fecha"
+                             , sortableHeader config SortByAccount "" "Cuenta"
+                             , sortableHeader config SortByDescription "" "Descripción"
+                             ]
+                                ++ (if config.showInputAmountColumn then
+                                        [ th [ class "numeric" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Ingresado" ] ] ]
 
-                                    USD ->
-                                        SortByDollars
-                                )
-                                "numeric"
-                                (case config.displayCurrency of
-                                    ARS ->
-                                        "Total (ARS)"
+                                    else
+                                        []
+                                   )
+                                ++ (if config.showExchangeRateColumn then
+                                        [ sortableHeader config SortByExchangeRate "numeric" "Cotización (USD/ARS)" ]
 
-                                    USD ->
-                                        "Total (USD)"
-                                )
-                            , th [ class "actions-header" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Acciones" ] ]
-                            ]
+                                    else
+                                        []
+                                   )
+                                ++ [ sortableHeader config
+                                        (case config.displayCurrency of
+                                            ARS ->
+                                                SortByPesos
+
+                                            USD ->
+                                                SortByDollars
+                                        )
+                                        "numeric"
+                                        (case config.displayCurrency of
+                                            ARS ->
+                                                "Total (ARS)"
+
+                                            USD ->
+                                                "Total (USD)"
+                                        )
+                                   , th [ class "actions-header" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Acciones" ] ]
+                                   ]
+                            )
                         ]
-                    , tbody [] (List.map (movementRow config.dateDisplay config.displayCurrency config.onEdit config.onDelete) config.expenses ++ subtotalRows config visibleAccounts)
+                    , tbody [] (List.map (movementRow config.dateDisplay config.displayCurrency config.showInputAmountColumn config.showExchangeRateColumn config.onEdit config.onDelete) config.expenses ++ subtotalRows config visibleAccounts)
                     ]
                 ]
             ]
@@ -136,6 +152,16 @@ filterControls config =
                 [ span [ class "segmented-control__label" ] [ text "Divisa" ]
                 , radioSegment config.onSelectDisplayCurrency ARS (config.displayCurrency == ARS) "ARS"
                 , radioSegment config.onSelectDisplayCurrency USD (config.displayCurrency == USD) "USD"
+                ]
+            ]
+        , div [ class "report-options report-options--columns" ]
+            [ label [ class "column-toggle" ]
+                [ input [ type_ "checkbox", checked config.showInputAmountColumn, onClick config.onToggleShowInputAmountColumn ] []
+                , span [] [ text "Mostrar ingresado" ]
+                ]
+            , label [ class "column-toggle" ]
+                [ input [ type_ "checkbox", checked config.showExchangeRateColumn, onClick config.onToggleShowExchangeRateColumn ] []
+                , span [] [ text "Mostrar cotización" ]
                 ]
             ]
         , exportControls config
@@ -241,12 +267,21 @@ exportControls config =
         ]
 
 
-movementRow : DateDisplay -> Currency -> (String -> msg) -> (String -> msg) -> Movement -> Html msg
-movementRow dateDisplay displayCurrency onEdit onDelete movement =
+movementRow : DateDisplay -> Currency -> Bool -> Bool -> (String -> msg) -> (String -> msg) -> Movement -> Html msg
+movementRow dateDisplay displayCurrency showInputAmountColumn showExchangeRateColumn onEdit onDelete movement =
+    let
+        totalValue : Float
+        totalValue =
+            valueForCurrency displayCurrency movement
+
+        isConverted : Bool
+        isConverted =
+            movement.inputCurrency /= displayCurrency
+    in
     tr []
-        [ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay movement.date) ]
-        , td [ attribute "data-label" "Cuenta" ] [ text movement.accountName ]
-        , td [ attribute "data-label" "Descripción" ]
+        ([ td [ attribute "data-label" "Fecha" ] [ text (formatDate dateDisplay movement.date) ]
+         , td [ attribute "data-label" "Cuenta" ] [ text movement.accountName ]
+         , td [ attribute "data-label" "Descripción" ]
             [ span [] [ text (descriptionDisplay movement) ]
             , if isInvoiceRelatedCashflow movement then
                 span [ class "invoice-badge" ] [ text "Factura" ]
@@ -254,43 +289,69 @@ movementRow dateDisplay displayCurrency onEdit onDelete movement =
               else
                 text ""
             ]
-        , let
-            displayAmount : Float
-            displayAmount =
-                case movement.movementType of
-                    ExpenseMovement ->
-                        -movement.inputAmount
+         ]
+            ++ (if showInputAmountColumn then
+                    let
+                        displayAmount : Float
+                        displayAmount =
+                            case movement.movementType of
+                                ExpenseMovement ->
+                                    -movement.inputAmount
 
-                    IncomeMovement ->
-                        movement.inputAmount
+                                IncomeMovement ->
+                                    movement.inputAmount
 
-                    SupplierInvoiceMovement ->
-                        -movement.inputAmount
+                                SupplierInvoiceMovement ->
+                                    -movement.inputAmount
 
-                    SupplierCreditNoteMovement ->
-                        movement.inputAmount
-          in
-          td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney movement.inputCurrency displayAmount) ]
-        , td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatNumber movement.exchangeRate) ]
-        , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency movement)) ]
-        , td [ class "action-cell", attribute "data-label" "" ]
-            [ div [ class "action-buttons" ]
-                [ button
-                    [ type_ "button"
-                    , class "edit-button"
-                    , onClick (onEdit movement.id)
+                                SupplierCreditNoteMovement ->
+                                    movement.inputAmount
+                    in
+                    [ td [ attribute "data-label" "Ingresado", class "numeric" ] [ text (formatMoney movement.inputCurrency displayAmount) ] ]
+
+                else
+                    []
+               )
+            ++ (if showExchangeRateColumn then
+                    [ td [ attribute "data-label" "Cotización", class "numeric" ] [ text (formatMoney ARS movement.exchangeRate) ] ]
+
+                else
+                    []
+               )
+            ++ [ td
+                    [ attribute "data-label" "Total"
+                    , classList
+                        [ ( "numeric", True )
+                        , ( "movement-total", True )
+                        , ( "movement-total--converted", isConverted )
+                        ]
                     ]
-                    [ text "✎" ]
-                , button
-                    [ type_ "button"
-                    , class "delete-button"
-                    , attribute "data-tutorial" ("delete-" ++ movement.id)
-                    , onClick (onDelete movement.id)
+                    [ span [ class "movement-total__value" ] [ text (formatMoney displayCurrency totalValue) ]
+                    , if isConverted then
+                        span [ class "movement-total__badge" ] [ text ("Convertido a " ++ formatNumber movement.exchangeRate ++ " ARS/USD") ]
+
+                      else
+                        text ""
                     ]
-                    [ text "×" ]
-                ]
-            ]
-        ]
+               , td [ class "action-cell", attribute "data-label" "" ]
+                    [ div [ class "action-buttons" ]
+                        [ button
+                            [ type_ "button"
+                            , class "edit-button"
+                            , onClick (onEdit movement.id)
+                            ]
+                            [ text "✎" ]
+                        , button
+                            [ type_ "button"
+                            , class "delete-button"
+                            , attribute "data-tutorial" ("delete-" ++ movement.id)
+                            , onClick (onDelete movement.id)
+                            ]
+                            [ text "×" ]
+                        ]
+                    ]
+               ]
+        )
 
 
 valueForCurrency : Currency -> { a | ars : Float, usd : Float } -> Float
@@ -370,23 +431,41 @@ subtotalRows config accounts =
             , usd = cashOnHand.usd + config.payable.usd
             }
     in
-    List.map (\account -> totalRow config.displayCurrency (text ("Subtotal " ++ account.name)) "subtotal" Nothing (summarizeMoney (movementsFor account config.expenses))) accounts
+    List.map (\account -> totalRow config.displayCurrency config.showInputAmountColumn config.showExchangeRateColumn (text ("Subtotal " ++ account.name)) "subtotal" Nothing (summarizeMoney (movementsFor account config.expenses))) accounts
         ++ [ totalRow config.displayCurrency
+                config.showInputAmountColumn
+                config.showExchangeRateColumn
                 (text "Saldo pendiente (facturas)")
                 "summary-divider subtotal clickable-summary-row"
                 (Just config.onSelectInvoiceView)
                 config.payable
-           , totalRow config.displayCurrency (text "Saldo de caja (movimientos)") "subtotal" Nothing cashOnHand
-           , totalRow config.displayCurrency (text "Posición neta") "grand-total" Nothing total
+           , totalRow config.displayCurrency config.showInputAmountColumn config.showExchangeRateColumn (text "Saldo de caja (movimientos)") "subtotal" Nothing cashOnHand
+           , totalRow config.displayCurrency config.showInputAmountColumn config.showExchangeRateColumn (text "Posición neta") "grand-total" Nothing total
            ]
 
 
-totalRow : Currency -> Html msg -> String -> Maybe msg -> MoneyTotal -> Html msg
-totalRow displayCurrency labelContent rowClass onSelect total =
+totalRow : Currency -> Bool -> Bool -> Html msg -> String -> Maybe msg -> MoneyTotal -> Html msg
+totalRow displayCurrency showInputAmountColumn showExchangeRateColumn labelContent rowClass onSelect total =
     let
         totalValue : Float
         totalValue =
             valueForCurrency displayCurrency total
+
+        valueColumnOffset : Int
+        valueColumnOffset =
+            3
+                + (if showInputAmountColumn then
+                    1
+
+                   else
+                    0
+                  )
+                + (if showExchangeRateColumn then
+                    1
+
+                   else
+                    0
+                  )
     in
     tr
         (class rowClass
@@ -398,7 +477,7 @@ totalRow displayCurrency labelContent rowClass onSelect total =
                         []
                )
         )
-        [ td [ attribute "colspan" "5", attribute "data-label" "Total" ] [ labelContent ]
+        [ td [ attribute "colspan" (String.fromInt valueColumnOffset), attribute "data-label" "Total" ] [ labelContent ]
         , td
             [ attribute "data-label" "Total"
             , classList

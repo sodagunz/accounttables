@@ -39,6 +39,8 @@ type alias Config msg =
     , onToggleAccountFilter : String -> msg
     , onSelectDateDisplay : DateDisplay -> msg
     , onSelectDisplayCurrency : Accounting.Currency -> msg
+    , onToggleShowInputAmountColumn : msg
+    , onToggleShowExchangeRateColumn : msg
     , onSelectSort : SortField -> msg
     , onExportCsv : msg
     , onExportXlsx : msg
@@ -137,6 +139,8 @@ view config model =
                                 , hiddenAccountIds = model.hiddenAccountIds
                                 , dateDisplay = model.dateDisplay
                                 , displayCurrency = model.displayCurrency
+                                , showInputAmountColumn = model.showInputAmountColumn
+                                , showExchangeRateColumn = model.showExchangeRateColumn
                                 , payable = payable
                                 , sortField = model.sortField
                                 , sortDirection = model.sortDirection
@@ -144,6 +148,8 @@ view config model =
                                 , onToggleAccount = config.onToggleAccountFilter
                                 , onSelectDateDisplay = config.onSelectDateDisplay
                                 , onSelectDisplayCurrency = config.onSelectDisplayCurrency
+                                , onToggleShowInputAmountColumn = config.onToggleShowInputAmountColumn
+                                , onToggleShowExchangeRateColumn = config.onToggleShowExchangeRateColumn
                                 , onSelectSort = config.onSelectSort
                                 , onExportCsv = config.onExportCsv
                                 , onExportXlsx = config.onExportXlsx

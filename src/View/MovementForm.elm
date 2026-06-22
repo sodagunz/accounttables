@@ -9,7 +9,7 @@ import InvoiceAllocation
 import InvoiceReport
 import Time
 import Util.Date as Date
-import Util.Format exposing (formatMoney)
+import Util.Format exposing (formatMoney, formatNumber)
 
 
 type alias Config msg =
@@ -73,6 +73,16 @@ submitButtonLabel form =
 
         SupplierCreditNoteMovement ->
             "Registrar nota de crédito"
+
+
+relatedToInvoiceLabel : MovementType -> String
+relatedToInvoiceLabel movementType =
+    case movementType of
+        IncomeMovement ->
+            "Reembolso por nota de crédito"
+
+        _ ->
+            "Relacionado a factura"
 
 
 showsExchangeRate : Form -> Bool
@@ -457,7 +467,7 @@ view config =
                         , onClick (config.onRelatedToInvoice (not config.form.relatedToInvoice))
                         ]
                         []
-                    , span [] [ text "Relacionado a factura" ]
+                    , span [] [ text (relatedToInvoiceLabel config.form.movementType) ]
                     ]
 
               else
@@ -474,7 +484,11 @@ view config =
 
                 Nothing ->
                     text ""
-            , p [ class "error" ] [ text config.error ]
+            , if config.error == "" then
+                text ""
+
+              else
+                p [ class "error" ] [ text config.error ]
             , let
                 buttonText : String
                 buttonText =
@@ -762,22 +776,26 @@ accountOption account =
 exchangeRateView : Config msg -> Html msg
 exchangeRateView config =
     let
-        status : String
+        status : Maybe String
         status =
             case config.exchangeRateStatus of
                 LoadingRate ->
-                    "Cargando cotización oficial..."
+                    Just "Buscando cotización bolsa para la fecha elegida..."
 
-                LoadedRate updatedAt ->
-                    "Actualizado: " ++ Date.formatApiDate config.zone updatedAt
+                LoadedRate ->
+                    Nothing
 
-                FailedRate ->
-                    "No se pudo cargar DolarApi. Usando cotización de respaldo."
+                FailedRate message ->
+                    Just message
     in
     div [ class "rate-status" ]
-        [ p []
-            [ strong [] [ text "1 U$D = " ]
-            , strong [] [ text (formatMoney ARS config.exchangeRate) ]
-            ]
-        , p [ class "rate-status__meta" ] [ text status ]
-        ]
+        (p [ class "rate-status__value" ]
+            [ text ("Cot. Aprox: " ++ formatNumber config.exchangeRate ++ " ARS/USD") ]
+            :: (case status of
+                    Just message ->
+                        [ p [ class "rate-status__meta" ] [ text message ] ]
+
+                    Nothing ->
+                        []
+               )
+        )

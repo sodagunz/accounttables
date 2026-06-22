@@ -38,7 +38,11 @@ view config =
                         []
                     , button [ class "primary", type_ "submit" ] [ text "Agregar" ]
                     ]
-                , p [ class "error" ] [ text config.error ]
+                , if config.error == "" then
+                    text ""
+
+                  else
+                    p [ class "error" ] [ text config.error ]
                 , if List.isEmpty config.accounts then
                     p [ class "empty empty--compact" ] [ text "No hay cuentas activas." ]
 

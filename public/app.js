@@ -27,6 +27,7 @@ import { firebaseConfig, hasFirebaseConfig } from "./firebase-config.js";
 
 const LEDGER_CACHE_SCHEMA_VERSION = 3;
 const LOCAL_LEDGER_SCHEMA_VERSION = 1;
+const EXCHANGE_RATE_CACHE_SCHEMA_VERSION = 1;
 const LAST_SESSION_KEY = "contabilizar:lastSession";
 const LOCAL_LEDGER_ID = "local";
 const LOCAL_LEDGER_KEY = "contabilizar:localLedger";
@@ -165,6 +166,7 @@ function downloadBlob(filename, mimeType, content) {
 
 function setupFirebaseAuth(app) {
   if (!hasFirebaseConfig(firebaseConfig)) {
+    setupExchangeRateLookup(app, null, null);
     app.ports.authStateChanged.send({ status: "unconfigured" });
     return;
   }
@@ -175,6 +177,7 @@ function setupFirebaseAuth(app) {
   const provider = new GoogleAuthProvider();
 
   setupFirestore(app, auth, db);
+  setupExchangeRateLookup(app, auth, db);
 
   onAuthStateChanged(auth, async (user) => {
     if (user) {
@@ -419,6 +422,129 @@ function focusAccountTool() {
 
   window.requestAnimationFrame(() => {
     accountInput?.focus();
+  });
+}
+
+function setupExchangeRateLookup(app, auth, db) {
+  app.ports.loadExchangeRate.subscribe(async ({ ledgerId, date, casa }) => {
+    const normalizedDate = String(date || "").trim();
+    const normalizedCasa = String(casa || "bolsa").trim() || "bolsa";
+    const effectiveLedgerId = String(ledgerId || LOCAL_LEDGER_ID).trim() || LOCAL_LEDGER_ID;
+
+    if (!normalizedDate) {
+      app.ports.exchangeRateLoaded.send({
+        status: "error",
+        date: normalizedDate,
+        source: "stored",
+        message: "Falta la fecha para buscar la cotización bolsa.",
+      });
+      return;
+    }
+
+    try {
+      const localEntry = loadExchangeRateCache(
+        auth?.currentUser?.uid,
+        effectiveLedgerId,
+        normalizedCasa,
+        normalizedDate,
+      );
+      if (localEntry) {
+        app.ports.exchangeRateLoaded.send({
+          status: "loaded",
+          date: normalizedDate,
+          sale: localEntry.sale,
+          source: "local-cache",
+        });
+        return;
+      }
+
+      const canUseFirestore =
+        Boolean(db) && Boolean(auth?.currentUser?.uid) && effectiveLedgerId !== LOCAL_LEDGER_ID;
+
+      if (canUseFirestore) {
+        try {
+          const rateRef = doc(
+            db,
+            "ledgers",
+            effectiveLedgerId,
+            "exchangeRates",
+            exchangeRateDocumentId(normalizedCasa, normalizedDate),
+          );
+          const rateSnapshot = await getDoc(rateRef);
+          if (rateSnapshot.exists()) {
+            const storedRate = Number(rateSnapshot.data()?.sale);
+            if (Number.isFinite(storedRate) && storedRate > 0) {
+              cacheExchangeRate(
+                auth.currentUser.uid,
+                effectiveLedgerId,
+                normalizedCasa,
+                normalizedDate,
+                storedRate,
+              );
+              app.ports.exchangeRateLoaded.send({
+                status: "loaded",
+                date: normalizedDate,
+                sale: storedRate,
+                source: "firestore",
+              });
+              return;
+            }
+          }
+        } catch (error) {
+          console.warn("Could not read exchange rate from Firestore", error);
+        }
+      }
+
+      const fetchedRate = isToday(normalizedDate)
+        ? await fetchLiveExchangeRateFromApi(normalizedCasa)
+        : await fetchHistoricalExchangeRateFromApi(normalizedCasa, normalizedDate);
+
+      cacheExchangeRate(
+        auth?.currentUser?.uid,
+        effectiveLedgerId,
+        normalizedCasa,
+        normalizedDate,
+        fetchedRate,
+      );
+
+      if (canUseFirestore) {
+        await setDoc(
+          doc(
+            db,
+            "ledgers",
+            effectiveLedgerId,
+            "exchangeRates",
+            exchangeRateDocumentId(normalizedCasa, normalizedDate),
+          ),
+          {
+            id: exchangeRateDocumentId(normalizedCasa, normalizedDate),
+            casa: normalizedCasa,
+            date: normalizedDate,
+            sale: fetchedRate,
+            updatedAt: serverTimestamp(),
+            fetchedAt: new Date().toISOString(),
+          },
+          { merge: true },
+        ).catch((error) => {
+          console.warn("Could not persist exchange rate to Firestore", error);
+        });
+      }
+
+      app.ports.exchangeRateLoaded.send({
+        status: "loaded",
+        date: normalizedDate,
+        sale: fetchedRate,
+        source: isToday(normalizedDate) ? "api-live" : "api",
+      });
+    } catch (error) {
+      console.error("Exchange rate load failed", error);
+      app.ports.exchangeRateLoaded.send({
+        status: "error",
+        date: normalizedDate,
+        source: "api",
+        message: exchangeRateErrorMessage(error, normalizedDate),
+      });
+    }
   });
 }
 
@@ -1518,6 +1644,134 @@ function saveFilterWindow(filterWindow) {
   } catch (error) {
     console.warn("Could not save filter window", error);
   }
+}
+
+function exchangeRateCacheKey(uid, ledgerId, casa, date) {
+  const scope = uid ? `${uid}:${ledgerId}` : `local:${ledgerId || LOCAL_LEDGER_ID}`;
+  return `contabilizar:exchangeRate:${scope}:${casa}:${date}`;
+}
+
+function exchangeRateDocumentId(casa, date) {
+  return `${casa}-${date}`;
+}
+
+function cacheExchangeRate(uid, ledgerId, casa, date, sale) {
+  const normalizedSale = Number(sale);
+  if (!Number.isFinite(normalizedSale) || normalizedSale <= 0) {
+    return null;
+  }
+
+  const entry = {
+    casa: String(casa || "bolsa"),
+    date: String(date || ""),
+    sale: normalizedSale,
+  };
+
+  try {
+    localStorage.setItem(
+      exchangeRateCacheKey(uid, ledgerId, entry.casa, entry.date),
+      JSON.stringify({
+        schemaVersion: EXCHANGE_RATE_CACHE_SCHEMA_VERSION,
+        cachedAt: new Date().toISOString(),
+        payload: entry,
+      }),
+    );
+  } catch (error) {
+    console.warn("Could not cache exchange rate", error);
+  }
+
+  return entry;
+}
+
+function loadExchangeRateCache(uid, ledgerId, casa, date) {
+  try {
+    const rawEntry = localStorage.getItem(exchangeRateCacheKey(uid, ledgerId, casa, date));
+    if (!rawEntry) {
+      return null;
+    }
+
+    const cache = JSON.parse(rawEntry);
+    if (
+      cache?.schemaVersion !== EXCHANGE_RATE_CACHE_SCHEMA_VERSION ||
+      cache?.payload?.casa !== casa ||
+      cache?.payload?.date !== date
+    ) {
+      localStorage.removeItem(exchangeRateCacheKey(uid, ledgerId, casa, date));
+      return null;
+    }
+
+    const sale = Number(cache.payload.sale);
+    if (!Number.isFinite(sale) || sale <= 0) {
+      return null;
+    }
+
+    return {
+      casa,
+      date,
+      sale,
+    };
+  } catch (error) {
+    console.warn("Could not load cached exchange rate", error);
+    return null;
+  }
+}
+
+async function fetchHistoricalExchangeRateFromApi(casa, date) {
+  const [year, month, day] = String(date || "").split("-");
+  if (!year || !month || !day) {
+    throw new Error("La fecha histórica no es válida.");
+  }
+
+  const response = await fetch(
+    `https://api.argentinadatos.com/v1/cotizaciones/dolares/${encodeURIComponent(casa)}/${encodeURIComponent(year)}/${encodeURIComponent(month)}/${encodeURIComponent(day)}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`La API histórica devolvió ${response.status}.`);
+  }
+
+  const payload = await response.json();
+  const sale = Number(payload?.venta);
+  if (!Number.isFinite(sale) || sale <= 0) {
+    throw new Error("La API histórica no devolvió una venta válida.");
+  }
+
+  return sale;
+}
+
+async function fetchLiveExchangeRateFromApi(casa) {
+  const response = await fetch(
+    `https://dolarapi.com/v1/ambito/dolares/${encodeURIComponent(casa)}`,
+  );
+
+  if (!response.ok) {
+    throw new Error(`La API en vivo devolvió ${response.status}.`);
+  }
+
+  const payload = await response.json();
+  const sale = Number(payload?.venta);
+  if (!Number.isFinite(sale) || sale <= 0) {
+    throw new Error("La API en vivo no devolvió una venta válida.");
+  }
+
+  return sale;
+}
+
+function todayIsoDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function isToday(date) {
+  return String(date || "") === todayIsoDate();
+}
+
+function exchangeRateErrorMessage(error, date) {
+  const details = String(error?.message || "").trim();
+  return `No se pudo cargar la cotización bolsa del ${date}.${details ? ` ${details}` : ""}`.trim();
 }
 
 function updateLedgerCache(uid, ledgerId, updatePayload) {

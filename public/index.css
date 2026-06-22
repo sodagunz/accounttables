@@ -8,6 +8,8 @@
         BlinkMacSystemFont,
         "Segoe UI",
         sans-serif;
+    --color-primary: #133128;
+    --color-primary-hover: #0b241d;
     background: #f6f8f7;
     color: #1e2422;
 }
@@ -37,7 +39,7 @@ select {
 }
 
 .topbar {
-    background: #17352c;
+    background: var(--color-primary);
     color: #ffffff;
     padding: 14px clamp(16px, 4vw, 40px);
 }
@@ -89,6 +91,19 @@ h1 {
     font-size: clamp(1.45rem, 3vw, 2.3rem);
     line-height: 1;
     letter-spacing: 0;
+}
+
+.brand-title {
+    display: flex;
+    gap: 0.02em;
+}
+
+.brand-title__main {
+    color: #ffffff;
+}
+
+.brand-title__accent {
+    color: #b8d9c8;
 }
 
 .auth-status {
@@ -218,7 +233,7 @@ main {
 }
 
 .migration-panel strong {
-    color: #17352c;
+    color: var(--color-primary);
 }
 
 .migration-panel__actions {
@@ -318,7 +333,7 @@ main {
 }
 
 .driver-popover.driverjs-theme-accounttables .driver-popover-title {
-    color: #17352c;
+    color: var(--color-primary);
     font-size: 1rem;
     font-weight: 800;
 }
@@ -359,13 +374,13 @@ main {
 
 .driver-popover.driverjs-theme-accounttables .driver-popover-next-btn {
     border: 0;
-    background: #17352c;
+    background: var(--color-primary);
     color: #ffffff;
     padding: 0 14px;
 }
 
 .driver-popover.driverjs-theme-accounttables .driver-popover-next-btn:hover {
-    background: #0e2b23;
+    background: var(--color-primary-hover);
     color: #ffffff;
 }
 
@@ -539,7 +554,7 @@ main {
 }
 
 .movement-title {
-    color: #17352c;
+    color: var(--color-primary);
     font-size: 1.25rem;
 }
 
@@ -693,7 +708,7 @@ select:focus {
 .primary {
     border: 0;
     border-radius: 6px;
-    background: #17352c;
+    background: var(--color-primary);
     color: #ffffff;
     padding: 11px 14px;
     cursor: pointer;
@@ -701,7 +716,7 @@ select:focus {
 }
 
 .primary:hover {
-    background: #0e2b23;
+    background: var(--color-primary-hover);
 }
 
 .primary--movement {
@@ -750,7 +765,7 @@ select:focus {
 }
 
 .admin-disclosure__summary strong {
-    color: #17352c;
+    color: var(--color-primary);
     font-size: 0.95rem;
 }
 
@@ -788,7 +803,7 @@ select:focus {
 }
 
 .ledger-context__name {
-    color: #17352c;
+    color: var(--color-primary);
     font-weight: 800;
     overflow-wrap: anywhere;
 }
@@ -818,7 +833,7 @@ select:focus {
 .accounts-disclosure__summary strong,
 .ledger-disclosure__summary strong,
 .members-disclosure__summary strong {
-    color: #17352c;
+    color: var(--color-primary);
     font-size: 0.84rem;
 }
 
@@ -998,7 +1013,7 @@ select:focus {
 .segmented-control__option--active {
     background: #e7f2ee;
     font-weight: 700;
-    color: #17352c;
+    color: var(--color-primary);
 }
 
 .segmented-control__option:not(.segmented-control__option--active):hover {
@@ -1036,7 +1051,7 @@ select:focus {
 .view-mode-toggle__btn--active {
     background: #e7f2ee;
     font-weight: 700;
-    color: #17352c;
+    color: var(--color-primary);
 }
 
 .view-mode-toggle__btn:not(.view-mode-toggle__btn--active):hover {
@@ -1161,7 +1176,7 @@ th {
 
 .sort-button:hover,
 .sort-button--active {
-    color: #17352c;
+    color: var(--color-primary);
     text-decoration: underline;
     text-underline-offset: 3px;
 }
@@ -1179,7 +1194,7 @@ td.action-cell {
 }
 
 .movement-total--converted {
-    color: #17352c;
+    color: var(--color-primary);
 }
 
 .movement-total__badge {
@@ -1285,7 +1300,7 @@ th:first-child {
 .grand-total td {
     background: #eef5f2;
     border-top: 2px solid #2f806c;
-    color: #17352c;
+    color: var(--color-primary);
     font-weight: 800;
 }
 
@@ -1608,7 +1623,7 @@ td.is-negative,
 }
 
 .allocation-picker__header strong {
-    color: #17352c;
+    color: var(--color-primary);
 }
 
 .allocation-picker__header span,

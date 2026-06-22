@@ -191,7 +191,11 @@ view config model =
             [ div [ class "topbar__inner" ]
                 [ div [ class "topbar__content" ]
                     [ div []
-                        [ h1 [] [ text "accounttables" ] ]
+                        [ h1 [ class "brand-title" ]
+                            [ span [ class "brand-title__main" ] [ text "account" ]
+                            , span [ class "brand-title__accent" ] [ text "tables" ]
+                            ]
+                        ]
                     , div [ class "topbar__actions" ]
                         [ AuthStatus.view
                             { authState = model.authState

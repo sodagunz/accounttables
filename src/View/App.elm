@@ -229,7 +229,7 @@ reopenTutorialButton config model =
         _ ->
             section [ class "setup-shortcut" ]
                 [ button [ class "setup-shortcut__button", type_ "button", onClick config.onReopenTutorial ]
-                    [ text "Abrir configuracion inicial" ]
+                    [ text "Abrir tutorial" ]
                 ]
 
 

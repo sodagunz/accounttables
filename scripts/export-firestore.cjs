@@ -2,27 +2,22 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const { GoogleAuth } = require("google-auth-library");
 
-const projectId = process.argv[2];
-const mode = process.argv[3];
-const targetId = mode === "ledger" ? process.argv[4] || null : null;
-const outputPath = mode === "ledger" ? process.argv[5] || null : process.argv[4] || null;
-
-if (!projectId || !mode || !["all", "ledger"].includes(mode)) {
-  console.error(
-    "Usage: node scripts/export-firestore.cjs <project-id> <all|ledger> [ledger-id] [output-file]",
-  );
-  process.exit(1);
-}
-
-if (mode === "ledger" && !targetId) {
-  console.error(
-    "Usage for ledger export: node scripts/export-firestore.cjs <project-id> ledger <ledger-id> [output-file]",
-  );
-  process.exit(1);
-}
+const args = process.argv.slice(2);
+const projectId = args[0];
 
 if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
   console.error("GOOGLE_APPLICATION_CREDENTIALS must point to a service-account JSON file.");
+  process.exit(1);
+}
+
+if (!projectId) {
+  printUsage();
+  process.exit(1);
+}
+
+const parsedCommand = parseCommand(args.slice(1));
+if (!parsedCommand) {
+  printUsage();
   process.exit(1);
 }
 
@@ -35,16 +30,109 @@ async function main() {
   });
   const client = await auth.getClient();
 
-  const exportData =
-    mode === "all" ? await exportAllCollections(client) : await exportLedger(client, targetId);
+  if (parsedCommand.action === "export") {
+    const exportData =
+      parsedCommand.mode === "all"
+        ? await exportAllCollections(client)
+        : await exportLedger(client, parsedCommand.ledgerId);
 
-  const filePath =
-    outputPath ||
-    (mode === "all" ? timestampedPath("firestore-backup") : timestampedPath(`ledger-${targetId}`));
+    const filePath =
+      parsedCommand.filePath ||
+      (parsedCommand.mode === "all"
+        ? timestampedPath("firestore-backup")
+        : timestampedPath(`ledger-${parsedCommand.ledgerId}`));
 
+    await writeJsonFile(filePath, exportData);
+    console.log(`Wrote ${filePath}`);
+    return;
+  }
+
+  const importData = await readJsonFile(parsedCommand.filePath);
+  await importBackup(client, importData, parsedCommand);
+}
+
+function parseCommand(commandArgs) {
+  const [first, second, third, fourth] = commandArgs;
+
+  if (!first) {
+    return null;
+  }
+
+  if (first === "export") {
+    if (second === "all") {
+      return {
+        action: "export",
+        mode: "all",
+        filePath: third || null,
+      };
+    }
+
+    if (second === "ledger" && third) {
+      return {
+        action: "export",
+        mode: "ledger",
+        ledgerId: third,
+        filePath: fourth || null,
+      };
+    }
+
+    return null;
+  }
+
+  if (first === "import") {
+    if (!second) {
+      return null;
+    }
+
+    return {
+      action: "import",
+      filePath: second,
+      targetLedgerId: third || null,
+    };
+  }
+
+  if (first === "all") {
+    return {
+      action: "export",
+      mode: "all",
+      filePath: second || null,
+    };
+  }
+
+  if (first === "ledger" && second) {
+    return {
+      action: "export",
+      mode: "ledger",
+      ledgerId: second,
+      filePath: third || null,
+    };
+  }
+
+  return null;
+}
+
+function printUsage() {
+  console.error(`Usage:
+  node scripts/export-firestore.cjs <project-id> export all [output-file]
+  node scripts/export-firestore.cjs <project-id> export ledger <ledger-id> [output-file]
+  node scripts/export-firestore.cjs <project-id> import <input-file> [target-ledger-id]
+
+Backward-compatible export forms:
+  node scripts/export-firestore.cjs <project-id> all [output-file]
+  node scripts/export-firestore.cjs <project-id> ledger <ledger-id> [output-file]
+
+Notes:
+  - import performs upserts only; it does not delete remote documents missing from the backup.
+  - [target-ledger-id] is only valid for ledger backups and lets you restore into a different ledger id.`);
+}
+
+async function writeJsonFile(filePath, value) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(exportData, null, 2));
-  console.log(`Wrote ${filePath}`);
+  await fs.writeFile(filePath, JSON.stringify(value, null, 2));
+}
+
+async function readJsonFile(filePath) {
+  return JSON.parse(await fs.readFile(filePath, "utf8"));
 }
 
 async function exportAllCollections(client) {
@@ -228,6 +316,202 @@ function decodeValue(value) {
   }
 
   return value;
+}
+
+async function importBackup(client, backup, options) {
+  if (backup?.mode === "all") {
+    if (options.targetLedgerId) {
+      throw new Error("target-ledger-id can only be used with ledger backups");
+    }
+
+    await importAllCollections(client, backup.collections || {});
+    console.log(`Imported full backup from ${options.filePath}`);
+    return;
+  }
+
+  if (backup?.mode === "ledger") {
+    const ledger = backup.ledger;
+    if (!ledger) {
+      throw new Error("Ledger backup is missing the ledger payload");
+    }
+
+    const targetLedgerId = options.targetLedgerId || ledger.id;
+    await importLedger(client, ledger, targetLedgerId);
+    console.log(`Imported ledger ${ledger.id} into ${targetLedgerId} from ${options.filePath}`);
+    return;
+  }
+
+  throw new Error("Unsupported backup format: expected mode 'all' or 'ledger'");
+}
+
+async function importAllCollections(client, collections) {
+  for (const [collectionId, documents] of Object.entries(collections)) {
+    console.log(`Importing collection ${collectionId}`);
+    await importCollection(client, databaseRoot, collectionId, documents || {});
+  }
+}
+
+async function importLedger(client, ledgerDocument, targetLedgerId) {
+  const ledgerPath = `${databaseRoot}/ledgers/${targetLedgerId}`;
+  await importDocumentTree(
+    client,
+    ledgerPath,
+    rewriteLedgerDocument(ledgerDocument, targetLedgerId),
+  );
+}
+
+async function importCollection(client, parentPath, collectionId, documents) {
+  for (const [documentId, documentNode] of Object.entries(documents)) {
+    const documentPath = `${parentPath}/${collectionId}/${documentId}`;
+    console.log(`  Importing ${documentPath.slice(`${databaseRoot}/`.length)}`);
+    await importDocumentTree(client, documentPath, documentNode);
+  }
+}
+
+async function importDocumentTree(client, documentPath, documentNode) {
+  if (!documentNode) {
+    return;
+  }
+
+  const fields = encodeDocumentFields(documentNode);
+  await request(client, {
+    method: "PATCH",
+    url: `${baseUrl}/${documentPath}`,
+    data: { fields },
+  });
+
+  for (const [collectionId, documents] of Object.entries(documentNode.subcollections || {})) {
+    await importCollection(client, documentPath, collectionId, documents || {});
+  }
+}
+
+function rewriteLedgerDocument(ledgerDocument, targetLedgerId) {
+  const cloned = deepClone(ledgerDocument);
+  const originalLedgerId = ledgerDocument.id;
+
+  cloned.id = targetLedgerId;
+  cloned.path = `ledgers/${targetLedgerId}`;
+
+  if (cloned.fields && typeof cloned.fields === "object") {
+    cloned.fields.id = targetLedgerId;
+  }
+
+  rewriteNestedPaths(cloned.subcollections || {}, ["userLedgers"], (documentNode) => {
+    if (documentNode.fields?.ledgerId === originalLedgerId) {
+      documentNode.fields.ledgerId = targetLedgerId;
+    }
+  });
+
+  rewriteNestedPaths(cloned.subcollections || {}, ["emailInvites"], (documentNode) => {
+    if (documentNode.fields?.ledgerId === originalLedgerId) {
+      documentNode.fields.ledgerId = targetLedgerId;
+    }
+  });
+
+  return cloned;
+}
+
+function rewriteNestedPaths(subcollections, collectionPath, visitor) {
+  if (collectionPath.length === 0) {
+    return;
+  }
+
+  const [collectionId, ...remainingPath] = collectionPath;
+  const documents = subcollections[collectionId] || {};
+
+  for (const documentNode of Object.values(documents)) {
+    if (remainingPath.length === 0) {
+      visitor(documentNode);
+      continue;
+    }
+
+    rewriteNestedPaths(documentNode.subcollections || {}, remainingPath, visitor);
+  }
+}
+
+function encodeDocumentFields(documentNode) {
+  if (documentNode.raw?.fields) {
+    return documentNode.raw.fields;
+  }
+
+  return encodeFields(documentNode.fields || {});
+}
+
+function encodeFields(fields) {
+  return Object.fromEntries(
+    Object.entries(fields).map(([key, value]) => [key, encodeValue(value)]),
+  );
+}
+
+function encodeValue(value) {
+  if (value === null) {
+    return { nullValue: null };
+  }
+
+  if (Array.isArray(value)) {
+    return {
+      arrayValue: {
+        values: value.map(encodeValue),
+      },
+    };
+  }
+
+  if (typeof value === "boolean") {
+    return { booleanValue: value };
+  }
+
+  if (typeof value === "number") {
+    if (Number.isInteger(value)) {
+      return { integerValue: String(value) };
+    }
+
+    return { doubleValue: value };
+  }
+
+  if (typeof value === "string") {
+    if (looksLikeTimestamp(value)) {
+      return { timestampValue: value };
+    }
+
+    return { stringValue: value };
+  }
+
+  if (isGeoPoint(value)) {
+    return {
+      geoPointValue: {
+        latitude: value.latitude,
+        longitude: value.longitude,
+      },
+    };
+  }
+
+  if (value && typeof value === "object") {
+    return {
+      mapValue: {
+        fields: encodeFields(value),
+      },
+    };
+  }
+
+  throw new Error(`Unsupported Firestore value: ${String(value)}`);
+}
+
+function looksLikeTimestamp(value) {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value);
+}
+
+function isGeoPoint(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    typeof value.latitude === "number" &&
+    typeof value.longitude === "number" &&
+    Object.keys(value).length === 2
+  );
+}
+
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value));
 }
 
 function timestampedPath(prefix) {

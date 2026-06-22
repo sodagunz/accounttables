@@ -35,8 +35,16 @@
           exec ${pkgs.firebase-tools}/bin/firebase deploy --project contabilizar-78c2d "$@"
         '')
         (pkgs.writeShellScriptBin "update-rules" ''
-          exec env GOOGLE_APPLICATION_CREDENTIALS=.secrets/contabilizar-admin-api.json
+          exec env GOOGLE_APPLICATION_CREDENTIALS=.secrets/contabilizar-admin-api.json \
             ${pkgs.nodejs_22}/bin/node scripts/deploy-firestore-rules.cjs contabilizar-78c2d firestore.rules
+        '')
+        (pkgs.writeShellScriptBin "backup-firestore" ''
+          exec env GOOGLE_APPLICATION_CREDENTIALS=.secrets/contabilizar-admin-api.json \
+            ${pkgs.nodejs_22}/bin/node scripts/export-firestore.cjs contabilizar-78c2d "$@"
+        '')
+        (pkgs.writeShellScriptBin "restore-firestore" ''
+          exec env GOOGLE_APPLICATION_CREDENTIALS=.secrets/contabilizar-admin-api.json \
+            ${pkgs.nodejs_22}/bin/node scripts/export-firestore.cjs contabilizar-78c2d import "$@"
         '')
         (pkgs.writeShellScriptBin "run-local" ''
           exec ${pkgs.python314}/bin/python3 -m http.server 8008 -d $(${pkgs.git}/bin/git rev-parse --show-toplevel)/public
@@ -80,6 +88,20 @@
         update-rules = {
           type = "app";
           program = "${pkgs.writeShellScriptBin "update-rules" "exec env GOOGLE_APPLICATION_CREDENTIALS=.secrets/contabilizar-admin-api.json ${pkgs.nodejs_22}/bin/node scripts/deploy-firestore-rules.cjs contabilizar-78c2d firestore.rules"}/bin/update-rules";
+        };
+        backup-firestore = {
+          type = "app";
+          program = "${pkgs.writeShellScriptBin "backup-firestore" ''
+            exec env GOOGLE_APPLICATION_CREDENTIALS=.secrets/contabilizar-admin-api.json \
+              ${pkgs.nodejs_22}/bin/node scripts/export-firestore.cjs contabilizar-78c2d "$@"
+          ''}/bin/backup-firestore";
+        };
+        restore-firestore = {
+          type = "app";
+          program = "${pkgs.writeShellScriptBin "restore-firestore" ''
+            exec env GOOGLE_APPLICATION_CREDENTIALS=.secrets/contabilizar-admin-api.json \
+              ${pkgs.nodejs_22}/bin/node scripts/export-firestore.cjs contabilizar-78c2d import "$@"
+          ''}/bin/restore-firestore";
         };
         run-local = {
           type = "app";
@@ -129,7 +151,7 @@
           shellHook = ''
             export NODE_PATH=${pkgs.firebase-tools}/lib/node_modules:${pkgs.firebase-tools}/lib/node_modules/firebase-tools/node_modules
             echo "Elm accounting app dev shell"
-            echo "Available: build, build-release, deploy, format, review, run-local, test, update-rules, elm, firebase, git, node, pnpm, prettier, python3, uglify-js"
+            echo "Available: backup-firestore, build, build-release, deploy, format, restore-firestore, review, run-local, test, update-rules, elm, firebase, git, node, pnpm, prettier, python3, uglify-js"
           '';
         };
       });

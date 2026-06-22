@@ -49,3 +49,30 @@ If you are not familiar with Nix, you can still use the project without it; you 
 
 The app uses Firebase Auth and Firestore. Configuration is done via `firebase-config.js`.
 I will probably migrate away from Firebase in the future, but for now it's fast, easy and free; and it doesn't require a roundtrip through the Atlantic the same way deploying a server to my homelab would. If anyone knows a free and reliable VPS provider in latam, please let me know in an issue or something. I really need very, very small compute resources for this project, but I'd like to avoid the dynamic pricing that comes from cloud.
+
+### Firestore backup and restore
+
+There is a small service-account-based backup script at `scripts/export-firestore.cjs`.
+It can export the entire Firestore document tree or a single ledger, and it can restore the same JSON format back into Firestore.
+
+The Nix shell exposes convenience wrappers that use `.secrets/contabilizar-admin-api.json` as `GOOGLE_APPLICATION_CREDENTIALS`:
+
+```sh
+# whole database
+backup-firestore export all
+backup-firestore export all backups/full.json
+restore-firestore backups/full.json
+
+# single ledger
+backup-firestore export ledger <ledger-id>
+backup-firestore export ledger <ledger-id> backups/ledger.json
+restore-firestore backups/ledger.json
+
+# restore a ledger backup into a different ledger id
+restore-firestore backups/ledger.json <target-ledger-id>
+```
+
+Notes:
+- Restore performs **upserts only**. It does not delete remote documents that are absent from the backup file.
+- Whole-database backups preserve top-level collections such as `userLedgers`, `userEmails`, and `emailInvites`.
+- Single-ledger backups only include `ledgers/{ledgerId}` and its subcollections.

@@ -3,5 +3,5 @@ module Api.Dolar exposing (ExchangeRateStatus(..))
 
 type ExchangeRateStatus
     = LoadingRate
-    | LoadedRate String
+    | LoadedRate
     | FailedRate String

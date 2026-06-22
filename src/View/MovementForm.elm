@@ -75,6 +75,16 @@ submitButtonLabel form =
             "Registrar nota de crédito"
 
 
+relatedToInvoiceLabel : MovementType -> String
+relatedToInvoiceLabel movementType =
+    case movementType of
+        IncomeMovement ->
+            "Reembolso por nota de crédito"
+
+        _ ->
+            "Relacionado a factura"
+
+
 showsExchangeRate : Form -> Bool
 showsExchangeRate form =
     not (isInvoiceType form.movementType)
@@ -457,7 +467,7 @@ view config =
                         , onClick (config.onRelatedToInvoice (not config.form.relatedToInvoice))
                         ]
                         []
-                    , span [] [ text "Relacionado a factura" ]
+                    , span [] [ text (relatedToInvoiceLabel config.form.movementType) ]
                     ]
 
               else
@@ -474,7 +484,11 @@ view config =
 
                 Nothing ->
                     text ""
-            , p [ class "error" ] [ text config.error ]
+            , if config.error == "" then
+                text ""
+
+              else
+                p [ class "error" ] [ text config.error ]
             , let
                 buttonText : String
                 buttonText =
@@ -762,20 +776,26 @@ accountOption account =
 exchangeRateView : Config msg -> Html msg
 exchangeRateView config =
     let
-        status : String
+        status : Maybe String
         status =
             case config.exchangeRateStatus of
                 LoadingRate ->
-                    "Buscando cotización bolsa para la fecha elegida..."
+                    Just "Buscando cotización bolsa para la fecha elegida..."
 
-                LoadedRate message ->
-                    message
+                LoadedRate ->
+                    Nothing
 
                 FailedRate message ->
-                    message
+                    Just message
     in
     div [ class "rate-status" ]
-        [ p [ class "rate-status__value" ]
+        (p [ class "rate-status__value" ]
             [ text ("Cot. Aprox: " ++ formatNumber config.exchangeRate ++ " ARS/USD") ]
-        , p [ class "rate-status__meta" ] [ text status ]
-        ]
+            :: (case status of
+                    Just message ->
+                        [ p [ class "rate-status__meta" ] [ text message ] ]
+
+                    Nothing ->
+                        []
+               )
+        )

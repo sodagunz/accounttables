@@ -448,7 +448,7 @@ update msg model =
                     ( { updatedModel
                         | exchangeRate = movement.exchangeRate
                         , exchangeRateDate = movement.date
-                        , exchangeRateStatus = LoadedRate (loadedExchangeRateMessage movement.date)
+                        , exchangeRateStatus = LoadedRate
                       }
                     , cmd
                     )
@@ -571,7 +571,7 @@ handleExchangeRateLoaded value model =
                         ( { model
                             | exchangeRate = sale
                             , exchangeRateDate = payload.date
-                            , exchangeRateStatus = LoadedRate (loadedExchangeRateMessage payload.date)
+                            , exchangeRateStatus = LoadedRate
                             , error = ""
                           }
                         , Cmd.none
@@ -597,11 +597,6 @@ handleExchangeRateLoaded value model =
             ( { model | exchangeRateStatus = FailedRate (Decode.errorToString error) }, Cmd.none )
 
 
-loadedExchangeRateMessage : String -> String
-loadedExchangeRateMessage date =
-    "Bolsa del " ++ formatDate NumericDate date
-
-
 failedExchangeRateMessage : String -> String
 failedExchangeRateMessage date =
     "No se pudo cargar la cotización bolsa del " ++ formatDate NumericDate date ++ "."
@@ -623,7 +618,7 @@ ensureExchangeRateReady model =
             FailedRate message ->
                 Err message
 
-            LoadedRate _ ->
+            LoadedRate ->
                 Ok ()
 
 

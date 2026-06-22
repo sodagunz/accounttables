@@ -80,6 +80,10 @@ service cloud.firestore {
       match /events/{eventId} {
         allow read, write: if isLedgerMember(ledgerId);
       }
+
+      match /exchangeRates/{exchangeRateId} {
+        allow read, write: if isLedgerMember(ledgerId);
+      }
     }
 
     match /userLedgers/{uid}/ledgers/{ledgerId} {

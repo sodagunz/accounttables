@@ -3,7 +3,6 @@ module Util.Date exposing
     , DateDisplay(..)
     , dateFromIso
     , dateToIso
-    , formatApiDate
     , formatDate
     , pad2
     , weekStartIso
@@ -68,64 +67,6 @@ formatDate dateDisplay iso =
 
                 LongDate ->
                     Calendar.formatWithLanguage spanish "EEEE d 'de' MMMM 'de' y" date
-
-
-formatApiDate : Time.Zone -> String -> String
-formatApiDate zone timestamp =
-    case parseApiTimestamp timestamp of
-        Nothing ->
-            timestamp
-
-        Just posix ->
-            dateToIso zone posix
-                |> formatDate NumericDate
-                |> (\date -> date ++ " " ++ pad2 (Time.toHour zone posix) ++ ":" ++ pad2 (Time.toMinute zone posix))
-
-
-parseApiTimestamp : String -> Maybe Time.Posix
-parseApiTimestamp timestamp =
-    let
-        datePart : String
-        datePart =
-            String.left 10 timestamp
-
-        timePart : String
-        timePart =
-            timestamp
-                |> String.dropLeft 11
-                |> String.left 8
-    in
-    case ( Calendar.fromIsoString datePart, String.split ":" timePart ) of
-        ( Ok date, [ hourString, minuteString, secondString ] ) ->
-            Maybe.map3
-                (\hour minute second ->
-                    let
-                        millis : Int
-                        millis =
-                            ((Calendar.toRataDie date - unixEpochRataDie) * 24 + hour)
-                                * 60
-                                * 60
-                                * 1000
-                                + minute
-                                * 60
-                                * 1000
-                                + second
-                                * 1000
-                    in
-                    Time.millisToPosix millis
-                )
-                (String.toInt hourString)
-                (String.toInt minuteString)
-                (String.toInt secondString)
-
-        _ ->
-            Nothing
-
-
-unixEpochRataDie : Int
-unixEpochRataDie =
-    Calendar.fromCalendarDate 1970 Jan 1
-        |> Calendar.toRataDie
 
 
 spanish : Calendar.Language

@@ -1,14 +1,13 @@
 port module Main exposing (Msg, main)
 
 import Accounting exposing (FilterWindow, SortField)
-import Api.Dolar as Dolar exposing (ExchangeRateStatus(..), OfficialDollar)
+import Api.Dolar exposing (ExchangeRateStatus(..))
 import Auth
 import Browser
 import Config
 import Export
 import Flags
 import Html exposing (Html)
-import Http
 import InvoiceReport
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -23,7 +22,7 @@ import Update.LedgerData as LedgerData
 import Update.Ledgers as Ledgers
 import Update.Movements as Movements
 import Update.Sorting as Sorting
-import Util.Date exposing (DateDisplay, dateToIso)
+import Util.Date exposing (DateDisplay(..), dateToIso, formatDate)
 import View.App as AppView
 
 
@@ -42,6 +41,8 @@ type Msg
     | SelectFilter FilterWindow
     | SelectDateDisplay DateDisplay
     | SelectDisplayCurrency Accounting.Currency
+    | ToggleShowInputAmountColumn
+    | ToggleShowExchangeRateColumn
     | SelectSort SortField
     | ExportCsv
     | ExportXlsx
@@ -51,7 +52,7 @@ type Msg
     | SignOut
     | AuthStateChanged Decode.Value
     | LedgerLoaded Decode.Value
-    | GotExchangeRate (Result Http.Error OfficialDollar)
+    | ExchangeRateLoaded Decode.Value
     | AddMovement
     | MovementIdGenerated Decode.Value
     | UpdateNewAccountName String
@@ -123,6 +124,9 @@ port saveFilterWindowSelection : String -> Cmd msg
 port appendEvent : Encode.Value -> Cmd msg
 
 
+port loadExchangeRate : Encode.Value -> Cmd msg
+
+
 port focusAccountTool : () -> Cmd msg
 
 
@@ -130,6 +134,9 @@ port eventsLoaded : (Decode.Value -> msg) -> Sub msg
 
 
 port ledgerLoaded : (Decode.Value -> msg) -> Sub msg
+
+
+port exchangeRateLoaded : (Decode.Value -> msg) -> Sub msg
 
 
 port prepareLocalMigration : () -> Cmd msg
@@ -179,7 +186,6 @@ init flags =
         baseCmds : List (Cmd Msg)
         baseCmds =
             [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
-            , Dolar.fetchOfficialDollar GotExchangeRate
             ]
     in
     ( model
@@ -200,14 +206,20 @@ update msg model =
                 today : String
                 today =
                     dateToIso zone posix
+
+                updatedModel : Model
+                updatedModel =
+                    { model
+                        | form = Accounting.setDate today model.form
+                        , today = today
+                        , zone = zone
+                        , exchangeRateDate = today
+                        , exchangeRateStatus = LoadingRate
+                    }
+                        |> Model.ensureSelectedAccount
             in
-            ( { model
-                | form = Accounting.setDate today model.form
-                , today = today
-                , zone = zone
-              }
-                |> Model.ensureSelectedAccount
-            , Cmd.none
+            ( updatedModel
+            , requestExchangeRate updatedModel.currentLedgerId today
             )
 
         UpdateDescription description ->
@@ -225,7 +237,20 @@ update msg model =
             ( { model | form = Accounting.setCurrency (Accounting.currencyFromString currency) model.form }, Cmd.none )
 
         UpdateDate date ->
-            ( { model | form = Accounting.setDate date model.form }, Cmd.none )
+            let
+                updatedModel : Model
+                updatedModel =
+                    { model
+                        | form = Accounting.setDate date model.form
+                        , exchangeRateDate = date
+                        , exchangeRateStatus = LoadingRate
+                    }
+            in
+            if date == "" then
+                ( updatedModel, Cmd.none )
+
+            else
+                ( updatedModel, requestExchangeRate updatedModel.currentLedgerId date )
 
         UpdateMovementType movementType ->
             ( { model | form = Accounting.setMovementType movementType model.form }, Cmd.none )
@@ -252,6 +277,12 @@ update msg model =
 
         SelectDisplayCurrency currency ->
             ( { model | displayCurrency = currency }, Cmd.none )
+
+        ToggleShowInputAmountColumn ->
+            ( { model | showInputAmountColumn = not model.showInputAmountColumn }, Cmd.none )
+
+        ToggleShowExchangeRateColumn ->
+            ( { model | showExchangeRateColumn = not model.showExchangeRateColumn }, Cmd.none )
 
         SelectSort sortField ->
             ( Sorting.select sortField model, Cmd.none )
@@ -280,21 +311,16 @@ update msg model =
         LedgerLoaded value ->
             LedgerData.handleLedgerLoaded ledgerDataConfig value model
 
-        GotExchangeRate result ->
-            case result of
-                Ok officialDollar ->
-                    ( { model
-                        | exchangeRate = officialDollar.sale
-                        , exchangeRateStatus = LoadedRate officialDollar.updatedAt
-                      }
-                    , Cmd.none
-                    )
-
-                Err _ ->
-                    ( { model | exchangeRateStatus = FailedRate }, Cmd.none )
+        ExchangeRateLoaded value ->
+            handleExchangeRateLoaded value model
 
         AddMovement ->
-            Movements.requestId movementsConfig model
+            case ensureExchangeRateReady model of
+                Ok () ->
+                    Movements.requestId movementsConfig model
+
+                Err error ->
+                    ( { model | error = error }, Cmd.none )
 
         MovementIdGenerated value ->
             Movements.handleGeneratedId movementsConfig value model
@@ -413,7 +439,22 @@ update msg model =
             Movements.delete movementsConfig movementId model
 
         EditMovement movementId ->
-            Movements.edit movementId model
+            case List.head (List.filter (\movement -> movement.id == movementId) model.expenses) of
+                Just movement ->
+                    let
+                        ( updatedModel, cmd ) =
+                            Movements.edit movementId model
+                    in
+                    ( { updatedModel
+                        | exchangeRate = movement.exchangeRate
+                        , exchangeRateDate = movement.date
+                        , exchangeRateStatus = LoadedRate (loadedExchangeRateMessage movement.date)
+                      }
+                    , cmd
+                    )
+
+                Nothing ->
+                    Movements.edit movementId model
 
         CancelEdit ->
             Movements.cancelEdit model
@@ -487,6 +528,105 @@ update msg model =
             Tutorial.handleTutorialAction tutorialConfig value model
 
 
+type alias ExchangeRatePayload =
+    { status : String
+    , date : String
+    , sale : Maybe Float
+    , source : Maybe String
+    , message : Maybe String
+    }
+
+
+exchangeRatePayloadDecoder : Decode.Decoder ExchangeRatePayload
+exchangeRatePayloadDecoder =
+    Decode.map5 ExchangeRatePayload
+        (Decode.field "status" Decode.string)
+        (Decode.field "date" Decode.string)
+        (Decode.maybe (Decode.field "sale" Decode.float))
+        (Decode.maybe (Decode.field "source" Decode.string))
+        (Decode.maybe (Decode.field "message" Decode.string))
+
+
+requestExchangeRate : String -> String -> Cmd Msg
+requestExchangeRate ledgerId date =
+    loadExchangeRate
+        (Encode.object
+            [ ( "ledgerId", Encode.string ledgerId )
+            , ( "date", Encode.string date )
+            , ( "casa", Encode.string "bolsa" )
+            ]
+        )
+
+
+handleExchangeRateLoaded : Decode.Value -> Model -> ( Model, Cmd Msg )
+handleExchangeRateLoaded value model =
+    case Decode.decodeValue exchangeRatePayloadDecoder value of
+        Ok payload ->
+            if payload.date /= model.form.date then
+                ( model, Cmd.none )
+
+            else
+                case ( payload.status, payload.sale ) of
+                    ( "loaded", Just sale ) ->
+                        ( { model
+                            | exchangeRate = sale
+                            , exchangeRateDate = payload.date
+                            , exchangeRateStatus = LoadedRate (loadedExchangeRateMessage payload.date)
+                            , error = ""
+                          }
+                        , Cmd.none
+                        )
+
+                    ( "error", _ ) ->
+                        ( { model
+                            | exchangeRateDate = payload.date
+                            , exchangeRateStatus = FailedRate (payload.message |> Maybe.withDefault (failedExchangeRateMessage payload.date))
+                          }
+                        , Cmd.none
+                        )
+
+                    _ ->
+                        ( { model
+                            | exchangeRateDate = payload.date
+                            , exchangeRateStatus = FailedRate (failedExchangeRateMessage payload.date)
+                          }
+                        , Cmd.none
+                        )
+
+        Err error ->
+            ( { model | exchangeRateStatus = FailedRate (Decode.errorToString error) }, Cmd.none )
+
+
+loadedExchangeRateMessage : String -> String
+loadedExchangeRateMessage date =
+    "Bolsa del " ++ formatDate NumericDate date
+
+
+failedExchangeRateMessage : String -> String
+failedExchangeRateMessage date =
+    "No se pudo cargar la cotización bolsa del " ++ formatDate NumericDate date ++ "."
+
+
+ensureExchangeRateReady : Model -> Result String ()
+ensureExchangeRateReady model =
+    if model.form.date == "" then
+        Ok ()
+
+    else if model.exchangeRateDate /= model.form.date then
+        Err "Todavía no está lista la cotización bolsa para la fecha elegida."
+
+    else
+        case model.exchangeRateStatus of
+            LoadingRate ->
+                Err "Espera a que cargue la cotización bolsa para la fecha elegida."
+
+            FailedRate message ->
+                Err message
+
+            LoadedRate _ ->
+                Ok ()
+
+
 payloadCmd : (Encode.Value -> Cmd Msg) -> Maybe Encode.Value -> Cmd Msg
 payloadCmd toCmd payload =
     payload
@@ -521,6 +661,8 @@ messages =
     , toggleAccountFilter = ToggleAccountFilter
     , selectDateDisplay = SelectDateDisplay
     , selectDisplayCurrency = SelectDisplayCurrency
+    , toggleShowInputAmountColumn = ToggleShowInputAmountColumn
+    , toggleShowExchangeRateColumn = ToggleShowExchangeRateColumn
     , selectSort = SelectSort
     , exportCsv = ExportCsv
     , exportXlsx = ExportXlsx
@@ -610,6 +752,7 @@ subscriptions _ =
     Sub.batch
         [ authStateChanged AuthStateChanged
         , ledgerLoaded LedgerLoaded
+        , exchangeRateLoaded ExchangeRateLoaded
         , expenseIdGenerated MovementIdGenerated
         , eventsLoaded EventsLoaded
         , localMigrationPrepared LocalMigrationPrepared

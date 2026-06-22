@@ -9,7 +9,7 @@ import InvoiceAllocation
 import InvoiceReport
 import Time
 import Util.Date as Date
-import Util.Format exposing (formatMoney)
+import Util.Format exposing (formatMoney, formatNumber)
 
 
 type alias Config msg =
@@ -766,18 +766,16 @@ exchangeRateView config =
         status =
             case config.exchangeRateStatus of
                 LoadingRate ->
-                    "Cargando cotización oficial..."
+                    "Buscando cotización bolsa para la fecha elegida..."
 
-                LoadedRate updatedAt ->
-                    "Actualizado: " ++ Date.formatApiDate config.zone updatedAt
+                LoadedRate message ->
+                    message
 
-                FailedRate ->
-                    "No se pudo cargar DolarApi. Usando cotización de respaldo."
+                FailedRate message ->
+                    message
     in
     div [ class "rate-status" ]
-        [ p []
-            [ strong [] [ text "1 U$D = " ]
-            , strong [] [ text (formatMoney ARS config.exchangeRate) ]
-            ]
+        [ p [ class "rate-status__value" ]
+            [ text ("Cot. Aprox: " ++ formatNumber config.exchangeRate ++ " ARS/USD") ]
         , p [ class "rate-status__meta" ] [ text status ]
         ]

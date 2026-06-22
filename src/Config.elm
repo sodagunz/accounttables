@@ -42,6 +42,8 @@ type alias Messages msg =
     , toggleAccountFilter : String -> msg
     , selectDateDisplay : DateDisplay -> msg
     , selectDisplayCurrency : Accounting.Currency -> msg
+    , toggleShowInputAmountColumn : msg
+    , toggleShowExchangeRateColumn : msg
     , selectSort : SortField -> msg
     , exportCsv : msg
     , exportXlsx : msg
@@ -103,6 +105,8 @@ view messages =
     , onToggleAccountFilter = messages.toggleAccountFilter
     , onSelectDateDisplay = messages.selectDateDisplay
     , onSelectDisplayCurrency = messages.selectDisplayCurrency
+    , onToggleShowInputAmountColumn = messages.toggleShowInputAmountColumn
+    , onToggleShowExchangeRateColumn = messages.toggleShowExchangeRateColumn
     , onSelectSort = messages.selectSort
     , onExportCsv = messages.exportCsv
     , onExportXlsx = messages.exportXlsx

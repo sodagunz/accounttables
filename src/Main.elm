@@ -511,12 +511,7 @@ update msg model =
                 reopenResult =
                     Tutorial.tutorialNavigateTo tutorialConfig step { model | tutorialCompletionVisible = False, tutorialMovementId = Nothing }
             in
-            ( Tuple.first reopenResult
-            , Cmd.batch
-                [ saveTutorialState (Encode.string "")
-                , Tuple.second reopenResult
-                ]
-            )
+            reopenResult
 
         DismissTutorialCompletion ->
             ( { model | tutorialCompletionVisible = False }, Cmd.none )

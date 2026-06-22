@@ -67,15 +67,6 @@ type alias Config msg =
 view : Config msg -> Model -> Html msg
 view config model =
     let
-        isTutorialOpen : Bool
-        isTutorialOpen =
-            case model.tutorialState of
-                TutorialOpen _ ->
-                    True
-
-                _ ->
-                    False
-
         mainContent : List (Html msg)
         mainContent =
             [ reopenTutorialButton config model
@@ -202,13 +193,7 @@ view config model =
                     [ div []
                         [ h1 [] [ text "accounttables" ] ]
                     , div [ class "topbar__actions" ]
-                        [ if isTutorialOpen then
-                            text ""
-
-                          else
-                            button [ class "topbar-setup-button", type_ "button", onClick config.onReopenTutorial ]
-                                [ text "Configuracion inicial" ]
-                        , AuthStatus.view
+                        [ AuthStatus.view
                             { authState = model.authState
                             , ledgerLoadState = model.ledgerLoadState
                             , onSignIn = config.onSignIn

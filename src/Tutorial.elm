@@ -31,14 +31,14 @@ type alias Config msg =
 decodeTutorialStateFromFlags : Decode.Value -> TutorialState
 decodeTutorialStateFromFlags flags =
     case Decode.decodeValue (Decode.field "tutorialState" Decode.string) flags of
-        Ok "dismissed" ->
-            TutorialDismissed
+        Ok "open" ->
+            TutorialOpen SignInStep
 
         Ok "completed" ->
             TutorialCompleted
 
         _ ->
-            TutorialOpen SignInStep
+            TutorialDismissed
 
 
 actionDecoder : Decode.Decoder String

@@ -1657,11 +1657,16 @@ function saveFilterWindow(filterWindow) {
 }
 
 function loadColorScheme() {
+  const fallback =
+    window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+
   try {
-    return localStorage.getItem(COLOR_SCHEME_KEY) || "light";
+    return localStorage.getItem(COLOR_SCHEME_KEY) || fallback;
   } catch (error) {
     console.warn("Could not load color scheme", error);
-    return "light";
+    return fallback;
   }
 }
 

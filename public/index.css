@@ -8,14 +8,16 @@
         BlinkMacSystemFont,
         "Segoe UI",
         sans-serif;
-    --color-primary: #091a15;
-    --color-primary-hover: #05110d;
+    --color-primary: #123126;
+    --color-primary-hover: #091a15;
     --page-bg: #f6f8f7;
     --page-text: #1e2422;
     --panel-bg: #ffffff;
     --panel-border: #dce4e0;
     --muted-surface: #f8faf9;
     --subtle-surface: #eef5f2;
+    --toggle-active-surface: #eef5f2;
+    --toggle-hover-surface: #d8f3e1;
     --field-bg: #ffffff;
     --field-border: #bfcbc6;
     --field-text: #1e2422;
@@ -23,25 +25,55 @@
     --table-border: #d4ddd9;
     --popover-bg: #ffffff;
     --popover-border: #d4ddd9;
+    --summary-highlight-bg: var(--muted-surface);
+    --allocation-row-bg: #ffffff;
+    --selection-surface: #eef8f4;
+    --success-surface: #e7f2ee;
+    --success-text: #17624f;
+    --primary-button-bg: var(--color-primary);
+    --primary-button-hover-bg: var(--color-primary-hover);
+    --primary-button-border: transparent;
+    --primary-button-text: #ffffff;
+    --primary-button-hover-text: #ffffff;
+    --header-text: #ffffff;
+    --header-subtle-text: #d6e6df;
     background: var(--page-bg);
     color: var(--page-text);
 }
 
 :root[data-theme="dark"] {
     color-scheme: dark;
-    --page-bg: #0c1311;
+    --color-primary: #e6efea;
+    --color-primary-hover: #4ade80;
+    --page-bg: #13201b;
     --page-text: #e6efea;
-    --panel-bg: #13201b;
-    --panel-border: #294038;
-    --muted-surface: #1a2a24;
-    --subtle-surface: #173127;
-    --field-bg: #10201b;
-    --field-border: #355247;
-    --field-text: #e6efea;
-    --body-muted: #adc1b8;
-    --table-border: #2b433b;
-    --popover-bg: #13201b;
-    --popover-border: #294038;
+    --panel-bg: #262b29;
+    --panel-border: #46504c;
+    --muted-surface: #313836;
+    --subtle-surface: #123126;
+    --toggle-active-surface: #243a30;
+    --toggle-hover-surface: #21553b;
+    --field-bg: #202624;
+    --field-border: #596660;
+    --field-text: #eef4f1;
+    --body-muted: #c6d0cb;
+    --table-border: #4a5550;
+    --popover-bg: #262b29;
+    --popover-border: #46504c;
+    --summary-highlight-bg: var(--muted-surface);
+    --allocation-row-bg: var(--page-bg);
+    --selection-surface: #243a30;
+    --success-surface: #243a30;
+    --success-text: #7ee2a4;
+    --primary-button-bg: var(--subtle-surface);
+    --primary-button-hover-bg: var(--color-primary);
+    --primary-button-border: var(--panel-border);
+    --primary-button-text: #e6efea;
+    --primary-button-hover-text: #123126;
+    --header-bg: #123126;
+    --header-bg-hover: #4ade80;
+    --header-text: #f4f7f2;
+    --header-subtle-text: #c6d7cf;
 }
 
 * {
@@ -72,8 +104,8 @@ select {
 }
 
 .topbar {
-    background: var(--color-primary);
-    color: #ffffff;
+    background: var(--header-bg, var(--color-primary));
+    color: var(--header-text);
     padding: 14px clamp(16px, 4vw, 40px);
 }
 
@@ -154,16 +186,16 @@ h1 {
     min-width: 48px;
     min-height: 28px;
     padding: 2px;
-    border: 1px solid rgba(255, 255, 255, 0.24);
+    border: 1px solid color-mix(in srgb, var(--header-text) 22%, transparent);
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.14);
-    color: #ffffff;
+    background: color-mix(in srgb, var(--header-text) 12%, transparent);
+    color: var(--header-text);
     cursor: pointer;
     line-height: 1;
 }
 
 .theme-toggle:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: color-mix(in srgb, var(--header-text) 18%, transparent);
 }
 
 .theme-toggle__icon {
@@ -175,7 +207,22 @@ h1 {
     width: 22px;
     height: 22px;
     font-size: 0.82rem;
-    color: rgba(255, 255, 255, 0.92);
+}
+
+.theme-toggle__icon--sun {
+    color: #123126;
+}
+
+.theme-toggle__icon--moon {
+    color: color-mix(in srgb, var(--header-text) 92%, transparent);
+}
+
+.theme-toggle--dark .theme-toggle__icon--sun {
+    color: #13201b;
+}
+
+.theme-toggle--dark .theme-toggle__icon--moon {
+    color: #e6efea;
 }
 
 .theme-toggle__thumb {
@@ -198,7 +245,7 @@ h1 {
     display: grid;
     justify-items: end;
     gap: 8px;
-    color: #d6e6df;
+    color: var(--header-subtle-text);
     font-size: 0.9rem;
     line-height: 1.35;
     min-width: 180px;
@@ -208,18 +255,18 @@ h1 {
 .auth-button {
     border: 0;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.15);
-    color: #ffffff;
+    background: color-mix(in srgb, var(--header-text) 15%, transparent);
+    color: var(--header-text);
     cursor: pointer;
     font-weight: 700;
     font-size: 0.9rem;
     height: 30px;
     padding: 0 10px;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.4);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--header-text) 40%, transparent);
 }
 
 .auth-button:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: color-mix(in srgb, var(--header-text) 25%, transparent);
 }
 
 .auth-user {
@@ -231,7 +278,7 @@ h1 {
 }
 
 .auth-user span {
-    color: #ffffff;
+    color: var(--header-text);
     font-weight: 700;
 }
 
@@ -275,7 +322,7 @@ h1 {
 }
 
 .auth-meta {
-    color: #b7cbc2;
+    color: var(--header-subtle-text);
     font-size: 0.82rem;
 }
 
@@ -463,13 +510,13 @@ main {
 .driver-popover.driverjs-theme-accounttables .driver-popover-next-btn {
     border: 0;
     background: var(--color-primary);
-    color: #ffffff;
+    color: var(--primary-button-text);
     padding: 0 14px;
 }
 
 .driver-popover.driverjs-theme-accounttables .driver-popover-next-btn:hover {
     background: var(--color-primary-hover);
-    color: #ffffff;
+    color: var(--primary-button-text);
 }
 
 .driver-popover.driverjs-theme-accounttables .driver-popover-prev-btn,
@@ -750,12 +797,12 @@ select:focus {
 }
 
 .movement-type__option--active {
-    background: var(--subtle-surface);
+    background: var(--toggle-active-surface);
     font-weight: 700;
 }
 
 .movement-type__option:not(.movement-type__option--active):hover {
-    background: var(--muted-surface);
+    background: var(--toggle-hover-surface);
 }
 
 .conversion {
@@ -779,12 +826,12 @@ select:focus {
 }
 
 .rate-status__value {
-    color: #6b7772;
+    color: var(--page-text);
     font-size: 0.74rem;
 }
 
 .rate-status__meta {
-    color: #9aa6a1;
+    color: var(--body-muted);
     font-size: 0.64rem;
 }
 
@@ -794,17 +841,18 @@ select:focus {
 }
 
 .primary {
-    border: 0;
+    border: 1px solid var(--primary-button-border);
     border-radius: 6px;
-    background: var(--color-primary);
-    color: #ffffff;
+    background: var(--primary-button-bg);
+    color: var(--primary-button-text);
     padding: 11px 14px;
     cursor: pointer;
     font-weight: 800;
 }
 
 .primary:hover {
-    background: var(--color-primary-hover);
+    background: var(--primary-button-hover-bg);
+    color: var(--primary-button-hover-text);
 }
 
 .primary--movement {
@@ -1099,13 +1147,13 @@ select:focus {
 }
 
 .segmented-control__option--active {
-    background: var(--subtle-surface);
+    background: var(--toggle-active-surface);
     font-weight: 700;
     color: var(--color-primary);
 }
 
 .segmented-control__option:not(.segmented-control__option--active):hover {
-    background: var(--muted-surface);
+    background: var(--toggle-hover-surface);
 }
 
 .view-mode-toggle {
@@ -1143,7 +1191,7 @@ select:focus {
 }
 
 .view-mode-toggle__btn:not(.view-mode-toggle__btn--active):hover {
-    background: var(--muted-surface);
+    background: var(--toggle-hover-surface);
 }
 
 .segmented-control__label {
@@ -1370,8 +1418,8 @@ th:first-child {
 }
 
 .invoice-status--full {
-    background: #e7f2ee;
-    color: #17624f;
+    background: var(--success-surface);
+    color: var(--success-text);
 }
 
 .invoice-status--over {
@@ -1386,14 +1434,16 @@ th:first-child {
 }
 
 .grand-total td {
-    background: #eef5f2;
+    background: var(--subtle-surface);
     border-top: 2px solid #2f806c;
-    color: var(--color-primary);
+    color: var(--page-text);
     font-weight: 800;
 }
 
 .summary-divider td {
+    background: var(--summary-highlight-bg);
     border-top: 2px solid #2f806c;
+    color: var(--page-text);
 }
 
 td.is-negative,
@@ -1528,7 +1578,7 @@ td.is-negative,
     }
 
     .movement-panel {
-        border-bottom: 1px solid #cfe0d9;
+        border-bottom: 1px solid var(--panel-border);
         box-shadow: none;
         padding-top: 18px;
     }
@@ -1647,7 +1697,7 @@ td.is-negative,
 
     .expense-table .subtotal,
     .expense-table .grand-total {
-        background: #f8faf9;
+        background: var(--muted-surface);
     }
 
     .expense-table .subtotal td,
@@ -1661,8 +1711,8 @@ td.is-negative,
     margin-left: 6px;
     padding: 1px 6px;
     border-radius: 4px;
-    background: #eef5f2;
-    color: #2f806c;
+    background: var(--success-surface);
+    color: var(--success-text);
     font-size: 0.72rem;
     font-weight: 700;
     vertical-align: middle;
@@ -1742,13 +1792,27 @@ td.is-negative,
     border-color: var(--panel-border);
 }
 
-:root[data-theme="dark"] .movement-total__badge,
-:root[data-theme="dark"] .invoice-badge {
+:root[data-theme="dark"] .grand-total td {
+    background: #1e332a;
+    color: var(--page-text);
+}
+
+:root[data-theme="dark"] .brand-title__main {
+    color: #f4f7f2;
+}
+
+:root[data-theme="dark"] .theme-toggle__thumb {
+    background: #13201b;
+    box-shadow: 0 1px 3px rgba(19, 32, 27, 0.2);
+}
+
+:root[data-theme="dark"] .movement-total__badge {
     color: #7ee2a4;
 }
 
-:root[data-theme="dark"] .invoice-status--full {
-    color: #7ee2a4;
+:root[data-theme="dark"] .invoice-status--partial {
+    background: #9a3412;
+    color: #fff7ed;
 }
 
 .allocation-target-row {
@@ -1756,16 +1820,16 @@ td.is-negative,
     grid-template-columns: auto minmax(0, 1fr);
     gap: 10px;
     align-items: flex-start;
-    border: 1px solid #d4ddd9;
+    border: 1px solid var(--table-border);
     border-radius: 6px;
-    background: #ffffff;
+    background: var(--allocation-row-bg);
     padding: 8px;
     cursor: pointer;
 }
 
 .allocation-target-row--selected {
     border-color: #2f806c;
-    background: #eef8f4;
+    background: var(--selection-surface);
 }
 
 .allocation-target-row input[type="checkbox"] {
@@ -1781,7 +1845,7 @@ td.is-negative,
 }
 
 .allocation-target-row__title {
-    color: #24302c;
+    color: var(--page-text);
     font-weight: 800;
 }
 

@@ -22,8 +22,7 @@ view config =
             AuthLoading ->
                 [ div [ class "auth-user" ]
                     [ syncDot Loading
-                    , span [ class "auth-user__skeleton auth-user__skeleton-name", attribute "aria-label" "Comprobando sesión" ] []
-                    , span [ class "auth-user__skeleton auth-user__skeleton-button", attribute "aria-hidden" "true" ] []
+                    , span [ class "auth-user__skeleton auth-user__skeleton-button", attribute "aria-label" "Comprobando sesión" ] []
                     ]
                 ]
 
@@ -31,13 +30,14 @@ view config =
                 [ p [] [ text "Firebase no configurado." ] ]
 
             SignedOut ->
-                [ button [ type_ "button", class "auth-button", attribute "data-tutorial" "sign-in", onClick config.onSignIn ] [ text "Ingresar con Google" ] ]
+                [ button [ type_ "button", class "auth-button auth-button--google auth-button--icon-only", attribute "data-tutorial" "sign-in", attribute "aria-label" "Ingresar con Google", title "Ingresar con Google", onClick config.onSignIn ]
+                    [ googleIcon ]
+                ]
 
-            SignedIn user ->
+            SignedIn _ ->
                 [ div [ class "auth-user" ]
                     [ syncDot config.ledgerLoadState
-                    , span [ class "auth-user__name" ] [ text (userLabel user) ]
-                    , button [ type_ "button", class "auth-button", attribute "aria-label" "Cerrar sesión", onClick config.onSignOut ] [ text "⏻" ]
+                    , button [ type_ "button", class "auth-button auth-button--icon-only", attribute "aria-label" "Cerrar sesión", onClick config.onSignOut ] [ signOutIcon ]
                     ]
                 , ledgerStatus config.ledgerLoadState
                 ]
@@ -47,6 +47,24 @@ view config =
                 , button [ type_ "button", class "auth-button", onClick config.onSignIn ] [ text "Reintentar" ]
                 ]
         )
+
+
+googleIcon : Html msg
+googleIcon =
+    span
+        [ class "auth-button__icon auth-button__icon--google"
+        , attribute "aria-hidden" "true"
+        ]
+        []
+
+
+signOutIcon : Html msg
+signOutIcon =
+    span
+        [ class "auth-button__icon auth-button__icon--sign-out"
+        , attribute "aria-hidden" "true"
+        ]
+        []
 
 
 ledgerStatus : LoadState -> Html msg
@@ -97,15 +115,3 @@ syncDot loadState =
         , attribute "aria-label" statusLabel
         ]
         []
-
-
-userLabel : Auth.User -> String
-userLabel user =
-    if user.displayName /= "" then
-        user.displayName
-
-    else if user.email /= "" then
-        user.email
-
-    else
-        "Sesión iniciada"

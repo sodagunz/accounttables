@@ -125,7 +125,7 @@ select {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 10px 14px;
+    gap: 10px 7px;
     align-items: center;
 }
 
@@ -264,11 +264,15 @@ h1 {
     color: var(--header-subtle-text);
     font-size: 0.9rem;
     line-height: 1.35;
-    min-width: 180px;
+    min-width: 65px;
     text-align: right;
 }
 
 .auth-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     border: 0;
     border-radius: 4px;
     background: color-mix(in srgb, var(--header-text) 15%, transparent);
@@ -283,6 +287,55 @@ h1 {
 
 .auth-button:hover {
     background: color-mix(in srgb, var(--header-text) 25%, transparent);
+}
+
+.auth-button--icon-only {
+    width: 34px;
+    min-width: 34px;
+    max-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    max-height: 34px;
+    aspect-ratio: 1;
+    flex: 0 0 34px;
+    padding: 0;
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--header-text) 12%, transparent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--header-text) 22%, transparent);
+}
+
+.auth-button--icon-only:hover {
+    background: color-mix(in srgb, var(--header-text) 18%, transparent);
+}
+
+.auth-button--google {
+    width: 34px;
+    height: 34px;
+}
+
+.auth-button__label {
+    line-height: 1;
+}
+
+.auth-button__icon {
+    width: 15px;
+    height: 15px;
+    flex: 0 0 auto;
+    background-color: currentColor;
+    -webkit-mask: var(--icon) no-repeat center;
+    mask: var(--icon) no-repeat center;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+}
+
+.auth-button__icon--google {
+    width: 17px;
+    height: 17px;
+    --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M12 11.636v2.727h6.273c-.255 1.636-1.91 4.8-6.273 4.8c-3.764 0-6.837-3.11-6.837-6.945S8.236 5.273 12 5.273c2.145 0 3.582.91 4.4 1.691l3-2.891C17.491 2.291 14.964 1.2 12 1.2C5.891 1.2.945 6.145.945 12.218S5.891 23.236 12 23.236c6.927 0 11.527-4.855 11.527-11.691c0-.782-.091-1.382-.2-1.91z'/%3E%3C/svg%3E");
+}
+
+.auth-button__icon--sign-out {
+    --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M10.75 3A2.75 2.75 0 0 0 8 5.75v2a.75.75 0 0 0 1.5 0v-2c0-.69.56-1.25 1.25-1.25h5.5c.69 0 1.25.56 1.25 1.25v12.5c0 .69-.56 1.25-1.25 1.25h-5.5c-.69 0-1.25-.56-1.25-1.25v-2a.75.75 0 0 0-1.5 0v2A2.75 2.75 0 0 0 10.75 21h5.5A2.75 2.75 0 0 0 19 18.25V5.75A2.75 2.75 0 0 0 16.25 3z'/%3E%3Cpath fill='black' d='M13.53 8.47a.75.75 0 0 0 0 1.06l1.72 1.72H4.75a.75.75 0 0 0 0 1.5h10.5l-1.72 1.72a.75.75 0 1 0 1.06 1.06l3-3a.75.75 0 0 0 0-1.06l-3-3a.75.75 0 0 0-1.06 0'/%3E%3C/svg%3E");
 }
 
 .auth-user {
@@ -310,9 +363,12 @@ h1 {
 }
 
 .auth-user__skeleton-button {
-    width: 52px;
-    min-height: 44px;
-    border-radius: 6px;
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    min-height: 34px;
+    aspect-ratio: 1;
+    border-radius: 50%;
     background: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.28);
 }

@@ -111,7 +111,7 @@ expenseTableBody config =
                                             USD ->
                                                 "Total (USD)"
                                         )
-                                   , th [ class "actions-header" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Acciones" ] ]
+                                   , th [ class "actions-header" ] [ button [ type_ "button", class "non-sort-button" ] [ text "Editar/Borrar" ] ]
                                    ]
                             )
                         ]
@@ -337,21 +337,18 @@ movementRow dateDisplay displayCurrency showInputAmountColumn showExchangeRateCo
                         ]
                     ]
                , td [ class "action-cell", attribute "data-label" "" ]
-                    [ div [ class "action-buttons" ]
-                        [ button
-                            [ type_ "button"
-                            , class "edit-button"
-                            , onClick (onEdit movement.id)
-                            ]
-                            [ text "✎" ]
-                        , button
-                            [ type_ "button"
-                            , class "delete-button"
-                            , attribute "data-tutorial" ("delete-" ++ movement.id)
-                            , onClick (onDelete movement.id)
-                            ]
-                            [ text "×" ]
+                    [ button
+                        [ type_ "button"
+                        , class "edit-button"
+                        , onClick (onEdit movement.id)
                         ]
+                        [ text "✎" ]
+                    , button
+                        [ type_ "button"
+                        , class "delete-button"
+                        , onClick (onDelete movement.id)
+                        ]
+                        [ text "×" ]
                     ]
                ]
         )

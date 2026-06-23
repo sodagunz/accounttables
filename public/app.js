@@ -32,7 +32,6 @@ const LAST_SESSION_KEY = "contabilizar:lastSession";
 const LOCAL_LEDGER_ID = "local";
 const LOCAL_LEDGER_KEY = "contabilizar:localLedger";
 const DEFAULT_LOCAL_LEDGER_NAME = "Libro contable de desconocido";
-const TUTORIAL_STATE_KEY = "contabilizar:tutorialState";
 const FILTER_WINDOW_KEY = "contabilizar:filterWindow";
 const COLOR_SCHEME_KEY = "contabilizar:colorScheme";
 
@@ -43,7 +42,6 @@ const app = Elm.Main.init({
   node: document.getElementById("app"),
   flags: {
     ledger: loadStartupLedgerCache(),
-    tutorialState: loadTutorialState(),
     filterWindow: loadFilterWindow(),
     colorScheme: initialColorScheme,
   },
@@ -51,27 +49,9 @@ const app = Elm.Main.init({
 
 setupFirebaseAuth(app);
 setupLastAccountStorage(app);
-setupTutorialDriver(app);
 
 app.ports.focusAccountTool.subscribe(() => {
   focusAccountTool();
-});
-
-app.ports.openDisclosure.subscribe((id) => {
-  const el = document.getElementById(id);
-  if (el) el.open = true;
-  window.requestAnimationFrame(() => {
-    window.accounttablesTutorialDriver?.refresh();
-  });
-});
-
-app.ports.focusElement.subscribe((selector) => {
-  const el = document.querySelector(selector);
-  if (el) el.focus();
-});
-
-app.ports.saveTutorialState.subscribe((state) => {
-  saveTutorialState(state);
 });
 
 app.ports.saveFilterWindowSelection.subscribe((filterWindow) => {
@@ -237,183 +217,6 @@ function setupLastAccountStorage(app) {
   app.ports.saveLastAccountSelection.subscribe(({ ledgerId, accountId }) => {
     saveLastAccountId(ledgerId, accountId);
   });
-}
-
-function setupTutorialDriver(app) {
-  const driverFactory = window.driver?.js?.driver;
-
-  if (!driverFactory) {
-    console.warn("Driver.js is not available; tutorial tour disabled.");
-    return;
-  }
-
-  let driverObj = null;
-  const baseDriverConfig = {
-    animate: true,
-    smoothScroll: true,
-    allowClose: false,
-    overlayClickBehavior: () => {},
-    overlayOpacity: 0.585,
-    stagePadding: 6,
-    stageRadius: 6,
-    popoverClass: "driverjs-theme-accounttables",
-    nextBtnText: "Siguiente",
-    prevBtnText: "Atras",
-    doneBtnText: "Finalizar",
-  };
-
-  const emitTutorialAction = (action, payload = {}) => {
-    const port = app.ports.tutorialAction;
-    if (port?.send) {
-      port.send({ action, ...payload });
-    }
-  };
-
-  const destroyTutorial = () => {
-    if (driverObj) {
-      driverObj.destroy();
-      driverObj = null;
-    }
-  };
-
-  const ensureDriver = () => {
-    if (driverObj) {
-      return driverObj;
-    }
-
-    driverObj = driverFactory(baseDriverConfig);
-
-    return driverObj;
-  };
-
-  const popoverButtonsFor = (step) => {
-    const buttons = [];
-
-    if (step?.showBack) {
-      buttons.push("previous");
-    }
-
-    if (step?.showNext || step?.done) {
-      buttons.push("next");
-    }
-
-    if (step?.showSkip) {
-      buttons.push("close");
-    }
-
-    return buttons;
-  };
-
-  const labelCloseButton = (popover) => {
-    const closeButton =
-      popover?.closeButton ||
-      popover?.closeBtn ||
-      document.querySelector(".driver-popover-close-btn");
-
-    if (!closeButton) return;
-
-    closeButton.textContent = "Saltar este paso";
-    closeButton.setAttribute("aria-label", "Saltar este paso");
-    closeButton.setAttribute("title", "Saltar este paso");
-  };
-
-  const openTutorialDisclosures = (ids) => {
-    if (!Array.isArray(ids)) return;
-
-    ids.forEach((id) => {
-      const el = document.getElementById(String(id || ""));
-      if (el) el.open = true;
-    });
-  };
-
-  const showTutorialStep = (step, retry = true) => {
-    openTutorialDisclosures(step?.openDisclosures);
-
-    const selector = String(step?.selector || "");
-    const target = selector ? document.querySelector(selector) : null;
-    const isMobile = window.matchMedia("(max-width: 520px)").matches;
-
-    if (selector && !target) {
-      if (retry) {
-        window.requestAnimationFrame(() => showTutorialStep(step, false));
-        return;
-      }
-
-      destroyTutorial();
-      emitTutorialAction("target-missing", {
-        selector,
-        step: String(step?.step || ""),
-      });
-      return;
-    }
-
-    const driver = ensureDriver();
-    const showButtons = popoverButtonsFor(step);
-
-    target?.scrollIntoView({
-      behavior: isMobile ? "auto" : "smooth",
-      block: isMobile ? "center" : "nearest",
-      inline: "nearest",
-    });
-
-    const highlightStep = () => {
-      driver.setConfig({
-        ...baseDriverConfig,
-        nextBtnText: step?.done ? "Finalizar" : "Siguiente",
-        stagePadding: isMobile ? 4 : baseDriverConfig.stagePadding,
-        popoverOffset: isMobile ? 8 : 10,
-      });
-
-      driver.highlight({
-        element: selector || undefined,
-        disableActiveInteraction: !step?.allowTargetClick,
-        popover: {
-          title: String(step?.title || ""),
-          description: String(step?.description || ""),
-          side: step?.side || "bottom",
-          align: step?.align || "start",
-          showButtons,
-          nextBtnText: step?.done ? "Finalizar" : "Siguiente",
-          prevBtnText: "Atras",
-          doneBtnText: "Finalizar",
-          onPopoverRender: labelCloseButton,
-          onNextClick: () => emitTutorialAction(step?.done ? "done" : "next"),
-          onPrevClick: () => emitTutorialAction("back"),
-          onCloseClick: () => emitTutorialAction("skip"),
-        },
-      });
-    };
-
-    if (isMobile && target) {
-      window.requestAnimationFrame(highlightStep);
-    } else {
-      highlightStep();
-    }
-  };
-
-  const refreshTutorial = () => {
-    if (driverObj?.isActive()) {
-      driverObj.refresh();
-    }
-  };
-
-  if (app.ports.showTutorialStep?.subscribe) {
-    app.ports.showTutorialStep.subscribe(showTutorialStep);
-  }
-
-  if (app.ports.hideTutorial?.subscribe) {
-    app.ports.hideTutorial.subscribe(destroyTutorial);
-  }
-
-  if (app.ports.refreshTutorial?.subscribe) {
-    app.ports.refreshTutorial.subscribe(refreshTutorial);
-  }
-
-  window.accounttablesTutorialDriver = {
-    showStep: showTutorialStep,
-    hide: destroyTutorial,
-    refresh: refreshTutorial,
-  };
 }
 
 function focusAccountTool() {
@@ -1619,23 +1422,6 @@ function clearLastSession() {
     localStorage.removeItem(LAST_SESSION_KEY);
   } catch (error) {
     console.warn("Could not clear last session", error);
-  }
-}
-
-function loadTutorialState() {
-  try {
-    return localStorage.getItem(TUTORIAL_STATE_KEY) || "";
-  } catch (error) {
-    console.warn("Could not load tutorial state", error);
-    return "";
-  }
-}
-
-function saveTutorialState(state) {
-  try {
-    localStorage.setItem(TUTORIAL_STATE_KEY, String(state || ""));
-  } catch (error) {
-    console.warn("Could not save tutorial state", error);
   }
 }
 

@@ -97,7 +97,7 @@ invoiceTableBody config =
                             , th [ class "numeric" ] [ span [] [ text "Ingresado" ] ]
                             , th [ class "numeric" ] [ span [] [ text "Pendiente" ] ]
                             , th [ class "numeric" ] [ span [] [ text "Total" ] ]
-                            , th [ class "actions-header" ] [ span [] [ text "Acciones" ] ]
+                            , th [ class "actions-header" ] [ span [] [ text "Editar/Borrar" ] ]
                             ]
                         ]
                     , tbody []
@@ -173,20 +173,18 @@ row dateDisplay displayCurrency onEdit onDelete documentRow =
             [ text (formatMoney documentRow.settlement.currency documentRow.settlement.remainingDue) ]
         , td [ attribute "data-label" "Total", class "numeric" ] [ text (formatNumber (valueForCurrency displayCurrency movement)) ]
         , td [ class "action-cell", attribute "data-label" "" ]
-            [ div [ class "action-buttons" ]
-                [ button
-                    [ type_ "button"
-                    , class "edit-button"
-                    , onClick (onEdit movement.id)
-                    ]
-                    [ text "✎" ]
-                , button
-                    [ type_ "button"
-                    , class "delete-button"
-                    , onClick (onDelete movement.id)
-                    ]
-                    [ text "×" ]
+            [ button
+                [ type_ "button"
+                , class "edit-button"
+                , onClick (onEdit movement.id)
                 ]
+                [ text "✎" ]
+            , button
+                [ type_ "button"
+                , class "delete-button"
+                , onClick (onDelete movement.id)
+                ]
+                [ text "×" ]
             ]
         ]
 

@@ -12,10 +12,9 @@ import InvoiceReport
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
-import Model exposing (ColorScheme(..), MigrationState(..), Model, TutorialState(..), TutorialStep(..))
+import Model exposing (ColorScheme(..), MigrationState(..), Model)
 import Task
 import Time
-import Tutorial
 import Update.Accounts as Accounts
 import Update.Auth as AuthUpdate
 import Update.LedgerData as LedgerData
@@ -73,11 +72,8 @@ type Msg
     | SelectMigrationLedger String
     | ConfirmLocalMigration
     | SkipLocalMigration
-    | ReopenTutorial
     | ToggleColorScheme
     | SelectViewMode Model.ViewMode
-    | DismissTutorialCompletion
-    | TutorialActionReceived Decode.Value
 
 
 port exportTable : Encode.Value -> Cmd msg
@@ -152,24 +148,6 @@ port localMigrationPrepared : (Decode.Value -> msg) -> Sub msg
 port mergeLocalLedgerToFirestore : Encode.Value -> Cmd msg
 
 
-port saveTutorialState : Encode.Value -> Cmd msg
-
-
-port showTutorialStep : Encode.Value -> Cmd msg
-
-
-port openDisclosure : String -> Cmd msg
-
-
-port focusElement : String -> Cmd msg
-
-
-port hideTutorial : () -> Cmd msg
-
-
-port tutorialAction : (Decode.Value -> msg) -> Sub msg
-
-
 main : Program Decode.Value Model Msg
 main =
     Browser.element
@@ -186,19 +164,9 @@ init flags =
         model : Model
         model =
             Flags.modelFromFlags flags
-
-        baseCmds : List (Cmd Msg)
-        baseCmds =
-            [ Task.perform identity (Task.map2 GotToday Time.here Time.now)
-            ]
     in
     ( model
-    , case model.tutorialState of
-        TutorialOpen step ->
-            Cmd.batch (Tutorial.tutorialNavigateCmd tutorialConfig model step :: baseCmds)
-
-        _ ->
-            Cmd.batch baseCmds
+    , Task.perform identity (Task.map2 GotToday Time.here Time.now)
     )
 
 
@@ -313,7 +281,7 @@ update msg model =
             AuthUpdate.handleState authUpdateConfig (Auth.decodeAuthState value) model
 
         LedgerLoaded value ->
-            LedgerData.handleLedgerLoaded ledgerDataConfig value model
+            LedgerData.handleLedgerLoaded value model
 
         ExchangeRateLoaded value ->
             handleExchangeRateLoaded value model
@@ -337,48 +305,8 @@ update msg model =
                 addResult : ( Model, Maybe Encode.Value )
                 addResult =
                     Accounts.add model
-
-                updatedModel : Model
-                updatedModel =
-                    Tuple.first addResult
-
-                payload : Maybe Encode.Value
-                payload =
-                    Tuple.second addResult
-
-                finalResult : ( Model, Cmd Msg )
-                finalResult =
-                    case updatedModel.tutorialState of
-                        TutorialOpen AccountsStep ->
-                            if not (List.isEmpty (Model.activeAccounts updatedModel)) then
-                                let
-                                    nextAccountsStep : TutorialStep
-                                    nextAccountsStep =
-                                        Tutorial.stepAfterAccounts updatedModel
-
-                                    nextModel : Model
-                                    nextModel =
-                                        Tutorial.prepareStep nextAccountsStep { updatedModel | tutorialState = TutorialOpen nextAccountsStep, accountError = "" }
-                                in
-                                ( nextModel
-                                , Tutorial.tutorialNavigateCmd tutorialConfig nextModel nextAccountsStep
-                                )
-
-                            else
-                                ( updatedModel, Cmd.none )
-
-                        _ ->
-                            ( updatedModel, Cmd.none )
-
-                finalModel : Model
-                finalModel =
-                    Tuple.first finalResult
-
-                advanceCmd : Cmd Msg
-                advanceCmd =
-                    Tuple.second finalResult
             in
-            ( finalModel, Cmd.batch [ payloadCmd saveAccount payload, advanceCmd ] )
+            ( Tuple.first addResult, payloadCmd saveAccount (Tuple.second addResult) )
 
         DeleteAccount accountId ->
             let
@@ -505,18 +433,6 @@ update msg model =
                 NoMigration ->
                     ( model, Cmd.none )
 
-        ReopenTutorial ->
-            let
-                step : TutorialStep
-                step =
-                    Tutorial.reopenedStep model
-
-                reopenResult : ( Model, Cmd Msg )
-                reopenResult =
-                    Tutorial.tutorialNavigateTo tutorialConfig step { model | tutorialCompletionVisible = False, tutorialMovementId = Nothing }
-            in
-            reopenResult
-
         ToggleColorScheme ->
             let
                 nextColorScheme : Model.ColorScheme
@@ -532,14 +448,8 @@ update msg model =
             , saveColorSchemeSelection (Model.colorSchemeToString nextColorScheme)
             )
 
-        DismissTutorialCompletion ->
-            ( { model | tutorialCompletionVisible = False }, Cmd.none )
-
         SelectViewMode viewMode ->
             ( { model | viewMode = viewMode }, Cmd.none )
-
-        TutorialActionReceived value ->
-            Tutorial.handleTutorialAction tutorialConfig value model
 
 
 type alias ExchangeRatePayload =
@@ -650,9 +560,7 @@ view model =
 
 messages : Config.Messages Msg
 messages =
-    { reopenTutorial = ReopenTutorial
-    , dismissTutorialCompletion = DismissTutorialCompletion
-    , toggleColorScheme = ToggleColorScheme
+    { toggleColorScheme = ToggleColorScheme
     , signIn = SignInWithGoogle
     , signOut = SignOut
     , description = UpdateDescription
@@ -698,12 +606,7 @@ messages =
 
 ports : Config.Ports Msg
 ports =
-    { showTutorialStep = showTutorialStep
-    , openDisclosure = openDisclosure
-    , focusElement = focusElement
-    , hideTutorial = hideTutorial
-    , saveTutorialState = saveTutorialState
-    , mergeLocalLedgerToFirestore = mergeLocalLedgerToFirestore
+    { mergeLocalLedgerToFirestore = mergeLocalLedgerToFirestore
     , prepareLocalMigration = prepareLocalMigration
     , loadLedgerData = loadLedgerData
     , generateExpenseId = generateExpenseId
@@ -712,24 +615,19 @@ ports =
     }
 
 
-tutorialConfig : Tutorial.Config Msg
-tutorialConfig =
-    Config.tutorial ports
-
-
 ledgerDataConfig : LedgerData.Config Msg
 ledgerDataConfig =
-    Config.ledgerData tutorialConfig ports
+    Config.ledgerData ports
 
 
 authUpdateConfig : AuthUpdate.Config Msg
 authUpdateConfig =
-    Config.authUpdate tutorialConfig ports
+    Config.authUpdate ports
 
 
 movementsConfig : Movements.Config Msg
 movementsConfig =
-    Config.movements tutorialConfig ports
+    Config.movements ports
 
 
 exportVisibleTable : Export.Format -> Model -> Cmd Msg
@@ -766,7 +664,6 @@ subscriptions _ =
         , expenseIdGenerated MovementIdGenerated
         , eventsLoaded EventsLoaded
         , localMigrationPrepared LocalMigrationPrepared
-        , tutorialAction TutorialActionReceived
         ]
 
 

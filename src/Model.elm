@@ -3,8 +3,6 @@ module Model exposing
     , MigrationState(..)
     , Model
     , StorageMode(..)
-    , TutorialState(..)
-    , TutorialStep(..)
     , ViewMode(..)
     , activeAccounts
     , activeAccountsFromList
@@ -59,9 +57,6 @@ type alias Model =
     , showInputAmountColumn : Bool
     , showExchangeRateColumn : Bool
     , migrationState : MigrationState
-    , tutorialState : TutorialState
-    , tutorialCompletionVisible : Bool
-    , tutorialMovementId : Maybe String
     , viewMode : ViewMode
     , colorScheme : ColorScheme
     }
@@ -77,20 +72,6 @@ type MigrationState
     | PreparingMigration
     | ChoosingMigration (List Ledger.LedgerSummary) String
     | UploadingMigration String
-
-
-type TutorialStep
-    = SignInStep
-    | AccountsStep
-    | CollaboratorsStep
-    | FirstMovementStep
-    | DeleteMovementStep
-
-
-type TutorialState
-    = TutorialOpen TutorialStep
-    | TutorialDismissed
-    | TutorialCompleted
 
 
 type ViewMode
@@ -154,9 +135,6 @@ initial =
     , showInputAmountColumn = False
     , showExchangeRateColumn = False
     , migrationState = NoMigration
-    , tutorialState = TutorialDismissed
-    , tutorialCompletionVisible = False
-    , tutorialMovementId = Nothing
     , viewMode = CashflowView
     , colorScheme = LightScheme
     }
@@ -218,12 +196,16 @@ ensureSelectedAccount model =
                 { model | form = Accounting.setAccount account.id model.form }
 
             [] ->
-                { model | form = Accounting.setAccount "" model.form }
+                model
 
 
 selectedLedgerId : Model -> String
 selectedLedgerId model =
-    model.currentLedgerId
+    if model.currentLedgerId == "" then
+        Ledger.localLedgerId
+
+    else
+        model.currentLedgerId
 
 
 ledgerNameFor : String -> List Ledger.LedgerSummary -> String

@@ -7,7 +7,7 @@ import Html.Attributes exposing (attribute, class, classList, type_, value)
 import Html.Events exposing (onClick, onInput)
 import InvoiceReport
 import Ledger
-import Model exposing (ColorScheme(..), MigrationState(..), Model, StorageMode(..), TutorialState(..), ViewMode(..))
+import Model exposing (ColorScheme(..), MigrationState(..), Model, StorageMode(..), ViewMode(..))
 import Util.Date exposing (DateDisplay)
 import View.AuthStatus as AuthStatus
 import View.InvoiceTable as InvoiceTable
@@ -19,8 +19,6 @@ import View.MovementTable as MovementTable
 
 type alias Config msg =
     { localLedgerName : String
-    , onReopenTutorial : msg
-    , onDismissTutorialCompletion : msg
     , onToggleColorScheme : msg
     , onSignIn : msg
     , onSignOut : msg
@@ -88,9 +86,7 @@ view config model =
 
         mainContent : List (Html msg)
         mainContent =
-            [ reopenTutorialButton config model
-            , tutorialCompletionBanner config model
-            , migrationPrompt config model
+            [ migrationPrompt config model
             , localRiskBanner config model
             , div [ class "layout" ]
                 [ div [ class "input-area" ]
@@ -242,32 +238,6 @@ view config model =
             ]
         , main_ [] mainContent
         ]
-
-
-tutorialCompletionBanner : Config msg -> Model -> Html msg
-tutorialCompletionBanner config model =
-    if model.tutorialCompletionVisible then
-        section [ class "tutorial-done-banner" ]
-            [ strong [] [ text "Listo" ]
-            , span [] [ text "Ya puedes empezar a registrar movimientos." ]
-            , button [ type_ "button", onClick config.onDismissTutorialCompletion ] [ text "Cerrar" ]
-            ]
-
-    else
-        text ""
-
-
-reopenTutorialButton : Config msg -> Model -> Html msg
-reopenTutorialButton config model =
-    case model.tutorialState of
-        TutorialOpen _ ->
-            text ""
-
-        _ ->
-            section [ class "setup-shortcut" ]
-                [ button [ class "setup-shortcut__button", type_ "button", onClick config.onReopenTutorial ]
-                    [ text "Abrir tutorial" ]
-                ]
 
 
 migrationPrompt : Config msg -> Model -> Html msg

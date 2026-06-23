@@ -8,36 +8,20 @@ module Update.LedgerData exposing
 import Accounting
 import Json.Decode as Decode
 import Ledger exposing (LoadState(..))
-import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), TutorialStep(..))
+import Model exposing (MigrationState(..), Model, StorageMode(..))
 import Projector
-import Tutorial
 
 
 type alias Config msg =
-    { navigateTutorial : Model -> TutorialStep -> Cmd msg
-    , mergeLocalLedgerToFirestore : String -> Cmd msg
+    { mergeLocalLedgerToFirestore : String -> Cmd msg
     }
 
 
-handleLedgerLoaded : Config msg -> Decode.Value -> Model -> ( Model, Cmd msg )
-handleLedgerLoaded config value model =
+handleLedgerLoaded : Decode.Value -> Model -> ( Model, Cmd msg )
+handleLedgerLoaded value model =
     case Ledger.decodeLedger value of
         Ok ledger ->
-            let
-                updatedModel : Model
-                updatedModel =
-                    apply ledger model
-
-                advanceCmd : Cmd msg
-                advanceCmd =
-                    case ( model.tutorialState, updatedModel.tutorialState ) of
-                        ( TutorialOpen AccountsStep, TutorialOpen next ) ->
-                            config.navigateTutorial updatedModel next
-
-                        _ ->
-                            Cmd.none
-            in
-            ( updatedModel, advanceCmd )
+            ( apply ledger model, Cmd.none )
 
         Err error ->
             ( { model | ledgerLoadState = LoadError error, migrationState = NoMigration }, Cmd.none )
@@ -137,31 +121,7 @@ apply ledger model =
         , ledgerError = ""
         , migrationState = NoMigration
     }
-        |> adjustTutorialAfterLedgerLoad
         |> Model.ensureSelectedAccount
-
-
-adjustTutorialAfterLedgerLoad : Model -> Model
-adjustTutorialAfterLedgerLoad model =
-    case model.tutorialState of
-        TutorialOpen AccountsStep ->
-            if not (List.isEmpty (Model.activeAccounts model)) then
-                let
-                    nextStep : TutorialStep
-                    nextStep =
-                        Tutorial.stepAfterAccounts model
-                in
-                Tutorial.prepareStep nextStep
-                    { model
-                        | tutorialState = TutorialOpen nextStep
-                        , accountError = ""
-                    }
-
-            else
-                model
-
-        _ ->
-            model
 
 
 formWithLoadedAccount : Maybe String -> List Accounting.Account -> Accounting.Form -> Accounting.Form

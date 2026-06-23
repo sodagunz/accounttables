@@ -2,16 +2,12 @@ module Update.Auth exposing (Config, handleState)
 
 import Auth exposing (AuthState(..))
 import Ledger exposing (LoadState(..))
-import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), TutorialStep(..))
-import Tutorial
+import Model exposing (MigrationState(..), Model, StorageMode(..))
 
 
 type alias Config msg =
     { prepareLocalMigration : Cmd msg
     , loadLedgerData : String -> Cmd msg
-    , completeTutorial : Cmd msg
-    , tutorialAdvanceCmd : Model -> TutorialState -> TutorialState -> Cmd msg
-    , tutorialNavigateCmd : Model -> TutorialStep -> Cmd msg
     }
 
 
@@ -45,44 +41,23 @@ handleSignedIn config authState user model =
                 , accountError = ""
                 , ledgerError = ""
                 , migrationState = NoMigration
-                , tutorialState = TutorialCompleted
-                , tutorialCompletionVisible = False
-                , tutorialMovementId = Nothing
               }
-            , Cmd.batch
-                [ config.completeTutorial
-                , config.loadLedgerData invitedLedgerId
-                ]
+            , config.loadLedgerData invitedLedgerId
             )
 
         Nothing ->
-            let
-                newTutorialState : TutorialState
-                newTutorialState =
-                    tutorialAfterAuth model
-            in
             if localDataExists model then
-                let
-                    updatedModel : Model
-                    updatedModel =
-                        { model
-                            | authState = authState
-                            , storageMode = CloudSynced
-                            , ledgerLoadState = Loading
-                            , inviteEmail = ""
-                            , error = ""
-                            , accountError = ""
-                            , ledgerError = ""
-                            , migrationState = PreparingMigration
-                            , tutorialState = newTutorialState
-                        }
-                            |> Tutorial.prepareState
-                in
-                ( updatedModel
-                , Cmd.batch
-                    [ config.prepareLocalMigration
-                    , config.tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
-                    ]
+                ( { model
+                    | authState = authState
+                    , storageMode = CloudSynced
+                    , ledgerLoadState = Loading
+                    , inviteEmail = ""
+                    , error = ""
+                    , accountError = ""
+                    , ledgerError = ""
+                    , migrationState = PreparingMigration
+                  }
+                , config.prepareLocalMigration
                 )
 
             else
@@ -99,27 +74,18 @@ handleSignedIn config authState user model =
 
                                 else
                                     model.currentLedgerId
-
-                    updatedModel : Model
-                    updatedModel =
-                        { model
-                            | authState = authState
-                            , storageMode = CloudSynced
-                            , ledgerLoadState = Loading
-                            , currentLedgerId = ledgerId
-                            , inviteEmail = ""
-                            , error = ""
-                            , accountError = ""
-                            , ledgerError = ""
-                            , tutorialState = newTutorialState
-                        }
-                            |> Tutorial.prepareState
                 in
-                ( updatedModel
-                , Cmd.batch
-                    [ config.loadLedgerData ledgerId
-                    , config.tutorialAdvanceCmd updatedModel model.tutorialState updatedModel.tutorialState
-                    ]
+                ( { model
+                    | authState = authState
+                    , storageMode = CloudSynced
+                    , ledgerLoadState = Loading
+                    , currentLedgerId = ledgerId
+                    , inviteEmail = ""
+                    , error = ""
+                    , accountError = ""
+                    , ledgerError = ""
+                  }
+                , config.loadLedgerData ledgerId
                 )
 
 
@@ -137,21 +103,9 @@ handleSignedOut config authState model =
             }
                 |> Ledger.ensureLocalLedger LocalOnly
                 |> Model.ensureSelectedAccount
-
-        tutorialCmd : Cmd msg
-        tutorialCmd =
-            case signedOutModel.tutorialState of
-                TutorialOpen SignInStep ->
-                    config.tutorialNavigateCmd signedOutModel SignInStep
-
-                _ ->
-                    Cmd.none
     in
     ( signedOutModel
-    , Cmd.batch
-        [ config.loadLedgerData Ledger.localLedgerId
-        , tutorialCmd
-        ]
+    , config.loadLedgerData Ledger.localLedgerId
     )
 
 
@@ -179,13 +133,3 @@ localDataExists model =
                 || model.ledgerName
                 /= Ledger.localLedgerName
            )
-
-
-tutorialAfterAuth : Model -> TutorialState
-tutorialAfterAuth model =
-    case model.tutorialState of
-        TutorialOpen SignInStep ->
-            TutorialOpen (Tutorial.reopenedStep model)
-
-        _ ->
-            model.tutorialState

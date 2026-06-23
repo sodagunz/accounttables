@@ -29,7 +29,7 @@ view config =
                 [ p [] [ text "Firebase no configurado." ] ]
 
             SignedOut ->
-                [ button [ type_ "button", class "auth-button auth-button--google auth-button--icon-only", attribute "data-tutorial" "sign-in", attribute "aria-label" "Ingresar con Google", title "Ingresar con Google", onClick config.onSignIn ]
+                [ button [ type_ "button", class "auth-button auth-button--google auth-button--icon-only", attribute "aria-label" "Ingresar con Google", title "Ingresar con Google", onClick config.onSignIn ]
                     [ googleIcon ]
                 ]
 

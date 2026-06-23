@@ -125,7 +125,7 @@ select {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 10px 7px;
+    gap: 10px 6px;
     align-items: center;
 }
 
@@ -260,7 +260,7 @@ h1 {
 .auth-status {
     display: grid;
     justify-items: end;
-    gap: 8px;
+    gap: 6px;
     color: var(--header-subtle-text);
     font-size: 0.9rem;
     line-height: 1.35;
@@ -342,7 +342,7 @@ h1 {
     display: flex;
     flex-wrap: wrap;
     justify-content: flex-end;
-    gap: 8px;
+    gap: 6px;
     align-items: center;
 }
 
@@ -371,26 +371,6 @@ h1 {
     border-radius: 50%;
     background: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.28);
-}
-
-.sync-dot {
-    width: 9px;
-    height: 9px;
-    border-radius: 999px;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.18);
-    flex: 0 0 auto;
-}
-
-.sync-dot--synced {
-    background: #4ade80;
-}
-
-.sync-dot--syncing {
-    background: #facc15;
-}
-
-.sync-dot--error {
-    background: #f87171;
 }
 
 .auth-meta {
@@ -1613,11 +1593,6 @@ td.is-negative,
         justify-items: end;
         text-align: right;
         min-width: auto;
-    }
-
-    .sync-dot,
-    .auth-user__name {
-        display: none;
     }
 
     main {

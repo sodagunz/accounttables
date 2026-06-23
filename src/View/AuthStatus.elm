@@ -21,8 +21,7 @@ view config =
         (case config.authState of
             AuthLoading ->
                 [ div [ class "auth-user" ]
-                    [ syncDot Loading
-                    , span [ class "auth-user__skeleton auth-user__skeleton-button", attribute "aria-label" "Comprobando sesión" ] []
+                    [ span [ class "auth-user__skeleton auth-user__skeleton-button", attribute "aria-label" "Comprobando sesión" ] []
                     ]
                 ]
 
@@ -36,8 +35,7 @@ view config =
 
             SignedIn _ ->
                 [ div [ class "auth-user" ]
-                    [ syncDot config.ledgerLoadState
-                    , button [ type_ "button", class "auth-button auth-button--icon-only", attribute "aria-label" "Cerrar sesión", onClick config.onSignOut ] [ signOutIcon ]
+                    [ button [ type_ "button", class "auth-button auth-button--icon-only", attribute "aria-label" "Cerrar sesión", onClick config.onSignOut ] [ signOutIcon ]
                     ]
                 , ledgerStatus config.ledgerLoadState
                 ]
@@ -81,37 +79,3 @@ ledgerStatus loadState =
 
         LoadError message ->
             p [ class "auth-error" ] [ text message ]
-
-
-syncDot : LoadState -> Html msg
-syncDot loadState =
-    let
-        status : ( String, String )
-        status =
-            case loadState of
-                NotLoaded ->
-                    ( "sync-dot--syncing", "Sincronizando" )
-
-                Loading ->
-                    ( "sync-dot--syncing", "Sincronizando" )
-
-                Loaded ->
-                    ( "sync-dot--synced", "Sincronizado" )
-
-                LoadError _ ->
-                    ( "sync-dot--error", "Error de sincronización" )
-
-        statusClass : String
-        statusClass =
-            Tuple.first status
-
-        statusLabel : String
-        statusLabel =
-            Tuple.second status
-    in
-    span
-        [ class ("sync-dot " ++ statusClass)
-        , title statusLabel
-        , attribute "aria-label" statusLabel
-        ]
-        []

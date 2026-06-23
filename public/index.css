@@ -8,8 +8,8 @@
         BlinkMacSystemFont,
         "Segoe UI",
         sans-serif;
-    --color-primary: #133128;
-    --color-primary-hover: #0b241d;
+    --color-primary: #091a15;
+    --color-primary-hover: #05110d;
     background: #f6f8f7;
     color: #1e2422;
 }
@@ -98,12 +98,17 @@ h1 {
     gap: 0.02em;
 }
 
+.brand-title__main,
+.brand-title__accent {
+    display: inline-block;
+}
+
 .brand-title__main {
-    color: #ffffff;
+    color: #f4f7f2;
 }
 
 .brand-title__accent {
-    color: #b8d9c8;
+    color: #4ade80;
 }
 
 .auth-status {

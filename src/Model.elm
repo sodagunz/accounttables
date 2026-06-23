@@ -1,5 +1,6 @@
 module Model exposing
-    ( MigrationState(..)
+    ( ColorScheme(..)
+    , MigrationState(..)
     , Model
     , StorageMode(..)
     , TutorialState(..)
@@ -8,6 +9,8 @@ module Model exposing
     , activeAccounts
     , activeAccountsFromList
     , activeMovements
+    , colorSchemeFromString
+    , colorSchemeToString
     , ensureSelectedAccount
     , initial
     , ledgerNameFor
@@ -60,6 +63,7 @@ type alias Model =
     , tutorialCompletionVisible : Bool
     , tutorialMovementId : Maybe String
     , viewMode : ViewMode
+    , colorScheme : ColorScheme
     }
 
 
@@ -92,6 +96,31 @@ type TutorialState
 type ViewMode
     = CashflowView
     | InvoiceView
+
+
+type ColorScheme
+    = LightScheme
+    | DarkScheme
+
+
+colorSchemeFromString : String -> ColorScheme
+colorSchemeFromString value =
+    case value of
+        "dark" ->
+            DarkScheme
+
+        _ ->
+            LightScheme
+
+
+colorSchemeToString : ColorScheme -> String
+colorSchemeToString colorScheme =
+    case colorScheme of
+        LightScheme ->
+            "light"
+
+        DarkScheme ->
+            "dark"
 
 
 initial : Model
@@ -129,6 +158,7 @@ initial =
     , tutorialCompletionVisible = False
     , tutorialMovementId = Nothing
     , viewMode = CashflowView
+    , colorScheme = LightScheme
     }
 
 

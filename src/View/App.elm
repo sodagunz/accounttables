@@ -3,11 +3,11 @@ module View.App exposing (Config, view)
 import Accounting exposing (FilterWindow, Movement, SortField)
 import Auth exposing (AuthState(..))
 import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
-import Html.Attributes exposing (class, classList, type_, value)
+import Html.Attributes exposing (attribute, class, classList, type_, value)
 import Html.Events exposing (onClick, onInput)
 import InvoiceReport
 import Ledger
-import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), ViewMode(..))
+import Model exposing (ColorScheme(..), MigrationState(..), Model, StorageMode(..), TutorialState(..), ViewMode(..))
 import Util.Date exposing (DateDisplay)
 import View.AuthStatus as AuthStatus
 import View.InvoiceTable as InvoiceTable
@@ -21,6 +21,7 @@ type alias Config msg =
     { localLedgerName : String
     , onReopenTutorial : msg
     , onDismissTutorialCompletion : msg
+    , onToggleColorScheme : msg
     , onSignIn : msg
     , onSignOut : msg
     , onDescription : String -> msg
@@ -67,6 +68,24 @@ type alias Config msg =
 view : Config msg -> Model -> Html msg
 view config model =
     let
+        colorSchemeToggleLabel : String
+        colorSchemeToggleLabel =
+            case model.colorScheme of
+                LightScheme ->
+                    "Cambiar a modo oscuro"
+
+                DarkScheme ->
+                    "Cambiar a modo claro"
+
+        isDarkScheme : Bool
+        isDarkScheme =
+            case model.colorScheme of
+                LightScheme ->
+                    False
+
+                DarkScheme ->
+                    True
+
         mainContent : List (Html msg)
         mainContent =
             [ reopenTutorialButton config model
@@ -197,7 +216,21 @@ view config model =
                             ]
                         ]
                     , div [ class "topbar__actions" ]
-                        [ AuthStatus.view
+                        [ button
+                            [ classList
+                                [ ( "theme-toggle", True )
+                                , ( "theme-toggle--dark", isDarkScheme )
+                                ]
+                            , type_ "button"
+                            , attribute "aria-label" colorSchemeToggleLabel
+                            , attribute "title" colorSchemeToggleLabel
+                            , onClick config.onToggleColorScheme
+                            ]
+                            [ span [ class "theme-toggle__icon theme-toggle__icon--sun" ] [ text "☀" ]
+                            , span [ class "theme-toggle__thumb" ] []
+                            , span [ class "theme-toggle__icon theme-toggle__icon--moon" ] [ text "☾" ]
+                            ]
+                        , AuthStatus.view
                             { authState = model.authState
                             , ledgerLoadState = model.ledgerLoadState
                             , onSignIn = config.onSignIn

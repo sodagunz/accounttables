@@ -24,6 +24,7 @@ import View.App as AppView
 type alias Messages msg =
     { reopenTutorial : msg
     , dismissTutorialCompletion : msg
+    , toggleColorScheme : msg
     , signIn : msg
     , signOut : msg
     , description : String -> msg
@@ -87,6 +88,7 @@ view messages =
     { localLedgerName = Ledger.localLedgerName
     , onReopenTutorial = messages.reopenTutorial
     , onDismissTutorialCompletion = messages.dismissTutorialCompletion
+    , onToggleColorScheme = messages.toggleColorScheme
     , onSignIn = messages.signIn
     , onSignOut = messages.signOut
     , onDescription = messages.description

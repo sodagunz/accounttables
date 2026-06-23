@@ -34,6 +34,10 @@ const LOCAL_LEDGER_KEY = "contabilizar:localLedger";
 const DEFAULT_LOCAL_LEDGER_NAME = "Libro contable de desconocido";
 const TUTORIAL_STATE_KEY = "contabilizar:tutorialState";
 const FILTER_WINDOW_KEY = "contabilizar:filterWindow";
+const COLOR_SCHEME_KEY = "contabilizar:colorScheme";
+
+const initialColorScheme = loadColorScheme();
+applyColorScheme(initialColorScheme);
 
 const app = Elm.Main.init({
   node: document.getElementById("app"),
@@ -41,6 +45,7 @@ const app = Elm.Main.init({
     ledger: loadStartupLedgerCache(),
     tutorialState: loadTutorialState(),
     filterWindow: loadFilterWindow(),
+    colorScheme: initialColorScheme,
   },
 });
 
@@ -71,6 +76,11 @@ app.ports.saveTutorialState.subscribe((state) => {
 
 app.ports.saveFilterWindowSelection.subscribe((filterWindow) => {
   saveFilterWindow(filterWindow);
+});
+
+app.ports.saveColorSchemeSelection.subscribe((colorScheme) => {
+  saveColorScheme(colorScheme);
+  applyColorScheme(colorScheme);
 });
 
 app.ports.generateExpenseId.subscribe(() => {
@@ -1644,6 +1654,29 @@ function saveFilterWindow(filterWindow) {
   } catch (error) {
     console.warn("Could not save filter window", error);
   }
+}
+
+function loadColorScheme() {
+  try {
+    return localStorage.getItem(COLOR_SCHEME_KEY) || "light";
+  } catch (error) {
+    console.warn("Could not load color scheme", error);
+    return "light";
+  }
+}
+
+function saveColorScheme(colorScheme) {
+  try {
+    localStorage.setItem(COLOR_SCHEME_KEY, String(colorScheme || "light"));
+  } catch (error) {
+    console.warn("Could not save color scheme", error);
+  }
+}
+
+function applyColorScheme(colorScheme) {
+  const normalized = colorScheme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = normalized;
+  document.documentElement.style.colorScheme = normalized;
 }
 
 function exchangeRateCacheKey(uid, ledgerId, casa, date) {

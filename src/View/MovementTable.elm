@@ -320,18 +320,21 @@ movementRow dateDisplay displayCurrency showInputAmountColumn showExchangeRateCo
                )
             ++ [ td
                     [ attribute "data-label" "Total"
-                    , classList
-                        [ ( "numeric", True )
-                        , ( "movement-total", True )
-                        , ( "movement-total--converted", isConverted )
-                        ]
+                    , class "numeric"
                     ]
-                    [ span [ class "movement-total__value" ] [ text (formatMoney displayCurrency totalValue) ]
-                    , if isConverted then
-                        span [ class "movement-total__badge" ] [ text ("Convertido a " ++ formatNumber movement.exchangeRate ++ " ARS/USD") ]
+                    [ div
+                        [ classList
+                            [ ( "movement-total", True )
+                            , ( "movement-total--converted", isConverted )
+                            ]
+                        ]
+                        [ span [ class "movement-total__value" ] [ text (formatMoney displayCurrency totalValue) ]
+                        , if isConverted then
+                            span [ class "movement-total__badge" ] [ text ("Convertido a " ++ formatNumber movement.exchangeRate ++ " ARS/USD") ]
 
-                      else
-                        text ""
+                          else
+                            text ""
+                        ]
                     ]
                , td [ class "action-cell", attribute "data-label" "" ]
                     [ div [ class "action-buttons" ]

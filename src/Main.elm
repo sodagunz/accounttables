@@ -12,7 +12,7 @@ import InvoiceReport
 import Json.Decode as Decode
 import Json.Encode as Encode
 import Ledger exposing (LoadState(..))
-import Model exposing (MigrationState(..), Model, TutorialState(..), TutorialStep(..))
+import Model exposing (ColorScheme(..), MigrationState(..), Model, TutorialState(..), TutorialStep(..))
 import Task
 import Time
 import Tutorial
@@ -74,6 +74,7 @@ type Msg
     | ConfirmLocalMigration
     | SkipLocalMigration
     | ReopenTutorial
+    | ToggleColorScheme
     | SelectViewMode Model.ViewMode
     | DismissTutorialCompletion
     | TutorialActionReceived Decode.Value
@@ -119,6 +120,9 @@ port saveLastAccountSelection : Encode.Value -> Cmd msg
 
 
 port saveFilterWindowSelection : String -> Cmd msg
+
+
+port saveColorSchemeSelection : String -> Cmd msg
 
 
 port appendEvent : Encode.Value -> Cmd msg
@@ -513,6 +517,21 @@ update msg model =
             in
             reopenResult
 
+        ToggleColorScheme ->
+            let
+                nextColorScheme : Model.ColorScheme
+                nextColorScheme =
+                    case model.colorScheme of
+                        LightScheme ->
+                            DarkScheme
+
+                        DarkScheme ->
+                            LightScheme
+            in
+            ( { model | colorScheme = nextColorScheme }
+            , saveColorSchemeSelection (Model.colorSchemeToString nextColorScheme)
+            )
+
         DismissTutorialCompletion ->
             ( { model | tutorialCompletionVisible = False }, Cmd.none )
 
@@ -633,6 +652,7 @@ messages : Config.Messages Msg
 messages =
     { reopenTutorial = ReopenTutorial
     , dismissTutorialCompletion = DismissTutorialCompletion
+    , toggleColorScheme = ToggleColorScheme
     , signIn = SignInWithGoogle
     , signOut = SignOut
     , description = UpdateDescription

@@ -25,11 +25,18 @@ modelFromFlags flags =
                 |> Result.map Accounting.filterWindowFromString
                 |> Result.withDefault initialModel.filterWindow
 
+        colorScheme : Model.ColorScheme
+        colorScheme =
+            Decode.decodeValue (Decode.field "colorScheme" Decode.string) flags
+                |> Result.map Model.colorSchemeFromString
+                |> Result.withDefault initialModel.colorScheme
+
         baseModel : Model
         baseModel =
             { initialModel
                 | tutorialState = tutorialState
                 , filterWindow = filterWindow
+                , colorScheme = colorScheme
             }
 
         ledgerResult : Result String Ledger.LedgerData

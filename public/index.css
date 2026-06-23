@@ -61,7 +61,7 @@
     --popover-bg: #262b29;
     --popover-border: #46504c;
     --summary-highlight-bg: var(--muted-surface);
-    --allocation-row-bg: var(--page-bg);
+    --allocation-row-bg: var(--field-bg);
     --selection-surface: #243a30;
     --success-surface: #243a30;
     --success-text: #7ee2a4;
@@ -206,7 +206,6 @@ h1 {
     justify-content: center;
     width: 22px;
     height: 22px;
-    font-size: 0.82rem;
 }
 
 .theme-toggle__icon--sun {
@@ -217,12 +216,29 @@ h1 {
     color: color-mix(in srgb, var(--header-text) 92%, transparent);
 }
 
-.theme-toggle--dark .theme-toggle__icon--sun {
-    color: #13201b;
-}
-
+.theme-toggle--dark .theme-toggle__icon--sun,
 .theme-toggle--dark .theme-toggle__icon--moon {
     color: #e6efea;
+}
+
+.theme-toggle__glyph {
+    position: relative;
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    background-color: currentColor;
+    -webkit-mask: var(--icon) no-repeat center;
+    mask: var(--icon) no-repeat center;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+}
+
+.theme-toggle__glyph--sun {
+    --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cg fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+.theme-toggle__glyph--moon {
+    --icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 3a6 6 0 0 0 9 9a9 9 0 1 1-9-9'/%3E%3C/svg%3E");
 }
 
 .theme-toggle__thumb {
@@ -1518,7 +1534,7 @@ td.is-negative,
 
 @media (max-width: 520px) {
     body {
-        background: #ffffff;
+        background: var(--page-bg);
     }
 
     .topbar {
@@ -1652,8 +1668,9 @@ td.is-negative,
     .expense-table tr {
         display: grid;
         gap: 8px;
-        border: 1px solid #dde7e2;
+        border: 1px solid var(--panel-border);
         border-radius: 8px;
+        background: var(--panel-bg);
         padding: 12px;
     }
 
@@ -1670,7 +1687,7 @@ td.is-negative,
 
     .expense-table td::before {
         content: attr(data-label);
-        color: #68756f;
+        color: var(--body-muted);
         font-size: 0.78rem;
         font-weight: 800;
         text-transform: uppercase;
@@ -1790,11 +1807,6 @@ td.is-negative,
 :root[data-theme="dark"] .migration-panel,
 :root[data-theme="dark"] .tutorial-done-banner {
     border-color: var(--panel-border);
-}
-
-:root[data-theme="dark"] .grand-total td {
-    background: #1e332a;
-    color: var(--page-text);
 }
 
 :root[data-theme="dark"] .brand-title__main {

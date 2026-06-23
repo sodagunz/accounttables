@@ -226,9 +226,9 @@ view config model =
                             , attribute "title" colorSchemeToggleLabel
                             , onClick config.onToggleColorScheme
                             ]
-                            [ span [ class "theme-toggle__icon theme-toggle__icon--sun" ] [ text "☀" ]
+                            [ span [ class "theme-toggle__icon theme-toggle__icon--sun" ] [ span [ class "theme-toggle__glyph theme-toggle__glyph--sun" ] [] ]
                             , span [ class "theme-toggle__thumb" ] []
-                            , span [ class "theme-toggle__icon theme-toggle__icon--moon" ] [ text "☾" ]
+                            , span [ class "theme-toggle__icon theme-toggle__icon--moon" ] [ span [ class "theme-toggle__glyph theme-toggle__glyph--moon" ] [] ]
                             ]
                         , AuthStatus.view
                             { authState = model.authState

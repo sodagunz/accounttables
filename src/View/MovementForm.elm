@@ -343,7 +343,7 @@ view config =
     in
     section [ class "panel movement-panel" ]
         [ Html.h2 [ class "section-title movement-title" ] [ text "Registrar movimiento" ]
-        , Html.form [ class "form-grid", attribute "data-tutorial" "movement-form", onSubmit config.onSubmit ]
+        , Html.form [ class "form-grid", onSubmit config.onSubmit ]
             [ label []
                 [ text "Importe"
                 , input
@@ -354,7 +354,6 @@ view config =
                     , attribute "aria-label" "Importe del movimiento"
                     , attribute "min" "0.01"
                     , step "0.01"
-                    , attribute "data-tutorial" "movement-amount"
                     , autofocus True
                     , value config.form.amount
                     , onInput config.onAmount

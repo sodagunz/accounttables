@@ -3,11 +3,11 @@ module View.App exposing (Config, view)
 import Accounting exposing (FilterWindow, Movement, SortField)
 import Auth exposing (AuthState(..))
 import Html exposing (Html, button, div, h1, header, label, main_, option, p, section, select, span, strong, text)
-import Html.Attributes exposing (class, classList, type_, value)
+import Html.Attributes exposing (attribute, class, classList, type_, value)
 import Html.Events exposing (onClick, onInput)
 import InvoiceReport
 import Ledger
-import Model exposing (MigrationState(..), Model, StorageMode(..), TutorialState(..), ViewMode(..))
+import Model exposing (ColorScheme(..), MigrationState(..), Model, StorageMode(..), ViewMode(..))
 import Util.Date exposing (DateDisplay)
 import View.AuthStatus as AuthStatus
 import View.InvoiceTable as InvoiceTable
@@ -19,8 +19,7 @@ import View.MovementTable as MovementTable
 
 type alias Config msg =
     { localLedgerName : String
-    , onReopenTutorial : msg
-    , onDismissTutorialCompletion : msg
+    , onToggleColorScheme : msg
     , onSignIn : msg
     , onSignOut : msg
     , onDescription : String -> msg
@@ -67,20 +66,27 @@ type alias Config msg =
 view : Config msg -> Model -> Html msg
 view config model =
     let
-        isTutorialOpen : Bool
-        isTutorialOpen =
-            case model.tutorialState of
-                TutorialOpen _ ->
-                    True
+        colorSchemeToggleLabel : String
+        colorSchemeToggleLabel =
+            case model.colorScheme of
+                LightScheme ->
+                    "Cambiar a modo oscuro"
 
-                _ ->
+                DarkScheme ->
+                    "Cambiar a modo claro"
+
+        isDarkScheme : Bool
+        isDarkScheme =
+            case model.colorScheme of
+                LightScheme ->
                     False
+
+                DarkScheme ->
+                    True
 
         mainContent : List (Html msg)
         mainContent =
-            [ reopenTutorialButton config model
-            , tutorialCompletionBanner config model
-            , migrationPrompt config model
+            [ migrationPrompt config model
             , localRiskBanner config model
             , div [ class "layout" ]
                 [ div [ class "input-area" ]
@@ -200,14 +206,26 @@ view config model =
             [ div [ class "topbar__inner" ]
                 [ div [ class "topbar__content" ]
                     [ div []
-                        [ h1 [] [ text "accounttables" ] ]
+                        [ h1 [ class "brand-title" ]
+                            [ span [ class "brand-title__main" ] [ text "account" ]
+                            , span [ class "brand-title__accent" ] [ text "tables" ]
+                            ]
+                        ]
                     , div [ class "topbar__actions" ]
-                        [ if isTutorialOpen then
-                            text ""
-
-                          else
-                            button [ class "topbar-setup-button", type_ "button", onClick config.onReopenTutorial ]
-                                [ text "Configuracion inicial" ]
+                        [ button
+                            [ classList
+                                [ ( "theme-toggle", True )
+                                , ( "theme-toggle--dark", isDarkScheme )
+                                ]
+                            , type_ "button"
+                            , attribute "aria-label" colorSchemeToggleLabel
+                            , attribute "title" colorSchemeToggleLabel
+                            , onClick config.onToggleColorScheme
+                            ]
+                            [ span [ class "theme-toggle__icon theme-toggle__icon--sun" ] [ span [ class "theme-toggle__glyph theme-toggle__glyph--sun" ] [] ]
+                            , span [ class "theme-toggle__thumb" ] []
+                            , span [ class "theme-toggle__icon theme-toggle__icon--moon" ] [ span [ class "theme-toggle__glyph theme-toggle__glyph--moon" ] [] ]
+                            ]
                         , AuthStatus.view
                             { authState = model.authState
                             , ledgerLoadState = model.ledgerLoadState
@@ -220,32 +238,6 @@ view config model =
             ]
         , main_ [] mainContent
         ]
-
-
-tutorialCompletionBanner : Config msg -> Model -> Html msg
-tutorialCompletionBanner config model =
-    if model.tutorialCompletionVisible then
-        section [ class "tutorial-done-banner" ]
-            [ strong [] [ text "Listo" ]
-            , span [] [ text "Ya puedes empezar a registrar movimientos." ]
-            , button [ type_ "button", onClick config.onDismissTutorialCompletion ] [ text "Cerrar" ]
-            ]
-
-    else
-        text ""
-
-
-reopenTutorialButton : Config msg -> Model -> Html msg
-reopenTutorialButton config model =
-    case model.tutorialState of
-        TutorialOpen _ ->
-            text ""
-
-        _ ->
-            section [ class "setup-shortcut" ]
-                [ button [ class "setup-shortcut__button", type_ "button", onClick config.onReopenTutorial ]
-                    [ text "Abrir configuracion inicial" ]
-                ]
 
 
 migrationPrompt : Config msg -> Model -> Html msg

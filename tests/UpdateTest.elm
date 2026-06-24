@@ -323,8 +323,6 @@ movementsConfig =
     { generateExpenseId = Cmd.none
     , appendEvent = \_ _ -> Cmd.none
     , saveLastAccount = \_ _ -> Cmd.none
-    , navigateTutorial = \_ model -> ( model, Cmd.none )
-    , completeTutorial = Cmd.none
     }
 
 

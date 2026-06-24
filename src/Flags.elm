@@ -4,17 +4,12 @@ import Accounting
 import Json.Decode as Decode
 import Ledger
 import Model exposing (Model)
-import Tutorial
 import Update.LedgerData as LedgerData
 
 
 modelFromFlags : Decode.Value -> Model
 modelFromFlags flags =
     let
-        tutorialState : Model.TutorialState
-        tutorialState =
-            Tutorial.decodeTutorialStateFromFlags flags
-
         initialModel : Model
         initialModel =
             Model.initial
@@ -25,11 +20,17 @@ modelFromFlags flags =
                 |> Result.map Accounting.filterWindowFromString
                 |> Result.withDefault initialModel.filterWindow
 
+        colorScheme : Model.ColorScheme
+        colorScheme =
+            Decode.decodeValue (Decode.field "colorScheme" Decode.string) flags
+                |> Result.map Model.colorSchemeFromString
+                |> Result.withDefault initialModel.colorScheme
+
         baseModel : Model
         baseModel =
             { initialModel
-                | tutorialState = tutorialState
-                , filterWindow = filterWindow
+                | filterWindow = filterWindow
+                , colorScheme = colorScheme
             }
 
         ledgerResult : Result String Ledger.LedgerData

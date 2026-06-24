@@ -1,13 +1,14 @@
 module Model exposing
-    ( MigrationState(..)
+    ( ColorScheme(..)
+    , MigrationState(..)
     , Model
     , StorageMode(..)
-    , TutorialState(..)
-    , TutorialStep(..)
     , ViewMode(..)
     , activeAccounts
     , activeAccountsFromList
     , activeMovements
+    , colorSchemeFromString
+    , colorSchemeToString
     , ensureSelectedAccount
     , initial
     , ledgerNameFor
@@ -56,10 +57,8 @@ type alias Model =
     , showInputAmountColumn : Bool
     , showExchangeRateColumn : Bool
     , migrationState : MigrationState
-    , tutorialState : TutorialState
-    , tutorialCompletionVisible : Bool
-    , tutorialMovementId : Maybe String
     , viewMode : ViewMode
+    , colorScheme : ColorScheme
     }
 
 
@@ -75,23 +74,34 @@ type MigrationState
     | UploadingMigration String
 
 
-type TutorialStep
-    = SignInStep
-    | AccountsStep
-    | CollaboratorsStep
-    | FirstMovementStep
-    | DeleteMovementStep
-
-
-type TutorialState
-    = TutorialOpen TutorialStep
-    | TutorialDismissed
-    | TutorialCompleted
-
-
 type ViewMode
     = CashflowView
     | InvoiceView
+
+
+type ColorScheme
+    = LightScheme
+    | DarkScheme
+
+
+colorSchemeFromString : String -> ColorScheme
+colorSchemeFromString value =
+    case value of
+        "dark" ->
+            DarkScheme
+
+        _ ->
+            LightScheme
+
+
+colorSchemeToString : ColorScheme -> String
+colorSchemeToString colorScheme =
+    case colorScheme of
+        LightScheme ->
+            "light"
+
+        DarkScheme ->
+            "dark"
 
 
 initial : Model
@@ -125,10 +135,8 @@ initial =
     , showInputAmountColumn = False
     , showExchangeRateColumn = False
     , migrationState = NoMigration
-    , tutorialState = TutorialOpen SignInStep
-    , tutorialCompletionVisible = False
-    , tutorialMovementId = Nothing
     , viewMode = CashflowView
+    , colorScheme = LightScheme
     }
 
 
@@ -188,12 +196,16 @@ ensureSelectedAccount model =
                 { model | form = Accounting.setAccount account.id model.form }
 
             [] ->
-                { model | form = Accounting.setAccount "" model.form }
+                model
 
 
 selectedLedgerId : Model -> String
 selectedLedgerId model =
-    model.currentLedgerId
+    if model.currentLedgerId == "" then
+        Ledger.localLedgerId
+
+    else
+        model.currentLedgerId
 
 
 ledgerNameFor : String -> List Ledger.LedgerSummary -> String

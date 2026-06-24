@@ -2,7 +2,7 @@ module View.LedgerAccess exposing (Config, view)
 
 import Auth
 import Html exposing (Html, button, div, input, label, li, option, p, section, select, span, strong, text, ul)
-import Html.Attributes exposing (attribute, class, id, placeholder, type_, value)
+import Html.Attributes exposing (class, id, placeholder, type_, value)
 import Html.Events exposing (onClick, onInput, onSubmit)
 import Ledger exposing (LedgerSummary, Member)
 
@@ -164,7 +164,6 @@ inviteForm config =
                 Html.form [ class "inline-form", onSubmit config.onInvite ]
                     [ input
                         [ type_ "email"
-                        , attribute "data-tutorial" "invite-email"
                         , placeholder "Invitar por email"
                         , value config.inviteEmail
                         , onInput config.onInviteEmail

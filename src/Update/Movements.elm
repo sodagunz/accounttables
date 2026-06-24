@@ -12,7 +12,7 @@ import Accounting
 import Events
 import InvoiceAllocation
 import Json.Decode as Decode
-import Model exposing (Model, TutorialState(..), TutorialStep(..))
+import Model exposing (Model)
 import Projector
 
 
@@ -20,8 +20,6 @@ type alias Config msg =
     { generateExpenseId : Cmd msg
     , appendEvent : String -> Events.Event -> Cmd msg
     , saveLastAccount : String -> String -> Cmd msg
-    , navigateTutorial : TutorialStep -> Model -> ( Model, Cmd msg )
-    , completeTutorial : Cmd msg
     }
 
 
@@ -275,28 +273,8 @@ persistMovement config readyModel movement =
         updatedModel : Model
         updatedModel =
             Tuple.second eventAndUpdatedModel
-
-        isNewMovement : Bool
-        isNewMovement =
-            readyModel.form.editingId == Nothing
-
-        advanceResult : ( Model, Cmd msg )
-        advanceResult =
-            if isNewMovement then
-                case updatedModel.tutorialState of
-                    TutorialOpen FirstMovementStep ->
-                        config.navigateTutorial DeleteMovementStep { updatedModel | tutorialMovementId = Just movement.id }
-
-                    _ ->
-                        ( updatedModel, Cmd.none )
-
-            else
-                ( updatedModel, Cmd.none )
-
-        ( modelAfterAdvance, advanceCmd ) =
-            advanceResult
     in
-    ( { modelAfterAdvance
+    ( { updatedModel
         | form =
             { description = ""
             , amount = ""
@@ -314,7 +292,6 @@ persistMovement config readyModel movement =
     , Cmd.batch
         [ config.appendEvent readyModel.currentLedgerId event
         , config.saveLastAccount readyModel.currentLedgerId readyModel.form.accountId
-        , advanceCmd
         ]
     )
 
@@ -322,15 +299,6 @@ persistMovement config readyModel movement =
 delete : Config msg -> String -> Model -> ( Model, Cmd msg )
 delete config movementId model =
     let
-        isTutorialDelete : Bool
-        isTutorialDelete =
-            case ( model.tutorialState, model.tutorialMovementId ) of
-                ( TutorialOpen DeleteMovementStep, Just tutorialMovementId ) ->
-                    tutorialMovementId == movementId
-
-                _ ->
-                    False
-
         event : Events.Event
         event =
             Events.MovementDeletedEvent 0 { movementId = movementId }
@@ -346,27 +314,12 @@ delete config movementId model =
                         movement
                 )
                 model.expenses
-
-        baseModel : Model
-        baseModel =
-            { model
-                | events = event :: model.events
-                , expenses = Model.activeMovements updatedMovements
-            }
     in
-    ( if isTutorialDelete then
-        { baseModel | tutorialState = TutorialCompleted, tutorialCompletionVisible = True, tutorialMovementId = Nothing }
-
-      else
-        baseModel
-    , Cmd.batch
-        [ config.appendEvent model.currentLedgerId event
-        , if isTutorialDelete then
-            config.completeTutorial
-
-          else
-            Cmd.none
-        ]
+    ( { model
+        | events = event :: model.events
+        , expenses = Model.activeMovements updatedMovements
+      }
+    , config.appendEvent model.currentLedgerId event
     )
 
 

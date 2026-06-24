@@ -4,7 +4,6 @@ module Config exposing
     , authUpdate
     , ledgerData
     , movements
-    , tutorial
     , view
     )
 
@@ -13,7 +12,6 @@ import Events
 import Json.Encode as Encode
 import Ledger
 import Model exposing (ViewMode)
-import Tutorial
 import Update.Auth as AuthUpdate
 import Update.LedgerData as LedgerData
 import Update.Movements as Movements
@@ -22,8 +20,7 @@ import View.App as AppView
 
 
 type alias Messages msg =
-    { reopenTutorial : msg
-    , dismissTutorialCompletion : msg
+    { toggleColorScheme : msg
     , signIn : msg
     , signOut : msg
     , description : String -> msg
@@ -68,12 +65,7 @@ type alias Messages msg =
 
 
 type alias Ports msg =
-    { showTutorialStep : Encode.Value -> Cmd msg
-    , openDisclosure : String -> Cmd msg
-    , focusElement : String -> Cmd msg
-    , hideTutorial : () -> Cmd msg
-    , saveTutorialState : Encode.Value -> Cmd msg
-    , mergeLocalLedgerToFirestore : Encode.Value -> Cmd msg
+    { mergeLocalLedgerToFirestore : Encode.Value -> Cmd msg
     , prepareLocalMigration : () -> Cmd msg
     , loadLedgerData : Encode.Value -> Cmd msg
     , generateExpenseId : () -> Cmd msg
@@ -85,8 +77,7 @@ type alias Ports msg =
 view : Messages msg -> AppView.Config msg
 view messages =
     { localLedgerName = Ledger.localLedgerName
-    , onReopenTutorial = messages.reopenTutorial
-    , onDismissTutorialCompletion = messages.dismissTutorialCompletion
+    , onToggleColorScheme = messages.toggleColorScheme
     , onSignIn = messages.signIn
     , onSignOut = messages.signOut
     , onDescription = messages.description
@@ -130,40 +121,22 @@ view messages =
     }
 
 
-tutorial : Ports msg -> Tutorial.Config msg
-tutorial ports =
-    { showStep = ports.showTutorialStep
-    , openDisclosure = ports.openDisclosure
-    , focusElement = ports.focusElement
-    , hide = ports.hideTutorial
-    , saveState = ports.saveTutorialState
-    }
-
-
-ledgerData : Tutorial.Config msg -> Ports msg -> LedgerData.Config msg
-ledgerData tutorialConfig ports =
-    { navigateTutorial = Tutorial.tutorialNavigateCmd tutorialConfig
-    , mergeLocalLedgerToFirestore =
+ledgerData : Ports msg -> LedgerData.Config msg
+ledgerData ports =
+    { mergeLocalLedgerToFirestore =
         \ledgerId -> ports.mergeLocalLedgerToFirestore (Ledger.encodeLedgerRequest ledgerId)
     }
 
 
-authUpdate : Tutorial.Config msg -> Ports msg -> AuthUpdate.Config msg
-authUpdate tutorialConfig ports =
+authUpdate : Ports msg -> AuthUpdate.Config msg
+authUpdate ports =
     { prepareLocalMigration = ports.prepareLocalMigration ()
     , loadLedgerData = \ledgerId -> ports.loadLedgerData (Ledger.encodeLedgerRequest ledgerId)
-    , completeTutorial =
-        Cmd.batch
-            [ ports.hideTutorial ()
-            , ports.saveTutorialState (Encode.string "completed")
-            ]
-    , tutorialAdvanceCmd = Tutorial.tutorialAdvanceCmd tutorialConfig
-    , tutorialNavigateCmd = Tutorial.tutorialNavigateCmd tutorialConfig
     }
 
 
-movements : Tutorial.Config msg -> Ports msg -> Movements.Config msg
-movements tutorialConfig ports =
+movements : Ports msg -> Movements.Config msg
+movements ports =
     { generateExpenseId = ports.generateExpenseId ()
     , appendEvent =
         \ledgerId event ->
@@ -174,10 +147,4 @@ movements tutorialConfig ports =
                     ]
                 )
     , saveLastAccount = ports.saveLastAccount
-    , navigateTutorial = Tutorial.tutorialNavigateTo tutorialConfig
-    , completeTutorial =
-        Cmd.batch
-            [ ports.hideTutorial ()
-            , ports.saveTutorialState (Encode.string "completed")
-            ]
     }
